@@ -1,0 +1,387 @@
+{
+  "meta": {
+    "title": "3",
+    "created_at": "2026-02-20T19:01:43.024434+00:00"
+  },
+  "form": {
+    "Procesetf": "processall",
+    "CloseBool": "Close",
+    "csrf_token": "IjllMWZlNzM3NTA0MTIzNjFhMDE1ZTA3NjJhZGViZWFjZTI3NzVlYjIi.aZigKg.dIqutHgKu8t_7o1X_v0UKrEweYQ",
+    "FastSMA_tf": "1 day",
+    "FastSMA": "5",
+    "ComparisonFastSMA": "greater",
+    "PercentageFastSMA": "0",
+    "SMAFastBool": "percentage",
+    "MediumSMA_tf": "1 day",
+    "MediumSMA": "50",
+    "ComparisonMediumSMA": "greater",
+    "PercentageMediumSMA": "0",
+    "SMAMediumBool": "value",
+    "SlowSMA_tf": "1 day",
+    "SlowSMA": "200",
+    "ComparisonSlowSMA": "greater",
+    "PercentageSlowSMA": "0",
+    "smaslowyesno": "value",
+    "VWAP_tf": "1 day",
+    "VWAP": "14",
+    "ComparisonVWAP": "lower",
+    "PercentageVWAP": "0",
+    "VWAPBool": "percentage",
+    "RSI_tf": "1 day",
+    "RSI": "14",
+    "ComparisonRSI": "greater",
+    "PercentageRSI": "0",
+    "rsiyesno": "value",
+    "FastEMA_tf": "1 min",
+    "FastEMA": "8",
+    "ComparisonFastEMA": "greater",
+    "PercentageFastEMA": "0",
+    "FastEMABool": "value",
+    "SlowEMA_tf": "1 min",
+    "SlowEMA": "24",
+    "ComparisonSlowEMA": "greater",
+    "PercentageSlowEMA": "0",
+    "SlowEMABool": "value",
+    "OBV_tf": "1 day",
+    "OBV": "5",
+    "ComparisonOBV": "greater",
+    "PercentageOBV": "0",
+    "OBVBool": "value",
+    "ATR_tf": "1 day",
+    "ATR": "5",
+    "ComparisonATR": "greater",
+    "PercentageATR": "0",
+    "ATRBool": "value",
+    "PrevClose": "0",
+    "ComparisonPrevClose": "lower",
+    "PercentagePrevClose": "10",
+    "PrevCloseBool": "percentage",
+    "LowOfDay": "0",
+    "ComparisonLowOfDay": "greater",
+    "PercentageLowOfDay": "0",
+    "LowOfDayBool": "value",
+    "HighOfDay": "0",
+    "ComparisonHighOfDay": "greater",
+    "PercentageHighOfDay": "0",
+    "HighOfDayBool": "value",
+    "averageVolume_tf": "1 day",
+    "AverageVolume": "5",
+    "ComparisonAverageVolume": "greater",
+    "PercentageAverageVolume": "0",
+    "averageVolumeBool": "value",
+    "relativeVolume_tf": "1 day",
+    "RelativeVolume": "5",
+    "ComparisonRelativeVolume": "greater",
+    "PercentageRelativeVolume": "0",
+    "relativeVolumeyesno": "value",
+    "PivotPoint": "PP",
+    "ComparisonPivotPoint": "greater",
+    "PercentagePivotPoint": "0",
+    "pivotPointBool": "value",
+    "Pricelevel": "pricelow",
+    "ComparisonPrice": "greater",
+    "PercentagePrice": "0"
+  },
+  "securities": {
+    "cusip": [
+      "802899500",
+      "87601V101",
+      "58404N307",
+      "83193F109",
+      "G6S34K113",
+      "23342U102",
+      "750102105",
+      "56270V205",
+      "G45806109",
+      "89237U101",
+      "875372203",
+      "03211Q143",
+      "76680R206",
+      "361008105",
+      "26923Q465",
+      "68627M101",
+      "125405506",
+      "G6593L122",
+      "18452H305",
+      "47012E403",
+      "828061101",
+      "150042109",
+      "76674Q107",
+      "G0369L200",
+      "27005B103",
+      "10501E300",
+      "G4236L138",
+      "04681Y103",
+      "824567606",
+      "G9094C104",
+      "00246W103",
+      "452536402",
+      "G6421C120",
+      "64118P109",
+      "66987P409",
+      "500688106",
+      "834212201",
+      "81728A207",
+      "307357103",
+      "64051A101",
+      "001218155",
+      "98944F109"
+    ],
+    "ticker": [
+      "GROO",
+      "TAPP",
+      "MEDAF",
+      "RBLK",
+      "ABTS",
+      "DLTI",
+      "RXT",
+      "MGRX",
+      "HTLM",
+      "TFGL",
+      "TNDM",
+      "AMPG.RT.B",
+      "RNG",
+      "FNKO",
+      "CORD",
+      "ORIB",
+      "CGXEF",
+      "AIOS",
+      "CETY",
+      "JAKK",
+      "TARSF",
+      "MTTRY",
+      "RMNI",
+      "ANGH",
+      "EAXR",
+      "BCLI",
+      "GFAI",
+      "ASIC",
+      "SISI",
+      "TROO",
+      "AXTI",
+      "IMUC",
+      "NCI",
+      "NLST",
+      "NBY",
+      "KOS",
+      "STI",
+      "SNSE",
+      "CPPKF",
+      "NTHI",
+      "NSRX",
+      "ZEO"
+    ],
+    "CSV": [
+      {
+        "cusip": "802899500",
+        "ticker": "GROO",
+        "change": 0
+      },
+      {
+        "cusip": "87601V101",
+        "ticker": "TAPP",
+        "change": 0
+      },
+      {
+        "cusip": "58404N307",
+        "ticker": "MEDAF",
+        "change": 0
+      },
+      {
+        "cusip": "83193F109",
+        "ticker": "RBLK",
+        "change": 0
+      },
+      {
+        "cusip": "G6S34K113",
+        "ticker": "ABTS",
+        "change": 0
+      },
+      {
+        "cusip": "23342U102",
+        "ticker": "DLTI",
+        "change": 0
+      },
+      {
+        "cusip": "750102105",
+        "ticker": "RXT",
+        "change": 0
+      },
+      {
+        "cusip": "56270V205",
+        "ticker": "MGRX",
+        "change": 0
+      },
+      {
+        "cusip": "G45806109",
+        "ticker": "HTLM",
+        "change": 0
+      },
+      {
+        "cusip": "89237U101",
+        "ticker": "TFGL",
+        "change": 0
+      },
+      {
+        "cusip": "875372203",
+        "ticker": "TNDM",
+        "change": 0
+      },
+      {
+        "cusip": "03211Q143",
+        "ticker": "AMPG.RT.B",
+        "change": 0
+      },
+      {
+        "cusip": "76680R206",
+        "ticker": "RNG",
+        "change": 0
+      },
+      {
+        "cusip": "361008105",
+        "ticker": "FNKO",
+        "change": 0
+      },
+      {
+        "cusip": "26923Q465",
+        "ticker": "CORD",
+        "change": 0
+      },
+      {
+        "cusip": "68627M101",
+        "ticker": "ORIB",
+        "change": 0
+      },
+      {
+        "cusip": "125405506",
+        "ticker": "CGXEF",
+        "change": 0
+      },
+      {
+        "cusip": "G6593L122",
+        "ticker": "AIOS",
+        "change": 0
+      },
+      {
+        "cusip": "18452H305",
+        "ticker": "CETY",
+        "change": 0
+      },
+      {
+        "cusip": "47012E403",
+        "ticker": "JAKK",
+        "change": 0
+      },
+      {
+        "cusip": "828061101",
+        "ticker": "TARSF",
+        "change": 0
+      },
+      {
+        "cusip": "150042109",
+        "ticker": "MTTRY",
+        "change": 0
+      },
+      {
+        "cusip": "76674Q107",
+        "ticker": "RMNI",
+        "change": 0
+      },
+      {
+        "cusip": "G0369L200",
+        "ticker": "ANGH",
+        "change": 0
+      },
+      {
+        "cusip": "27005B103",
+        "ticker": "EAXR",
+        "change": 0
+      },
+      {
+        "cusip": "10501E300",
+        "ticker": "BCLI",
+        "change": 0
+      },
+      {
+        "cusip": "G4236L138",
+        "ticker": "GFAI",
+        "change": 0
+      },
+      {
+        "cusip": "04681Y103",
+        "ticker": "ASIC",
+        "change": 0
+      },
+      {
+        "cusip": "824567606",
+        "ticker": "SISI",
+        "change": 0
+      },
+      {
+        "cusip": "G9094C104",
+        "ticker": "TROO",
+        "change": 0
+      },
+      {
+        "cusip": "00246W103",
+        "ticker": "AXTI",
+        "change": 0
+      },
+      {
+        "cusip": "452536402",
+        "ticker": "IMUC",
+        "change": 0
+      },
+      {
+        "cusip": "G6421C120",
+        "ticker": "NCI",
+        "change": 0
+      },
+      {
+        "cusip": "64118P109",
+        "ticker": "NLST",
+        "change": 0
+      },
+      {
+        "cusip": "66987P409",
+        "ticker": "NBY",
+        "change": 0
+      },
+      {
+        "cusip": "500688106",
+        "ticker": "KOS",
+        "change": 0
+      },
+      {
+        "cusip": "834212201",
+        "ticker": "STI",
+        "change": 0
+      },
+      {
+        "cusip": "81728A207",
+        "ticker": "SNSE",
+        "change": 0
+      },
+      {
+        "cusip": "307357103",
+        "ticker": "CPPKF",
+        "change": 0
+      },
+      {
+        "cusip": "64051A101",
+        "ticker": "NTHI",
+        "change": 0
+      },
+      {
+        "cusip": "001218155",
+        "ticker": "NSRX",
+        "change": 0
+      },
+      {
+        "cusip": "98944F109",
+        "ticker": "ZEO",
+        "change": 0
+      }
+    ]
+  }
+}

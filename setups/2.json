@@ -1,0 +1,324 @@
+{
+  "meta": {
+    "title": "2",
+    "created_at": "2026-02-20T15:51:54.125975+00:00"
+  },
+  "form": {
+    "Procesetf": "processall",
+    "CloseBool": "Close",
+    "csrf_token": "IjllMWZlNzM3NTA0MTIzNjFhMDE1ZTA3NjJhZGViZWFjZTI3NzVlYjIi.aZhwVQ.7rB-Ew_xY278SUxvkerJAVhULSQ",
+    "FastSMA_tf": "1 day",
+    "FastSMA": "5",
+    "ComparisonFastSMA": "greater",
+    "PercentageFastSMA": "0",
+    "SMAFastBool": "percentage",
+    "MediumSMA_tf": "5 min",
+    "MediumSMA": "200",
+    "ComparisonMediumSMA": "greater",
+    "PercentageMediumSMA": "0",
+    "SMAMediumBool": "percentage",
+    "SlowSMA_tf": "1 day",
+    "SlowSMA": "200",
+    "ComparisonSlowSMA": "greater",
+    "PercentageSlowSMA": "0",
+    "smaslowyesno": "percentage",
+    "VWAP_tf": "1 day",
+    "VWAP": "5",
+    "ComparisonVWAP": "greater",
+    "PercentageVWAP": "0",
+    "VWAPBool": "percentage",
+    "RSI_tf": "1 day",
+    "RSI": "14",
+    "ComparisonRSI": "Not used",
+    "PercentageRSI": "0",
+    "rsiyesno": "value",
+    "FastEMA_tf": "5 min",
+    "FastEMA": "24",
+    "ComparisonFastEMA": "lower",
+    "PercentageFastEMA": "0",
+    "FastEMABool": "value",
+    "SlowEMA_tf": "5 min",
+    "SlowEMA": "60",
+    "ComparisonSlowEMA": "greater",
+    "PercentageSlowEMA": "0",
+    "SlowEMABool": "value",
+    "OBV_tf": "1 day",
+    "OBV": "5",
+    "ComparisonOBV": "greater",
+    "PercentageOBV": "0",
+    "OBVBool": "value",
+    "ATR_tf": "1 day",
+    "ATR": "5",
+    "ComparisonATR": "Not used",
+    "PercentageATR": "0",
+    "ATRBool": "value",
+    "PrevClose": "0",
+    "ComparisonPrevClose": "greater",
+    "PercentagePrevClose": "0",
+    "PrevCloseBool": "value",
+    "LowOfDay": "0",
+    "ComparisonLowOfDay": "greater",
+    "PercentageLowOfDay": "0",
+    "LowOfDayBool": "value",
+    "HighOfDay": "0",
+    "ComparisonHighOfDay": "greater",
+    "PercentageHighOfDay": "0",
+    "HighOfDayBool": "value",
+    "averageVolume_tf": "1 day",
+    "AverageVolume": "5",
+    "ComparisonAverageVolume": "greater",
+    "PercentageAverageVolume": "0",
+    "averageVolumeBool": "value",
+    "relativeVolume_tf": "1 day",
+    "RelativeVolume": "5",
+    "ComparisonRelativeVolume": "greater",
+    "PercentageRelativeVolume": "0",
+    "relativeVolumeyesno": "value",
+    "PivotPoint": "PP",
+    "ComparisonPivotPoint": "greater",
+    "PercentagePivotPoint": "0",
+    "pivotPointBool": "value",
+    "Pricelevel": "pricelow",
+    "ComparisonPrice": "greater",
+    "PercentagePrice": "0"
+  },
+  "securities": {
+    "cusip": [
+      "239360100",
+      "256918103",
+      "411292204",
+      "413160102",
+      "500688106",
+      "750102105",
+      "816307300",
+      "875372203",
+      "04681Y103",
+      "08975P108",
+      "14159C202",
+      "20678X403",
+      "26923W298",
+      "29103K100",
+      "29414V308",
+      "30334J128",
+      "34984V209",
+      "39540F309",
+      "45259L205",
+      "45569U101",
+      "46092D483",
+      "46092D541",
+      "47012E403",
+      "56270V205",
+      "57403M104",
+      "63903R106",
+      "68347P103",
+      "76680R206",
+      "82670R305",
+      "87961M105",
+      "88340F845",
+      "98139A105",
+      "98980W107"
+    ],
+    "ticker": [
+      "DWSN",
+      "DTCX",
+      "GITS",
+      "HLIT",
+      "KOS",
+      "RXT",
+      "SLQT",
+      "TNDM",
+      "ASIC",
+      "CMRC",
+      "CDIO",
+      "CDT",
+      "UFOD",
+      "FLD",
+      "EVTV",
+      "FGMCR",
+      "FET",
+      "GRNQ",
+      "IBO",
+      "INDI",
+      "OPEX",
+      "CELT",
+      "JAKK",
+      "MGRX",
+      "MGLD",
+      "NWGL",
+      "OPAL",
+      "RNG",
+      "SGN",
+      "TLX",
+      "OPEG",
+      "WK",
+      "ZSPC"
+    ],
+    "CSV": [
+      {
+        "cusip": "239360100",
+        "ticker": "DWSN",
+        "change": 0
+      },
+      {
+        "cusip": "256918103",
+        "ticker": "DTCX",
+        "change": 0
+      },
+      {
+        "cusip": "411292204",
+        "ticker": "GITS",
+        "change": 0
+      },
+      {
+        "cusip": "413160102",
+        "ticker": "HLIT",
+        "change": 0
+      },
+      {
+        "cusip": "500688106",
+        "ticker": "KOS",
+        "change": 0
+      },
+      {
+        "cusip": "750102105",
+        "ticker": "RXT",
+        "change": 0
+      },
+      {
+        "cusip": "816307300",
+        "ticker": "SLQT",
+        "change": 0
+      },
+      {
+        "cusip": "875372203",
+        "ticker": "TNDM",
+        "change": 0
+      },
+      {
+        "cusip": "04681Y103",
+        "ticker": "ASIC",
+        "change": 0
+      },
+      {
+        "cusip": "08975P108",
+        "ticker": "CMRC",
+        "change": 0
+      },
+      {
+        "cusip": "14159C202",
+        "ticker": "CDIO",
+        "change": 0
+      },
+      {
+        "cusip": "20678X403",
+        "ticker": "CDT",
+        "change": 0
+      },
+      {
+        "cusip": "26923W298",
+        "ticker": "UFOD",
+        "change": 0
+      },
+      {
+        "cusip": "29103K100",
+        "ticker": "FLD",
+        "change": 0
+      },
+      {
+        "cusip": "29414V308",
+        "ticker": "EVTV",
+        "change": 0
+      },
+      {
+        "cusip": "30334J128",
+        "ticker": "FGMCR",
+        "change": 0
+      },
+      {
+        "cusip": "34984V209",
+        "ticker": "FET",
+        "change": 0
+      },
+      {
+        "cusip": "39540F309",
+        "ticker": "GRNQ",
+        "change": 0
+      },
+      {
+        "cusip": "45259L205",
+        "ticker": "IBO",
+        "change": 0
+      },
+      {
+        "cusip": "45569U101",
+        "ticker": "INDI",
+        "change": 0
+      },
+      {
+        "cusip": "46092D483",
+        "ticker": "OPEX",
+        "change": 0
+      },
+      {
+        "cusip": "46092D541",
+        "ticker": "CELT",
+        "change": 0
+      },
+      {
+        "cusip": "47012E403",
+        "ticker": "JAKK",
+        "change": 0
+      },
+      {
+        "cusip": "56270V205",
+        "ticker": "MGRX",
+        "change": 0
+      },
+      {
+        "cusip": "57403M104",
+        "ticker": "MGLD",
+        "change": 0
+      },
+      {
+        "cusip": "63903R106",
+        "ticker": "NWGL",
+        "change": 0
+      },
+      {
+        "cusip": "68347P103",
+        "ticker": "OPAL",
+        "change": 0
+      },
+      {
+        "cusip": "76680R206",
+        "ticker": "RNG",
+        "change": 0
+      },
+      {
+        "cusip": "82670R305",
+        "ticker": "SGN",
+        "change": 0
+      },
+      {
+        "cusip": "87961M105",
+        "ticker": "TLX",
+        "change": 0
+      },
+      {
+        "cusip": "88340F845",
+        "ticker": "OPEG",
+        "change": 0
+      },
+      {
+        "cusip": "98139A105",
+        "ticker": "WK",
+        "change": 0
+      },
+      {
+        "cusip": "98980W107",
+        "ticker": "ZSPC",
+        "change": 0
+      }
+    ]
+  }
+}

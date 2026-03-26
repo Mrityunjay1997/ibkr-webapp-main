@@ -1,0 +1,345 @@
+{
+  "meta": {
+    "title": "upside shape up less than 15% long ideas",
+    "created_at": "2026-03-12T21:26:15.035889+00:00"
+  },
+  "form": {
+    "Procesetf": "processall",
+    "CloseBool": "Close",
+    "csrf_token": "IjllMWZlNzM3NTA0MTIzNjFhMDE1ZTA3NjJhZGViZWFjZTI3NzVlYjIi.abMfJA.q4jS2DlUQxIiUI9mI5-prWxlvsw",
+    "FastSMA_tf": "1 day",
+    "FastSMA": "5",
+    "ComparisonFastSMA": "greater",
+    "PercentageFastSMA": "0",
+    "SMAFastBool": "percentage",
+    "MediumSMA_tf": "1 day",
+    "MediumSMA": "50",
+    "ComparisonMediumSMA": "greater",
+    "PercentageMediumSMA": "0",
+    "SMAMediumBool": "percentage",
+    "SlowSMA_tf": "1 day",
+    "SlowSMA": "200",
+    "ComparisonSlowSMA": "greater",
+    "PercentageSlowSMA": "0",
+    "smaslowyesno": "percentage",
+    "VWAP_tf": "1 day",
+    "VWAP": "5",
+    "ComparisonVWAP": "greater",
+    "PercentageVWAP": "0",
+    "VWAPBool": "percentage",
+    "RSI_tf": "1 day",
+    "RSI": "14",
+    "ComparisonRSI": "lower",
+    "PercentageRSI": "60",
+    "rsiyesno": "percentage",
+    "FastEMA_tf": "1 day",
+    "FastEMA": "5",
+    "ComparisonFastEMA": "greater",
+    "PercentageFastEMA": "0",
+    "FastEMABool": "percentage",
+    "SlowEMA_tf": "1 day",
+    "SlowEMA": "10",
+    "ComparisonSlowEMA": "greater",
+    "PercentageSlowEMA": "0",
+    "SlowEMABool": "percentage",
+    "OBV_tf": "1 day",
+    "OBV": "5",
+    "ComparisonOBV": "greater",
+    "PercentageOBV": "0",
+    "OBVBool": "percentage",
+    "ATR_tf": "1 day",
+    "ATR": "5",
+    "ComparisonATR": "greater",
+    "PercentageATR": "0",
+    "ATRBool": "percentage",
+    "PrevClose": "0",
+    "ComparisonPrevClose": "lower",
+    "PercentagePrevClose": "15",
+    "PrevCloseBool": "percentage",
+    "LowOfDay": "0",
+    "ComparisonLowOfDay": "greater",
+    "PercentageLowOfDay": "0",
+    "LowOfDayBool": "value",
+    "HighOfDay": "0",
+    "ComparisonHighOfDay": "greater",
+    "PercentageHighOfDay": "0",
+    "HighOfDayBool": "value",
+    "averageVolume_tf": "1 day",
+    "AverageVolume": "5",
+    "ComparisonAverageVolume": "greater",
+    "PercentageAverageVolume": "0",
+    "averageVolumeBool": "value",
+    "relativeVolume_tf": "1 day",
+    "RelativeVolume": "5",
+    "ComparisonRelativeVolume": "greater",
+    "PercentageRelativeVolume": "0",
+    "relativeVolumeyesno": "value",
+    "PivotPoint": "PP",
+    "ComparisonPivotPoint": "greater",
+    "PercentagePivotPoint": "0",
+    "pivotPointBool": "value",
+    "Pricelevel": "pricelow",
+    "ComparisonPrice": "greater",
+    "PercentagePrice": "0"
+  },
+  "securities": {
+    "cusip": [
+      "40472A102",
+      "886885102",
+      "532275104",
+      "192005106",
+      "71601V105",
+      "12047B105",
+      "82670R305",
+      "92922P106",
+      "73102V204",
+      "89669L207",
+      "G1117K114",
+      "07134L107",
+      "125269100",
+      "500688106",
+      "92891H606",
+      "058586108",
+      "43289P106",
+      "91532F102",
+      "74347Y888",
+      "323193959",
+      "000943499",
+      "80880X104",
+      "91232N207",
+      "91167Q100",
+      "260557103",
+      "826165201",
+      "447011107",
+      "60743G100",
+      "61945C103",
+      "06748M196",
+      "38747R595",
+      "25460E232",
+      "67077M108",
+      "560667107",
+      "674599105",
+      "68236H204"
+    ],
+    "ticker": [
+      "EONR",
+      "TLYS",
+      "LWLG",
+      "CDXS",
+      "WOOF",
+      "BMBL",
+      "SGN",
+      "WTI",
+      "POLA",
+      "TPET",
+      "BIOX",
+      "BATL",
+      "CF",
+      "KOS",
+      "UVIX",
+      "BLDP",
+      "HIMX",
+      "UMAC",
+      "UCO",
+      "SOXS",
+      "LYB",
+      "SCNX",
+      "USO",
+      "BNO",
+      "DOW",
+      "SIDU",
+      "HUN",
+      "MOBX",
+      "MOS",
+      "VXX",
+      "TSDD",
+      "TZA",
+      "NTR",
+      "MSS",
+      "OXY",
+      "ONDS"
+    ],
+    "CSV": [
+      {
+        "cusip": "40472A102",
+        "ticker": "EONR",
+        "change": 0
+      },
+      {
+        "cusip": "886885102",
+        "ticker": "TLYS",
+        "change": 0
+      },
+      {
+        "cusip": "532275104",
+        "ticker": "LWLG",
+        "change": 0
+      },
+      {
+        "cusip": "192005106",
+        "ticker": "CDXS",
+        "change": 0
+      },
+      {
+        "cusip": "71601V105",
+        "ticker": "WOOF",
+        "change": 0
+      },
+      {
+        "cusip": "12047B105",
+        "ticker": "BMBL",
+        "change": 0
+      },
+      {
+        "cusip": "82670R305",
+        "ticker": "SGN",
+        "change": 0
+      },
+      {
+        "cusip": "92922P106",
+        "ticker": "WTI",
+        "change": 0
+      },
+      {
+        "cusip": "73102V204",
+        "ticker": "POLA",
+        "change": 0
+      },
+      {
+        "cusip": "89669L207",
+        "ticker": "TPET",
+        "change": 0
+      },
+      {
+        "cusip": "G1117K114",
+        "ticker": "BIOX",
+        "change": 0
+      },
+      {
+        "cusip": "07134L107",
+        "ticker": "BATL",
+        "change": 0
+      },
+      {
+        "cusip": "125269100",
+        "ticker": "CF",
+        "change": 0
+      },
+      {
+        "cusip": "500688106",
+        "ticker": "KOS",
+        "change": 0
+      },
+      {
+        "cusip": "92891H606",
+        "ticker": "UVIX",
+        "change": 0
+      },
+      {
+        "cusip": "058586108",
+        "ticker": "BLDP",
+        "change": 0
+      },
+      {
+        "cusip": "43289P106",
+        "ticker": "HIMX",
+        "change": 0
+      },
+      {
+        "cusip": "91532F102",
+        "ticker": "UMAC",
+        "change": 0
+      },
+      {
+        "cusip": "74347Y888",
+        "ticker": "UCO",
+        "change": 0
+      },
+      {
+        "cusip": "323193959",
+        "ticker": "SOXS",
+        "change": 0
+      },
+      {
+        "cusip": "000943499",
+        "ticker": "LYB",
+        "change": 0
+      },
+      {
+        "cusip": "80880X104",
+        "ticker": "SCNX",
+        "change": 0
+      },
+      {
+        "cusip": "91232N207",
+        "ticker": "USO",
+        "change": 0
+      },
+      {
+        "cusip": "91167Q100",
+        "ticker": "BNO",
+        "change": 0
+      },
+      {
+        "cusip": "260557103",
+        "ticker": "DOW",
+        "change": 0
+      },
+      {
+        "cusip": "826165201",
+        "ticker": "SIDU",
+        "change": 0
+      },
+      {
+        "cusip": "447011107",
+        "ticker": "HUN",
+        "change": 0
+      },
+      {
+        "cusip": "60743G100",
+        "ticker": "MOBX",
+        "change": 0
+      },
+      {
+        "cusip": "61945C103",
+        "ticker": "MOS",
+        "change": 0
+      },
+      {
+        "cusip": "06748M196",
+        "ticker": "VXX",
+        "change": 0
+      },
+      {
+        "cusip": "38747R595",
+        "ticker": "TSDD",
+        "change": 0
+      },
+      {
+        "cusip": "25460E232",
+        "ticker": "TZA",
+        "change": 0
+      },
+      {
+        "cusip": "67077M108",
+        "ticker": "NTR",
+        "change": 0
+      },
+      {
+        "cusip": "560667107",
+        "ticker": "MSS",
+        "change": 0
+      },
+      {
+        "cusip": "674599105",
+        "ticker": "OXY",
+        "change": 0
+      },
+      {
+        "cusip": "68236H204",
+        "ticker": "ONDS",
+        "change": 0
+      }
+    ]
+  }
+}

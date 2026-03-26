@@ -1,0 +1,142 @@
+{
+  "meta": {
+    "title": "start of short watch list add more variables fine tune",
+    "created_at": "2026-03-12T10:14:38.086179+00:00"
+  },
+  "form": {
+    "Procesetf": "processall",
+    "CloseBool": "Close",
+    "csrf_token": "IjllMWZlNzM3NTA0MTIzNjFhMDE1ZTA3NjJhZGViZWFjZTI3NzVlYjIi.abGAng.rTA-mJqaAYcbYV_qsonLj33ZXhw",
+    "FastSMA_tf": "1 day",
+    "FastSMA": "5",
+    "ComparisonFastSMA": "Not used",
+    "PercentageFastSMA": "0",
+    "SMAFastBool": "percentage",
+    "MediumSMA_tf": "1 day",
+    "MediumSMA": "50",
+    "ComparisonMediumSMA": "Not used",
+    "PercentageMediumSMA": "0",
+    "SMAMediumBool": "percentage",
+    "SlowSMA_tf": "1 day",
+    "SlowSMA": "200",
+    "ComparisonSlowSMA": "Not used",
+    "PercentageSlowSMA": "0",
+    "smaslowyesno": "percentage",
+    "VWAP_tf": "1 day",
+    "VWAP": "5",
+    "ComparisonVWAP": "Not used",
+    "PercentageVWAP": "0",
+    "VWAPBool": "percentage",
+    "RSI_tf": "1 day",
+    "RSI": "14",
+    "ComparisonRSI": "greater",
+    "PercentageRSI": "70",
+    "rsiyesno": "percentage",
+    "FastEMA_tf": "1 day",
+    "FastEMA": "5",
+    "ComparisonFastEMA": "Not used",
+    "PercentageFastEMA": "0",
+    "FastEMABool": "percentage",
+    "SlowEMA_tf": "1 day",
+    "SlowEMA": "10",
+    "ComparisonSlowEMA": "Not used",
+    "PercentageSlowEMA": "0",
+    "SlowEMABool": "percentage",
+    "OBV_tf": "1 day",
+    "OBV": "5",
+    "ComparisonOBV": "Not used",
+    "PercentageOBV": "0",
+    "OBVBool": "percentage",
+    "ATR_tf": "1 day",
+    "ATR": "5",
+    "ComparisonATR": "greater",
+    "PercentageATR": "0",
+    "ATRBool": "percentage",
+    "PrevClose": "0",
+    "ComparisonPrevClose": "greater",
+    "PercentagePrevClose": "0",
+    "PrevCloseBool": "percentage",
+    "LowOfDay": "0",
+    "ComparisonLowOfDay": "greater",
+    "PercentageLowOfDay": "0",
+    "LowOfDayBool": "value",
+    "HighOfDay": "0",
+    "ComparisonHighOfDay": "lower",
+    "PercentageHighOfDay": "0",
+    "HighOfDayBool": "percentage",
+    "averageVolume_tf": "1 day",
+    "AverageVolume": "5",
+    "ComparisonAverageVolume": "greater",
+    "PercentageAverageVolume": "0",
+    "averageVolumeBool": "percentage",
+    "relativeVolume_tf": "1 day",
+    "RelativeVolume": "5",
+    "ComparisonRelativeVolume": "greater",
+    "PercentageRelativeVolume": "0",
+    "relativeVolumeyesno": "percentage",
+    "PivotPoint": "PP",
+    "ComparisonPivotPoint": "Not used",
+    "PercentagePivotPoint": "0",
+    "pivotPointBool": "value",
+    "Pricelevel": "pricelow",
+    "ComparisonPrice": "greater",
+    "PercentagePrice": "0"
+  },
+  "securities": {
+    "cusip": [
+      "886885102",
+      "G88953107",
+      "88636R248",
+      "92891H606",
+      "91232N207",
+      "654902204",
+      "25460G286"
+    ],
+    "ticker": [
+      "TLYS",
+      "TMDE",
+      "HIMZ",
+      "UVIX",
+      "USO",
+      "NOK",
+      "TSLL"
+    ],
+    "CSV": [
+      {
+        "cusip": "886885102",
+        "ticker": "TLYS",
+        "change": 0
+      },
+      {
+        "cusip": "G88953107",
+        "ticker": "TMDE",
+        "change": 0
+      },
+      {
+        "cusip": "88636R248",
+        "ticker": "HIMZ",
+        "change": 0
+      },
+      {
+        "cusip": "92891H606",
+        "ticker": "UVIX",
+        "change": 0
+      },
+      {
+        "cusip": "91232N207",
+        "ticker": "USO",
+        "change": 0
+      },
+      {
+        "cusip": "654902204",
+        "ticker": "NOK",
+        "change": 0
+      },
+      {
+        "cusip": "25460G286",
+        "ticker": "TSLL",
+        "change": 0
+      }
+    ]
+  }
+}

@@ -1,0 +1,219 @@
+{
+  "meta": {
+    "title": "upside shape",
+    "created_at": "2026-03-03T15:30:43.601550+00:00"
+  },
+  "form": {
+    "Procesetf": "processall",
+    "CloseBool": "Close",
+    "csrf_token": "IjllMWZlNzM3NTA0MTIzNjFhMDE1ZTA3NjJhZGViZWFjZTI3NzVlYjIi.aaXgSA.MNc11sriam2fzovyEBtvRdP7zf0",
+    "FastSMA_tf": "1 day",
+    "FastSMA": "5",
+    "ComparisonFastSMA": "greater",
+    "PercentageFastSMA": "0",
+    "SMAFastBool": "percentage",
+    "MediumSMA_tf": "1 day",
+    "MediumSMA": "50",
+    "ComparisonMediumSMA": "greater",
+    "PercentageMediumSMA": "0",
+    "SMAMediumBool": "percentage",
+    "SlowSMA_tf": "1 day",
+    "SlowSMA": "200",
+    "ComparisonSlowSMA": "greater",
+    "PercentageSlowSMA": "0",
+    "smaslowyesno": "percentage",
+    "VWAP_tf": "1 day",
+    "VWAP": "5",
+    "ComparisonVWAP": "greater",
+    "PercentageVWAP": "0",
+    "VWAPBool": "percentage",
+    "RSI_tf": "1 day",
+    "RSI": "14",
+    "ComparisonRSI": "greater",
+    "PercentageRSI": "0",
+    "rsiyesno": "percentage",
+    "FastEMA_tf": "1 day",
+    "FastEMA": "5",
+    "ComparisonFastEMA": "greater",
+    "PercentageFastEMA": "0",
+    "FastEMABool": "percentage",
+    "SlowEMA_tf": "1 day",
+    "SlowEMA": "10",
+    "ComparisonSlowEMA": "greater",
+    "PercentageSlowEMA": "0",
+    "SlowEMABool": "percentage",
+    "OBV_tf": "1 day",
+    "OBV": "5",
+    "ComparisonOBV": "greater",
+    "PercentageOBV": "0",
+    "OBVBool": "percentage",
+    "ATR_tf": "1 day",
+    "ATR": "5",
+    "ComparisonATR": "greater",
+    "PercentageATR": "0",
+    "ATRBool": "percentage",
+    "PrevClose": "0",
+    "ComparisonPrevClose": "greater",
+    "PercentagePrevClose": "0",
+    "PrevCloseBool": "percentage",
+    "LowOfDay": "0",
+    "ComparisonLowOfDay": "greater",
+    "PercentageLowOfDay": "0",
+    "LowOfDayBool": "value",
+    "HighOfDay": "0",
+    "ComparisonHighOfDay": "greater",
+    "PercentageHighOfDay": "0",
+    "HighOfDayBool": "value",
+    "averageVolume_tf": "1 day",
+    "AverageVolume": "5",
+    "ComparisonAverageVolume": "greater",
+    "PercentageAverageVolume": "0",
+    "averageVolumeBool": "value",
+    "relativeVolume_tf": "1 day",
+    "RelativeVolume": "5",
+    "ComparisonRelativeVolume": "greater",
+    "PercentageRelativeVolume": "0",
+    "relativeVolumeyesno": "value",
+    "PivotPoint": "PP",
+    "ComparisonPivotPoint": "greater",
+    "PercentagePivotPoint": "0",
+    "pivotPointBool": "value",
+    "Pricelevel": "pricelow",
+    "ComparisonPrice": "greater",
+    "PercentagePrice": "0"
+  },
+  "securities": {
+    "cusip": [
+      "48123V102",
+      "89669L207",
+      "G88953107",
+      "92891H606",
+      "27966L306",
+      "64130M209",
+      "28238P109",
+      "25460G112",
+      "74347Y730",
+      "568423107",
+      "25460E224",
+      "911805307",
+      "90177C200",
+      "G50883100",
+      "62911P300",
+      "25460E232",
+      "063679484",
+      "457152106"
+    ],
+    "ticker": [
+      "ZD",
+      "TPET",
+      "TMDE",
+      "UVIX",
+      "EDSA",
+      "NMTC",
+      "EHTH",
+      "SOXS",
+      "VIXY",
+      "MARPS",
+      "HIBS",
+      "USEG",
+      "VEEE",
+      "JBDI",
+      "GXAI",
+      "TZA",
+      "JETD",
+      "INGM"
+    ],
+    "CSV": [
+      {
+        "cusip": "48123V102",
+        "ticker": "ZD",
+        "change": 0
+      },
+      {
+        "cusip": "89669L207",
+        "ticker": "TPET",
+        "change": 0
+      },
+      {
+        "cusip": "G88953107",
+        "ticker": "TMDE",
+        "change": 0
+      },
+      {
+        "cusip": "92891H606",
+        "ticker": "UVIX",
+        "change": 0
+      },
+      {
+        "cusip": "27966L306",
+        "ticker": "EDSA",
+        "change": 0
+      },
+      {
+        "cusip": "64130M209",
+        "ticker": "NMTC",
+        "change": 0
+      },
+      {
+        "cusip": "28238P109",
+        "ticker": "EHTH",
+        "change": 0
+      },
+      {
+        "cusip": "25460G112",
+        "ticker": "SOXS",
+        "change": 0
+      },
+      {
+        "cusip": "74347Y730",
+        "ticker": "VIXY",
+        "change": 0
+      },
+      {
+        "cusip": "568423107",
+        "ticker": "MARPS",
+        "change": 0
+      },
+      {
+        "cusip": "25460E224",
+        "ticker": "HIBS",
+        "change": 0
+      },
+      {
+        "cusip": "911805307",
+        "ticker": "USEG",
+        "change": 0
+      },
+      {
+        "cusip": "90177C200",
+        "ticker": "VEEE",
+        "change": 0
+      },
+      {
+        "cusip": "G50883100",
+        "ticker": "JBDI",
+        "change": 0
+      },
+      {
+        "cusip": "62911P300",
+        "ticker": "GXAI",
+        "change": 0
+      },
+      {
+        "cusip": "25460E232",
+        "ticker": "TZA",
+        "change": 0
+      },
+      {
+        "cusip": "063679484",
+        "ticker": "JETD",
+        "change": 0
+      },
+      {
+        "cusip": "457152106",
+        "ticker": "INGM",
+        "change": 0
+      }
+    ]
+  }
+}

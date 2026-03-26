@@ -1,0 +1,12 @@
+ta
+pytz
+ibapi
+numpy
+Flask
+pandas
+pytest
+WTForms
+waitress
+selenium
+Flask-WTF
+webdriver-manager

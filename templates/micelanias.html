@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<title></title>
+	<link rel="stylesheet" href="">
+	<link rel="stylesheet" href="../static/css/bootstrap.css">
+	<link rel="stylesheet" href="../static/css/style.css">
+	<link rel="stylesheet" href="../static/css/table.css">
+	<link rel="stylesheet" href="../static/css/paginations.css">
+</head>
+<body>
+	<br><br><br>
+
+	<button id = "AddFinancialInstrument" onclick="AddInstrument()">Add Instrument</button>
+	<div id = "addcustomfields">
+		<div class = "securityRow">
+			<div class="securityName"> 
+				<label class="subtitleSecurity">Ticker</label> 
+				<input type="text" class="subtitleSecurityInput">
+			</div>
+			<div class="securityName"> 
+				<label class="subtitleSecurity">Cusip</label> 
+				<input type="text" class="subtitleSecurityInput">
+			</div>
+		</div>
+
+
+	</div>
+<script type="text/javascript">
+	function AddInstrument() {
+		var firstdivElem = document.createElement("DIV");
+		firstdivElem.setAttribute("class", "securityRow");
+		txtt = "";
+		txtt += "<div class='securityName'> <label class='subtitleSecurity'>Ticker</label> <input type='text' class='subtitleSecurityInput'> </div>";
+		txtt += "<div class='securityName'> <label class='subtitleSecurity'>Cusip</label> <input type='text' class='subtitleSecurityInput'> </div>";
+		firstdivElem.innerHTML = txtt;
+		document.getElementById("addcustomfields").appendChild(firstdivElem);
+		console.log(1234);
+
+	}
+
+	
+</script>
+	<br><br><br>
+	<button id = "sendManual" onclick="formatInstrument()">Send</button>
+
+	<br><br><br><br>
+
+
+
+		<!-- Button trigger modal -->
+	<button type="button" class="btn-primary" data-toggle="modal" data-target="#exampleModalCenter">
+	  Launch demo modal
+	</button>
+
+	<!-- Modal -->
+	<div class="modal fade" id="exampleModalCenter" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+	  <div class="modal-dialog modal-dialog-centered" role="document">
+	    <div class="modal-content">
+	      <div class="modal-header">
+	        <h5 class="modal-title" id="exampleModalLongTitle">Modal title</h5>
+	        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+	          <span aria-hidden="true">&times;</span>
+	        </button>
+	      </div>
+	      <div class="modal-body">
+	      	<div id = "elementToAppendBuySell">
+		      	<form id ="formToSendToFlask">
+			      	<div class="buysell">
+			      		<div class="makeColum"> 
+			      			<label class="labelbuysell">Stock</label> 
+			      			<input type="text" value="ELFEO" class="buysellinput">
+			      		</div>
+			      		<div class="makeColum"> 
+			      			<label class="labelbuysell">N Share</label> 
+			      			<input type="number" value="1" class="buysellinput">
+			      		</div>
+			      		<div class="makeColum"> 
+			      			<label class="labelbuysell">Type</label> 
+			      			<select class="buysellSelect" id="changevalues0"> 
+			      				<option value="bracket" selected="">Bracket </option> 
+			      				<option value="limit">Limit</option> 
+			      			</select> 
+			      		</div>
+			      		<div class="makeColum"> 
+			      			<label class="labelbuysell">Side</label> 
+			      			<select class="buysellSelect"> 
+			      				<option value="long" selected="">Long </option> 
+			      				<option value="short">Short</option> 
+			      			</select> 
+			      		</div>
+			      		<div class="makeColum"> 
+			      			<label class="labelbuysell">Price</label> 
+			      			<input type="number" value="20" class="buysellinput" onchange="SupportResistenceChange()">
+			      		</div>
+			      		<div class="makeColum"> 
+			      			<label class="labelbuysell">Support</label> 
+			      			<input type="number" value="" class="buysellinput" id="support0">
+			      		</div>
+			      		<div class="makeColum"> 
+			      			<label class="labelbuysell">StopLoss(%)</label> 
+			      			<input type="number" value="10" class="buysellinput">
+			      		</div>
+			      		<div class="makeColum"> 
+			      			<label class="labelbuysell">Resistence</label> 
+			      			<input type="number" value="" class="buysellinput" id="resistence0">
+			      		</div>
+			      		<div class="makeColum"> 
+			      			<label class="labelbuysell">EMA</label> 
+			      			<input type="number" value="13" class="buysellinput">
+			      		</div>
+			      		<div class="makeColum"> 
+			      			<label class="labelbuysell">Order</label> 
+			      			<button class="buysellinput" id="sendToFlask7">Send</button>
+			      		</div>
+			      	</div>
+		      	</form>
+
+		      	<div class = "secondPart">
+		      		<div class="makeColum1"> 
+		      			<label class="labelbuysell">Support %</label> 
+		      			<input type="number" value="20" class="percentageClass" onchange='SupportResistenceChange()'>
+		      		</div>
+		      		<div class="makeColum1"> 
+		      			<label class="labelbuysell">Resist %</label> 
+		      			<input type="number" value="20" class="percentageClass" onchange='SupportResistenceChange()'>
+		      		</div>
+	      		</div>
+	      		
+	      	</div>
+	        
+
+
+	      </div>
+	      <div class="modal-footer">
+	        <button type="button" class="btn-secondary" data-dismiss="modal">Close</button>
+	      </div>
+	    </div>
+	  </div>
+	</div>
+
+	<script src="../static/js/jquery-3.6.0.min.js"></script>
+	<script src="../static/js/bootstrap.min.js"></script>
+
+	<script type="text/javascript">
+		function SupportResistenceChange() {
+		  var x = parseInt(document.getElementsByClassName("buysellinput")[2].value);
+		  console.log(x);
+		  try {
+		  	var theside = document.getElementsByClassName("buysellSelect")[1].value;
+		  	if ( theside == "long") {
+		  		//Support
+			  	var supportPercentage = parseInt(document.getElementsByClassName("percentageClass")[0].value);
+			  	document.getElementsByClassName("buysellinput")[3].value = x * (1.0 - supportPercentage / 100.0);  
+
+				//Resistence
+				var resistencePercentage = parseInt(document.getElementsByClassName("percentageClass")[1].value);
+				document.getElementsByClassName("buysellinput")[5].value = x * (1.0 + resistencePercentage / 100.0);
+		  	} else {
+		  		//Support
+			  	var supportPercentage = parseInt(document.getElementsByClassName("percentageClass")[0].value);
+			  	document.getElementsByClassName("buysellinput")[3].value = x * (1.0 + supportPercentage / 100.0);  
+
+				//Resistence
+				var resistencePercentage = parseInt(document.getElementsByClassName("percentageClass")[1].value);
+				document.getElementsByClassName("buysellinput")[5].value = x * (1.0 - resistencePercentage / 100.0);
+		  	}
+		  	
+
+		  } catch ( err ) {
+		  	console.log(err.message);
+
+		  }
+		  
+		}
+	</script>
+
+
+
+	
+</body>
+</html>

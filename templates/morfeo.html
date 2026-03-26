@@ -1,0 +1,2338 @@
+<html>
+	<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<title>Backtest</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Free HTML5 Website Template by freehtml5.co" />
+	<meta name="keywords" content="free website templates, free html5, free template, free bootstrap, free website template, html5, css3, mobile first, responsive" />
+	<meta name="author" content="freehtml5.co" />
+
+	<!-- 
+	//////////////////////////////////////////////////////
+
+	FREE HTML5 TEMPLATE 
+	DESIGNED & DEVELOPED by FreeHTML5.co
+		
+	Website: 		http://freehtml5.co/
+	Email: 			info@freehtml5.co
+	Twitter: 		http://twitter.com/fh5co
+	Facebook: 		https://www.facebook.com/fh5co
+
+	//////////////////////////////////////////////////////
+	 -->
+
+  	<!-- Facebook and Twitter integration -->
+	<meta property="og:title" content=""/>
+	<meta property="og:image" content=""/>
+	<meta property="og:url" content=""/>
+	<meta property="og:site_name" content=""/>
+	<meta property="og:description" content=""/>
+	<meta name="twitter:title" content="" />
+	<meta name="twitter:image" content="" />
+	<meta name="twitter:url" content="" />
+	<meta name="twitter:card" content="" />
+
+	<link href="https://fonts.googleapis.com/css?family=Open+Sans|Playfair+Display" rel="stylesheet">
+	
+	<!-- Animate.css -->
+	<!-- <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/mainpage.css') }}">  -->
+	<link rel="stylesheet" href="{{ url_for('static',filename='css/animate.css') }}">
+	<!-- Icomoon Icon Fonts-->
+	<link rel="stylesheet" href="{{ url_for('static',filename='css/icomoon.css') }}">
+	<!-- Bootstrap  -->
+	<link rel="stylesheet" href="{{ url_for('static',filename='css/bootstrap.css') }}">
+	<!-- Flexslider  -->
+	<link rel="stylesheet" href="{{ url_for('static',filename='css/flexslider.css') }}">
+	<!-- Theme style  -->
+	<link rel="stylesheet" href="{{ url_for('static',filename='css/style.css') }}">
+	<link rel="stylesheet" href="{{ url_for('static',filename='css/table.css') }}">
+	<link rel="stylesheet" href="{{ url_for('static',filename='css/paginations.css') }}">
+	<!-- Modernizr JS -->
+
+	<!-- FOR IE9 below -->
+	<!--[if lt IE 9]>
+	<script src="js/respond.min.js"></script>
+	<![endif]-->
+
+	</head>
+	<body>
+
+	<div class="fh5co-loader"></div>
+
+	<div id="page">
+	<nav class="fh5co-nav" role="navigation">
+		<div class="container">
+			<div class="top-menu">
+				<div class="row">
+					<div class="col-sm-2">
+						<div id="fh5co-logo"><a href="/">Backtesting Platform<span>.</span></a></div>
+					</div>
+					<div class="col-sm-10 text-right menu-1" style="display: none">
+						<ul>
+							<li class="active"><a href="/">Portfolio</a></li>
+							<li><a href="/">Page 2</a></li>
+							<li class="has-dropdown"><a href="/">Page 3</a>
+							</li>
+							<li><a href="/">Contact</a></li>
+						</ul>
+					</div>
+				</div>
+
+			</div>
+		</div>
+	</nav>
+	<div class="container">
+		<div id="fh5co-intro">
+			<div class="row animate-box">
+				<div class="col-md-8 col-md-offset-2 col-md-pull-2">
+					<h2>Custom Dashboard to Manage Trade with Interactive Brokers</h2>
+                    <div style="display: none;">
+                        <h3>Last Updated Folders: {{ pdffolder[0] }} and {{ pdffolder[1] }}</h3>
+                        <p><a class="btn btn-primary badge-soft red-black" id = "UpdatePDf" href="#"></i> Update PDF Files</a></p>
+                    </div>
+                </div>
+				<div id = "resolveThis">
+					<h2><span id ="getDate"></span></h2>
+				</div>
+			</div>
+		</div>
+
+
+		<div class="secondclass">
+			<ul class ="ulchange">
+			  <li class="lichange" style="display: none !important;"><a id = "lichange1" onclick="changePage1()">ark-funds</a></li>
+              <li class="lichange"><a id="lichange4" onclick="toggleIbkrMovers()">IBKR Top 50 Movers</a></li>
+			  <li class="lichange" style="float:right"><a id="lichange2" class="active1" onclick="changePage2()">CSV</a></li>
+			  <li class="lichange" style="float:right"><a id="lichange3" class="active2">Manual Instruments</a></li>
+			</ul>
+		</div>
+		<div></div>
+
+
+		<div id = "daniel">
+			<div class="row">
+				<!-- div class="col-md-10 col-xs-10 col-md-offset-1 slider-text" -->
+				<div class="slider-text">
+					<h4 id = "ConnectionIB"></h4>
+					<div id = "customAllform">
+                        <div id = "allForm">
+                            <h3 style="font-weight: 600">Input Parameters</h3>
+                            <div id="ibkr-movers-panel" style="display: none; margin:10px 0;padding:10px;border:1px solid #e5e7eb;border-radius:6px;">
+                                <h4 style="margin:0 0 6px 0;">IBKR Top 50 Movers</h4>
+                                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+                                    <div>
+                                        <label>Gainers / Losers</label><br>
+                                        <select id="movers_scan_code" style="width:110px; padding:4px;">
+                                            <option value="TOP_PERC_GAIN" selected>Gainers</option>
+                                            <option value="TOP_PERC_LOSE">Losers</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label>Min price</label><br>
+                                        <input id="movers_min_price" type="number" step="0.01" value="0.05" placeholder="0.05" style="width:110px">
+                                    </div>
+
+                                    <div>
+                                        <label>Min volume</label><br>
+                                        <input id="movers_min_volume" type="number" value="75000" placeholder="75000" style="width:110px">
+                                    </div>
+
+                                    <div style="display:flex;flex-direction:column;gap:6px">
+                                        <button type="button"
+                                                class="btn btn-primary badge-soft white-blue"
+                                                onclick="loadIbkrMovers()">
+                                            Fetch list
+                                        </button>
+
+                                    </div>
+                                </div>
+
+                                <div style="margin-top:8px;font-size:13px;">
+
+                                    <div id="movers_header"
+                                         style="cursor:pointer; display:flex; align-items:center; gap:6px;">
+
+                                        <span id="movers_arrow" style="transition:transform 0.2s;">▶</span>
+                                        <span id="movers_status">Idle</span>
+                                    </div>
+
+                                    <div id="movers_list"
+                                         style="display:none; margin-top:6px; max-height:180px; overflow:auto; font-size:12px;">
+                                    </div>
+
+                                </div>
+
+                                <div style="margin-top:6px;">
+                                    <button id="movers_use_btn"
+                                            type="button"
+                                            class="btn btn-sm"
+                                            style="display:none"
+                                            onclick="useMovers()">
+                                        Use as data
+                                    </button>
+                                </div>
+
+                            </div>
+
+						   	<form class = "myform" id = "firstFormToFlask">
+						   		<div class = "typeofprocessing">
+						   			<h4 style="padding-right: 5px;"> Select type of processing: </h4> <div> {{ Param.Procesetf }} </div>
+						   		</div>
+						   		<br>
+
+                                <!-- ------------- BACKGROUND SCANNER UI (insert under typeofprocessing) ------------- -->
+                                <div id="background-controls" style="margin-top:10px; padding:8px; border:1px solid #e6e6e6; border-radius:6px;">
+                                  <h4 style="margin:0 0 6px 0;">Background Scanner</h4>
+
+                                  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                                    <label style="margin:0; font-size:0.95rem;">Interval</label>
+                                    <input id="bg_interval_value" type="number" min="1" value="1" style="width:72px; padding:6px;" />
+                                    <select id="bg_interval_unit" style="padding:6px;">
+                                      <option value="seconds">seconds</option>
+                                      <option value="minutes" selected>minutes</option>
+                                      <option value="hours">hours</option>
+                                    </select>
+                                    <button id="bg_toggle" class="btn btn-primary badge-soft white-blue" style="padding:6px 12px;" disabled>Start</button>
+
+                                    <button id="bg_force_restart" class="btn btn-sm" title="Restart with last interval" style="padding:6px 10px; display:none;">Restart</button>
+
+                                    <div id="bg_status" style="margin-left:10px; font-weight:600;color:#333;">Status: <span id="bg_status_text">stopped</span></div>
+                                  </div>
+
+                                  <div style="margin-top:8px; display:flex; gap:20px; align-items:center; flex-wrap:wrap;">
+                                    <div>Last run: <span id="bg_last_run">never</span></div>
+                                    <div>Last updated results: <span id="bg_last_updated">never</span></div>
+                                    <div id="bg_message" style="color:#c00; font-weight:600;"></div>
+                                  </div>
+
+                                  <!-- small visual indicator area -->
+                                  <div id="bg_latest_summary" style="margin-top:8px; font-size:0.9rem; color:#333; display:none;"></div>
+                                </div>
+                                <!-- ------------- END BACKGROUND SCANNER UI ------------- -->
+                                <br>
+                                <hr style="border-top: 1.5px solid #c9c9c9;">
+                                <div style="margin-top:8px; margin-bottom:8px; display:flex; gap:8px; align-items:center;">
+                                    <button id="save_setup" class="btn btn-sm btn-outline-primary">Save Setup</button>
+                                    <button id="load_setup" class="btn btn-sm btn-outline-secondary">Load Setup</button>
+                                    <span id="setup_msg" style="margin-left:8px;color:#2b7a0b;"></span>
+                                </div>
+						   		{% for subfield in Param.CloseBool %}
+						   			<div class="selectclose">
+						   				<div class ="llegoelrastrillo"> {{ subfield }} </div> <div class = "closesymbol"> {{ subfield.label }}</div>
+						   			</div>
+						   		{% endfor %}
+						   		{{ Param.hidden_tag() }}
+
+						   		<table class = "firstTable">
+									<thead>
+										<tr class = "tableHead">
+											<th class = "headRow">Indicator</th>
+											<th class = "headRow">Time Frame</th>
+											<th class = "headRow">Number of days</th>
+											<th class = "headRow">Sign Indicator</th>
+											<th class = "headRow">Amount </th>
+											<th class = "headRow">Percentage / Val</th>
+										</tr>
+									</thead>
+									<tbody>
+										<tr>
+											<th>{{ Param.FastSMA.label(class_="LabelHead") }}</th>
+                                            <!-- NEW: time frame column for this indicator -->
+                                            <td>
+                                                <div id="tf_fast_sma">{{ Param.FastSMA_tf(class_="FastSMA_tf") }}</div>
+                                            </td>
+											<td>
+												<div id = "nchangeinput1"> {{ Param.FastSMA(class_="FastSMA", value = '5') }} </div>
+											</td>
+											<th>{{ Param.ComparisonFastSMA(class_="ComparisonFastSMA") }}</th>
+											<td>
+												<div id = "changeinput1"> {{ Param.PercentageFastSMA(class_="PercentageFastSMA", value = '0') }} </div>
+											</td>
+											<td>
+												{% for subfield in Param.SMAFastBool %}
+													<div class="formatingyesno">
+												    	<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} <div>
+												    </div>
+												{% endfor %}
+											</td>
+										</tr>
+                                        <tr>
+											<th>{{ Param.MediumSMA.label(class_="LabelHead") }}</th>
+                                            <!-- NEW: time frame column for this indicator -->
+                                            <td>
+                                                <div id="tf_medium_sma">{{ Param.MediumSMA_tf(class_="MediumSMA_tf") }}</div>
+                                            </td>
+											<td>
+												<div id = "nchangeinput13"> {{ Param.MediumSMA(class_="MediumSMA", value = '10') }} </div>
+											</td>
+											<th>{{ Param.ComparisonMediumSMA(class_="ComparisonMediumSMA") }}</th>
+											<td>
+												<div id = "changeinput13"> {{ Param.PercentageMediumSMA(class_="PercentageMediumSMA", value = '0') }} </div>
+											</td>
+											<td>
+												{% for subfield in Param.SMAMediumBool %}
+													<div class="formatingyesno">
+												    	<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} <div>
+												    </div>
+												{% endfor %}
+											</td>
+										</tr>
+										<tr>
+											<th>{{ Param.SlowSMA.label(class_="LabelHead") }}</th>
+                                            <!-- NEW: time frame column for this indicator -->
+                                            <td>
+                                                <div id="tf_slow_sma">{{ Param.SlowSMA_tf(class_="SlowSMA_tf") }}</div>
+                                            </td>
+											<td>
+												<div id = "nchangeinput2"> {{ Param.SlowSMA(class_="SlowSMA", value = '20') }} </div>
+											</td>
+											<th>{{ Param.ComparisonSlowSMA(class_="ComparisonSlowSMA") }}</th>
+											<td>
+												<div id = "changeinput2"> {{ Param.PercentageSlowSMA(class_="PercentageSlowSMA", value = '0') }} </div>
+											</td>
+											<td>
+												{% for subfield in Param.smaslowyesno %}
+													<div class="formatingyesno">
+												    	<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} <div>
+												    </div>
+												{% endfor %}
+											</td>
+										</tr>
+										<tr>
+											<th>{{ Param.VWAP.label(class_="LabelHead") }}</th>
+                                            <!-- NEW: time frame column for this indicator -->
+                                            <td>
+                                                <div id="tf_vwap">{{ Param.VWAP_tf(class_="VWAP_tf") }}</div>
+                                            </td>
+											<td>
+												<div id = "nchangeinput3"> {{ Param.VWAP(class_="VWAP", value = 5) }} </div>
+											</td>
+											<th>{{ Param.ComparisonVWAP(class_="ComparisonVWAP") }}</th>
+											<td>
+												<div id = "changeinput3"> {{ Param.PercentageVWAP(class_="PercentageVWAP", value = '0' ) }} </div>
+											</td>
+											<td>
+												{% for subfield in Param.VWAPBool %}
+													<div class="formatingyesno">
+												    	<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} <div>
+												    </div>
+												{% endfor %}
+											</td>
+										</tr>
+										<tr>
+											<td>{{ Param.RSI.label(class_="LabelHead") }}</td>
+                                            <!-- NEW: time frame column for this indicator -->
+                                            <td>
+                                                <div id="tf_rsi">{{ Param.RSI_tf(class_="RSI_tf") }}</div>
+                                            </td>
+											<td>
+												<div id = "nchangeinput4"> {{ Param.RSI(class_="RSI", value = '14') }} </div>
+											</td>
+											<th>{{ Param.ComparisonRSI(class_="ComparisonRSI") }}</th>
+											<td>
+												<div id = "changeinput4"> {{ Param.PercentageRSI(class_="PercentageRSI", value = '0') }} </div>
+											</td>
+											<td>
+												{% for subfield in Param.rsiyesno %}
+														<div class="formatingyesno">
+													    	<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} <div>
+													    </div>
+												{% endfor %}
+											</td>
+										</tr>
+										<tr>
+											<th>{{ Param.FastEMA.label(class_="LabelHead") }}</th>
+                                            <!-- NEW: time frame column for this indicator -->
+                                            <td>
+                                                <div id="tf_fast_ema">{{ Param.FastEMA_tf(class_="FastEMA_tf") }}</div>
+                                            </td>
+											<td>
+												<div id = "nchangeinput7"> {{ Param.FastEMA(class_="FastEMA", value = 5) }} </div>
+											</td>
+											<th>{{ Param.ComparisonFastEMA(class_="ComparisonFastEMA") }}</th>
+											<td>
+												<div id = "changeinput7"> {{ Param.PercentageFastEMA(class_="PercentageFastEMA", value = '0' ) }} </div>
+											</td>
+											<td>
+												{% for subfield in Param.FastEMABool %}
+													<div class="formatingyesno">
+												    	<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} <div>
+												    </div>
+												{% endfor %}
+											</td>
+										</tr>
+										<tr>
+											<th>{{ Param.SlowEMA.label(class_="LabelHead") }}</th>
+                                            <!-- NEW: time frame column for this indicator -->
+                                            <td>
+                                                <div id="tf_slow_ema">{{ Param.SlowEMA_tf(class_="SlowEMA_tf") }}</div>
+                                            </td>
+											<td>
+												<div id = "nchangeinput14"> {{ Param.SlowEMA(class_="SlowEMA", value = 10) }} </div>
+											</td>
+											<th>{{ Param.ComparisonSlowEMA(class_="ComparisonSlowEMA") }}</th>
+											<td>
+												<div id = "changeinput14"> {{ Param.PercentageSlowEMA(class_="PercentageSlowEMA", value = '0' ) }} </div>
+											</td>
+											<td>
+												{% for subfield in Param.SlowEMABool %}
+													<div class="formatingyesno">
+												    	<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} <div>
+												    </div>
+												{% endfor %}
+											</td>
+										</tr>
+										<tr>
+											<th>{{ Param.OBV.label(class_="LabelHead") }}</th>
+                                            <!-- NEW: time frame column for this indicator -->
+                                            <td>
+                                                <div id="tf_obv">{{ Param.OBV_tf(class_="OBV_tf") }}</div>
+                                            </td>
+											<td>
+												<div id = "nchangeinput8"> {{ Param.OBV(class_="OBV", value = 5) }} </div>
+											</td>
+											<th>{{ Param.ComparisonOBV(class_="ComparisonOBV") }}</th>
+											<td>
+												<div id = "changeinput8"> {{ Param.PercentageOBV(class_="PercentageOBV", value = '0' ) }} </div>
+											</td>
+											<td>
+												{% for subfield in Param.OBVBool %}
+													<div class="formatingyesno">
+												    	<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} <div>
+												    </div>
+												{% endfor %}
+											</td>
+										</tr>
+										<tr>
+											<th>{{ Param.ATR.label(class_="LabelHead") }}</th>
+                                            <!-- NEW: time frame column for this indicator -->
+                                            <td>
+                                                <div id="tf_atr">{{ Param.ATR_tf(class_="ATR_tf") }}</div>
+                                            </td>
+											<td>
+												<div id = "nchangeinput9"> {{ Param.ATR(class_="ATR", value = 5) }} </div>
+											</td>
+											<th>{{ Param.ComparisonATR(class_="ComparisonATR") }}</th>
+											<td>
+												<div id = "changeinput9"> {{ Param.PercentageATR(class_="PercentageATR", value = '0' ) }} </div>
+											</td>
+											<td>
+												{% for subfield in Param.ATRBool %}
+													<div class="formatingyesno">
+												    	<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} <div>
+												    </div>
+												{% endfor %}
+											</td>
+										</tr>
+                                        <tr>
+                                            <th>{{ Param.PrevClose.label(class_="LabelHead") }}</th>
+                                            <td>
+                                                <div alt="Timeframe space holder">&nbsp;</div>
+                                            </td>
+                                            <td>
+                                                <div id="nchangeinput10"> {{ Param.PrevClose(class_="PrevClose", value = 0) }} </div>
+                                            </td>
+                                            <th>{{ Param.ComparisonPrevClose(class_="ComparisonPrevClose") }}</th>
+                                            <td>
+                                                <div id="changeinput10"> {{ Param.PercentagePrevClose(class_="PercentagePrevClose", value = 0) }} </div>
+                                            </td>
+                                            <td>
+                                                {% for subfield in Param.PrevCloseBool %}
+                                                    <div class="formatingyesno">
+                                                        <div class="yesno"> {{ subfield }} </div>
+                                                        <div class="yesno"> {{ subfield.label }} <div>
+                                                    </div>
+                                                {% endfor %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th>{{ Param.LowOfDay.label(class_="LabelHead") }}</th>
+                                            <td>
+                                                <div alt="Timeframe space holder">&nbsp;</div>
+                                            </td>
+                                            <td>
+                                                <div id="nchangeinput11"> {{ Param.LowOfDay(class_="LowOfDay", value = 0) }} </div>
+                                            </td>
+                                            <th>{{ Param.ComparisonLowOfDay(class_="ComparisonLowOfDay") }}</th>
+                                            <td>
+                                                <div id="changeinput11"> {{ Param.PercentageLowOfDay(class_="PercentageLowOfDay", value = 0) }} </div>
+                                            </td>
+                                            <td>
+                                                {% for subfield in Param.LowOfDayBool %}
+                                                    <div class="formatingyesno">
+                                                        <div class="yesno"> {{ subfield }} </div>
+                                                        <div class="yesno"> {{ subfield.label }} <div>
+                                                    </div>
+                                                {% endfor %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th>{{ Param.HighOfDay.label(class_="LabelHead") }}</th>
+                                            <td>
+                                                <div alt="Timeframe space holder">&nbsp;</div>
+                                            </td>
+                                            <td>
+                                                <div id="nchangeinput12"> {{ Param.HighOfDay(class_="HighOfDay", value = 0) }} </div>
+                                            </td>
+                                            <th>{{ Param.ComparisonHighOfDay(class_="ComparisonHighOfDay") }}</th>
+                                            <td>
+                                                <div id="changeinput12"> {{ Param.PercentageHighOfDay(class_="PercentageHighOfDay", value = 0) }} </div>
+                                            </td>
+                                            <td>
+                                                {% for subfield in Param.HighOfDayBool %}
+                                                    <div class="formatingyesno">
+                                                        <div class="yesno"> {{ subfield }} </div>
+                                                        <div class="yesno"> {{ subfield.label }} <div>
+                                                    </div>
+                                                {% endfor %}
+                                            </td>
+                                        </tr>
+										<tr>
+											<td>{{ Param.AverageVolume.label(class_="LabelHead") }}</td>
+                                            <!-- NEW: time frame column for this indicator -->
+                                            <td>
+                                                <div id="tf_averagevolume">{{ Param.averageVolume_tf(class_="averageVolume_tf") }}</div>
+                                            </td>
+											<td>
+												<div id = "nchangeinput5"> {{ Param.AverageVolume(class_="AverageVolume", value = 5) }} </div>
+											</td>
+											<th>{{ Param.ComparisonAverageVolume(class_="ComparisonAverageVolume") }}</th>
+											<td>
+												<div id = "changeinput5"> {{ Param.PercentageAverageVolume(class_="PercentageAverageVolume", value = 0) }} </div>
+											</td>
+											<td>
+												{% for subfield in Param.averageVolumeBool %}
+														<div class="formatingyesno">
+													    	<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} <div>
+													    </div>
+												{% endfor %}
+											</td>
+										</tr>
+										<tr>
+											<td>{{ Param.RelativeVolume.label(class_="LabelHead") }}</td>
+                                            <!-- NEW: time frame column for this indicator -->
+                                            <td>
+                                                <div id="tf_relativevolume">{{ Param.relativeVolume_tf(class_="relativeVolume_tf") }}</div>
+                                            </td>
+											<td>
+												<div id = "nchangeinput6"> {{ Param.RelativeVolume(class_="RelativeVolume", value = 5) }}</div>
+											</td>
+											<td>{{ Param.ComparisonRelativeVolume(class_="ComparisonRelativeVolume") }}</td>
+											<td>
+												<div id = "changeinput6"> {{ Param.PercentageRelativeVolume(class_="PercentageRelativeVolume", value = 0) }}</div>
+											</td>
+											<td>
+												{% for subfield in Param.relativeVolumeyesno %}
+														<div class="formatingyesno">
+													    	<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} <div>
+													    </div>
+												{% endfor %}
+											</td>
+										</tr>
+										<!-- tr>
+											<th>Frequency</th>
+{#											<th>{{ Param.addFrequency(class_="SelectField") }} </th>#}
+											<th></th>
+											<td></td>
+
+										</tr -->
+									</tbody>
+								</table>
+								<br>
+
+								<table class = "secondTable">
+									<thead class = "secondTableHead">
+										<tr>
+											<th style="padding:10px">Indicator</th>
+											<th style="padding:10px">Variable</th>
+											<th style="padding:10px">Sign </th>
+											<th style="padding:10px">Percentage PP</th>
+											<th style="padding:10px">Percentage/Value</th>
+										</tr>
+									</thead>
+									<tbody class ="secondTableBody">
+										<tr>
+											<th style="padding:10px">Pivot Point</th>
+											<td style="padding:10px"> <div id = "changePP"> {{ Param.PivotPoint(class_="PivotPoint") }} </div></td>
+											<td style="padding:10px">{{ Param.ComparisonPivotPoint(class_="ComparisonPivotPoint") }}</td>
+											<td style="padding:10px"><div id = "percentagePP"> {{ Param.PercentagePivotPoint(class_="PercentagePivotPoint", value = '0') }} </div> </td>
+											<td>
+												{% for subfield in Param.pivotPointBool %}
+														<div class="formatingyesno">
+													    	<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} <div>
+													    </div>
+												{% endfor %}
+											</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Price Level</th>
+											<td style="padding:10px">
+												<div id = "ChangePric">
+													{{ Param.Pricelevel(class_="Pricelevel") }}
+												</div>
+											</td>
+											<td style="padding:10px">{{ Param.ComparisonPrice(class_="ComparisonPrice") }}</td>
+											<td style="padding:10px">
+												<div id = "PercentagePric">
+													{{ Param.PercentagePrice(class_="PercentagePrice", value = '0') }}
+												</div>
+											</td>
+											<td>
+											</td>
+										</tr>
+									</tbody>
+								</table>
+                                <div class="card-panel section-fade">
+                                  <br>
+                                  <h3>Search for stock meeting variables <span class="badge-soft white-blue">Run</span></h3>
+                                  <div class="SubmitData"> {{ Param.submit() }} </div>
+                                </div>
+                                <div id="bg_poll_times" style="margin-top:6px;">
+                                    Scanner last run: <span id="bg_backend_last_run">never</span>
+                                    &nbsp;|&nbsp;
+                                    Last poll (browser): <span id="bg_client_last_poll">never</span>
+                                </div>
+                                <div id="bg_current_time" style="margin-top:2px;">
+                                     Current time: <span id="bg_now">--:--:--</span>
+                                </div>
+
+						   	</form>
+
+						   	<form name="csvimportdataform" id="csvimportdataform">
+
+							    <input type="file" name="csvfile" id="csvfile" class="form-control-file csvchildren"/>
+							    <button type="submit" name="importdata" id="importdata" class="btn btn-info badge-soft white-blue">Proceed</button>
+							</form>
+						</div>
+						<div id = "customformToUse">
+							<button id = "AddFinancialInstrument" onclick="AddInstrument()">Add Instrument</button>
+							<div id = "addcustomfields"></div>
+						</div>
+					</div>
+
+				   	<div id = "validator"></div>
+					<div id = "IBForm"></div>
+                    <div style="margin-left: 20px;margin-bottom: 5px;">
+					<div>
+						<button onclick="hideShow()">Hide/Show Errors</button>
+					</div>
+					<div id = "demotest">
+
+
+							<!-- Modal -->
+							<div class="modal fade" id="exampleModalCenter" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+							  <div class="modal-dialog modal-dialog-centered" role="document">
+							    <div class="modal-content">
+							      <div class="modal-header">
+							        <h5 class="modal-title" id="exampleModalLongTitle">Modal title</h5>
+							        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+							          <span aria-hidden="true">&times;</span>
+							        </button>
+							      </div>
+									  <div class="modal-body">
+									      	<div id = "elementToAppendBuySell"></div>
+									  </div>
+									  <div id = "notConnected"></div>
+								      <div class="modal-footer">
+								      	<button type="button" class="btn btn-primary" id = "sendOrderToFlask">Place Order</button>
+								        <button type="button" class="btn-secondary" data-dismiss="modal">Close</button>
+								      </div>
+							    </div>
+							  </div>
+							</div>
+					</div>
+					<div id="elfeo"></div>
+					<div id = "WarningData">Run the algorithm to see the erros</div>
+				</div>
+				</div>
+			</div>
+		</div>
+
+
+
+		<aside id="fh5co-hero">
+			<div>
+				<ul style="padding-left: unset !important;">
+			   	<li>   <!-- <li style="background-image: url(images/img_bg_1.jpg);"> -->
+			   		<div></div>
+			   		<div class="container-fluid">
+			   			<div class="row">
+				   			<div class="col-md-11 col-xs-11 col-md-offset-1 slider-text">
+				   			<form>
+				   				<div id="add1" class="card-panel section-fade"></div>
+							</form>
+							<br><br><br>
+                                <div id = "createForm" style= "display: none;"></div>
+                                <br>
+				   			</div>
+				   		</div>
+			   		</div>
+			   	</li>
+			  	</ul>
+		  	</div>
+		</aside>
+	</div><!-- END container -->
+	</div>
+
+	<div class="gototop js-top">
+		<a href="#" class="js-gotop"><i class="icon-arrow-up2"></i></a>
+	</div>
+
+	<!-- jQuery -->
+	<script src="{{url_for('static', filename='js/jquery-3.6.0.min.js')}}"></script>
+	<!-- jQuery Easing -->
+	<script src="{{url_for('static', filename='js/jquery.easing.1.3.js')}}"></script>
+	<!-- Bootstrap -->
+	<script src="{{url_for('static', filename='js/bootstrap.min.js')}}"></script>
+	<!-- Waypoints -->
+	<script src="{{url_for('static', filename='js/jquery.waypoints.min.js')}}"></script>
+	<!-- Flexslider -->
+	<script src="{{url_for('static', filename='js/jquery.flexslider-min.js')}}"></script>
+	<!-- Sticky Kit -->
+	<script src="{{url_for('static', filename='js/sticky-kit.min.js')}}"></script>
+	<!-- Main -->
+	<script src="{{url_for('static', filename='js/main.js')}}"></script>
+	<script src="{{url_for('static', filename='js/togglechange.js')}}"></script>
+	<!-- Table -->
+
+
+<script>
+	$(function(){
+		$('#UpdatePDf').click(function(){
+			$.ajax({
+				url: '/updatepdf',
+				data: {"hola": [1, 2, 3]},
+				type: 'POST',
+				success: function(response){
+					console.log(response);
+					document.getElementById("getDate").innerHTML =response["result"];
+				},
+				error: function(error){
+					console.log(error);
+				}
+				});
+			});
+	});
+  // play beep using WebAudio (no files)
+  function playBeep(times=2){
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = ctx.currentTime;
+      for (let i=0;i<times;i++){
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = 880 - (i*120);
+        gain.gain.value = 0.12;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + i*0.22);
+        osc.stop(now + i*0.22 + 0.12);
+      }
+    } catch (e) {
+      // ignore audio errors
+      console.warn("beep failed", e);
+    }
+  }
+</script>
+
+
+<script type="text/javascript">
+    let _bg_results = null;
+	function warningResult(data_) {
+		if (Object.keys(data_).length > 0) {
+			myheader = "<a href='https://interactivebrokers.github.io/tws-api/message_codes.html' target = '_blank'>Click here to know more about IB errors</a> <br>";
+			mywarningTable = "<br>";
+			mywarningTable += "<table id='responsive-data-table' class='table dt-responsive nowrap'>";
+			mywarningTable += "<thead class='warningChangeColor'> <tr style='background-color: #F95959'> <th>Ticker</th> <th>Cusip</th> <th>Reason</th>";
+			mywarningTable += "</tr> </thead>";
+			mywarningTable += "<tbody>";
+			for (let x in data_) {
+				var mywarning = data_[x];
+				mywarningTable += "<tr>";
+				mywarningTable += "<td>" + mywarning[0] + "</td> <td>" + mywarning[1] + "</td> <td>" + mywarning[2] + "</td>";
+				mywarningTable += "</tr>";
+			}
+			mywarningTable += "<t/body>";
+			mywarningTable += "<t/table>";
+			document.getElementById("WarningData").innerHTML = myheader + mywarningTable;
+		}
+	}
+
+</script>
+
+
+<script type="text/javascript">
+	/*Add remove class*/
+	function ValidationFunction() {
+		var casa= $("#firstFormToFlask");
+		var validationFailed = true;
+		thecolors = ["red", "blue", "green", "brown"]; thecolors = "red";
+        var ndaysId = ["FastSMA", "MediumSMA", "SlowSMA", "VWAP", "RSI", "FastEMA", "SlowEMA", "OBV", "ATR",
+                       "PrevClose", "LowOfDay", "HighOfDay",
+                       "AverageVolume", "RelativeVolume", "PivotPoint", "Pricelevel"];
+        var percentageId = ["PercentageFastSMA", "PercentageMediumSMA", "PercentageSlowSMA", "PercentageVWAP", "PercentageRSI", "PercentageFastEMA", "PercentageSlowEMA", "PercentageOBV", "PercentageATR",
+                            "PercentagePrevClose", "PercentageLowOfDay", "PercentageHighOfDay",
+                            "PercentageAverageVolume", "PercentageRelativeVolume", "PercentagePivotPoint", "PercentagePrice"];
+        var comparison = ["ComparisonFastSMA", "ComparisonMediumSMA", "ComparisonSlowSMA", "ComparisonVWAP", "ComparisonRSI", "ComparisonFastEMA",  "ComparisonSlowEMA", "ComparisonOBV", "ComparisonATR",
+                           "ComparisonPrevClose", "ComparisonLowOfDay", "ComparisonHighOfDay",
+                           "ComparisonAverageVolume", "ComparisonRelativeVolume", "ComparisonPivotPoint", "ComparisonPrice"];
+		text_ = "";
+		text2 =  "";
+		var allIndicator = [];
+		for (let dd in comparison) {
+			var comp = comparison[dd];
+			var days_ = ndaysId[dd];
+			var percent_ = percentageId[dd];
+			compar_val = document.getElementById(comp).value;
+			days_val = document.getElementById(days_);
+			percent_val = document.getElementById(percent_);
+
+			//First Condtion check that is not empty
+			if (compar_val != "Not used" && (days_val.value=="" || percent_val.value == "")) {
+				text_ += "<p style='color:" + thecolors  + "; display: inline-block;'> Empty input in: " + days_ + ".</p> <br>";
+				validationFailed = false;
+			}
+			if (compar_val == "Not used") {
+				allIndicator.push(false);
+			}
+		}
+
+
+		//Prevent form to send if there is is not "Not used" and the row input
+		if (validationFailed==false || allIndicator.length == 14) {
+			if (allIndicator.length == 14) {
+				//console.log(allIndicator.length, " rrrr");
+				document.getElementById("validator").innerHTML = "<h3> Select at least one inequality</h3>";
+			} else {
+				document.getElementById("validator").innerHTML=text_;
+			}
+      		return false;
+   		}
+   		else {
+   			return true;
+   		}
+	}
+
+
+</script>
+
+
+
+<script>
+    function getColumnSimple(table_id, col) {
+        var tab = document.getElementById(table_id),
+            n = tab.rows.length,
+            arr = [],
+            row;
+
+        if (col < 0) {
+            return arr; // Return empty Array.
+        }
+        for (row = 0; row < n; ++row) {
+            if (tab.rows[row].cells.length > col) {
+                arr.push(tab.rows[row].cells[col].innerText);
+            }
+        }
+        return arr.slice(2, arr.length);
+    }
+</script>
+
+
+<script>
+/* Cleaned renderer: renderResultsFromBackend(response)
+   - single-pass
+   - clears #add1 before building
+   - safer handling of missing fields
+*/
+function renderResultsFromBackend(response) {
+    if (!response || !response.result) return;
+
+    // warnings
+    if ("warning" in response && response.warning && Object.keys(response.warning).length > 0) {
+        warningResult(response.warning);
+    }
+
+    // reset UI area
+    document.getElementById("add1").innerHTML = "";
+    document.getElementById("validator").classList.remove("loader");
+
+    var morca = response;
+    var mydata = response.result;
+
+    if (mydata === "disconnected") {
+        var text3 = "<p><span style='color: red;'>Not Connected with Interactive Brokers. Try again</span></p>";
+        if (response.error) text3 += "<p style='color:red;'>" + response.error + "</p>";
+        document.getElementById("IBForm").innerHTML = text3;
+        return;
+    }
+
+    var pivotPointVariables = ["PP", "R1", "R2", "R3", "S1", "S2", "S3"];
+    var buttonOrderId = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"];
+    var tableId = 0;
+    var idPlaceOrder = 0;
+
+    for (let etf in mydata) {
+        var idBuySell = buttonOrderId[tableId] || ("btn" + tableId);
+        var msg = mydata[etf];
+        var txt1 = "";
+
+        for (const groupKey in msg) {
+            let secondIdBuySell = 0;
+
+            const rows = Array.isArray(msg[groupKey])
+                ? msg[groupKey]
+                : Object.values(msg[groupKey] || {});
+
+            // iterate rows in this group
+            for (const dta of rows) {
+
+                // build header once per table (when secondIdBuySell === 0)
+                if (secondIdBuySell === 0) {
+                    // columns before pivot
+                    const headerCols = [
+                        { key: "symbol", label: "Ticker", raw: true },
+                        { key: "cusip",  label: "Cusip", raw: true },
+                        { key: "close",  label: "Last Price" },
+                        { key: "smaFast", label: "Fast SMA" }
+                    ];
+                    if ("smaFast1" in dta) headerCols.push({ key: "smaFast1", label: "Fast SMA1" });
+                    headerCols.push({ key: "smaMedium", label: "Medium SMA" });
+                    if ("smaMedium1" in dta) headerCols.push({ key: "smaMedium1", label: "Medium SMA1" });
+                    headerCols.push({ key: "smaSlow", label: "Slow SMA" });
+                    if ("smaSlow1" in dta) headerCols.push({ key: "smaSlow1", label: "Slow SMA1" });
+                    headerCols.push({ key: "vwap", label: "VWAP" });
+                    if ("vwap1" in dta) headerCols.push({ key: "vwap1", label: "VWAP1" });
+                    headerCols.push({ key: "rsi", label: "RSI" });
+                    if ("rsi1" in dta) headerCols.push({ key: "rsi1", label: "RSI1" });
+                    headerCols.push({ key: "emaFast", label: "Fast EMA" });
+                    if ("emaFast1" in dta) headerCols.push({ key: "emaFast1", label: "FastEMA1" });
+                    headerCols.push({ key: "emaSlow", label: "Slow EMA" });
+                    if ("emaSlow1" in dta) headerCols.push({ key: "emaSlow1", label: "SlowEMA1" });
+                    headerCols.push({ key: "obv", label: "OBV" });
+                    if ("obv1" in dta) headerCols.push({ key: "obv1", label: "OBV1" });
+                    headerCols.push({ key: "atr", label: "ATR" });
+                    if ("atr1" in dta) headerCols.push({ key: "atr1", label: "ATR1" });
+                    headerCols.push({ key: "prevClose", label: "Previous Close" });
+                    if ("PrevClose1" in dta) headerCols.push({ key: "PrevClose1", label: "Previous Close1" });
+                    headerCols.push({ key: "lowOfDay", label: "Low of Day" });
+                    if ("LowOfDay1" in dta) headerCols.push({ key: "LowOfDay1", label: "Low of Day1" });
+                    headerCols.push({ key: "highOfDay", label: "High of Day" });
+                    if ("HighOfDay1" in dta) headerCols.push({ key: "HighOfDay1", label: "High of Day1" });
+                    headerCols.push({ key: "volume", label: "Volume", raw: true });
+                    headerCols.push({ key: "averageVolume", label: "Avg Vol" });
+                    if ("averageVolume1" in dta) headerCols.push({ key: "averageVolume1", label: "Avg Vol1" });
+                    headerCols.push({ key: "relativeVolume", label: "Relative Volume" });
+                    if ("relativeVolume1" in dta) headerCols.push({ key: "relativeVolume1", label: "Relative Volume1" });
+
+                    // pivot primary
+                    const pivotPrimary = [];
+                    if (dta.Pivot && typeof dta.Pivot === "object") {
+                        for (const pp of pivotPointVariables) if (pp in dta.Pivot) pivotPrimary.push(pp);
+                    }
+                    if (pivotPrimary.length === 0) pivotPrimary.push("Pivot Point");
+
+                    // pivot secondary
+                    const pivotSecondary = [];
+                    if (dta.Pivot1 && typeof dta.Pivot1 === "object") {
+                        for (const pp of pivotPointVariables) if (pp in dta.Pivot1) pivotSecondary.push(pp);
+                    }
+
+                    // build header HTML
+                    let headerHtml = `<table id='responsive-data-table' class='table dt-responsive nowrap rsult${tableId}'>`;
+                    headerHtml += "<thead><tr>";
+                    headerHtml += headerCols.map(c => `<th>${c.label}</th>`).join("");
+                    headerHtml += pivotPrimary.map(p => `<th>${p}</th>`).join("");
+                    headerHtml += "<th>netPosition</th>";
+                    if (pivotSecondary.length > 0) headerHtml += pivotSecondary.map(p => `<th>${p}</th>`).join("");
+                    headerHtml += `<th id="SortingTable${tableId}">Change</th><th>Place Order</th>`;
+                    headerHtml += "</tr></thead><tbody>";
+                    txt1 += headerHtml;
+
+                    // persist header config on the group object (safe)
+                    var groupHeaderCols = headerCols;
+                    var groupPivotPrimary = pivotPrimary;
+                    var groupPivotSecondary = pivotSecondary;
+                }
+
+                // helper formatter
+                function fmt(x, maxDigits = 4) {
+                    if (x === null || x === undefined || x === "") return "n.d";
+                    const n = Number(x);
+                    if (!Number.isFinite(n)) return "n.d";
+                    return n.toFixed(maxDigits).replace(/\.?0+$/, "");
+                }
+
+                // net position decision
+                const np = Number(dta.netPosition);
+                const decision = Number.isFinite(np) ? (np > 0 ? "UP" : np < 0 ? "DOWN" : "UNCHANGE") : "UNCHANGE";
+                const rowClass = dta.signal === "yes" ? `content${tableId} yescondition` : `content${tableId}`;
+
+                txt1 += `<tr class='${rowClass}'>`;
+
+                const headerCols = groupHeaderCols || [];
+                const pivotPrimary = groupPivotPrimary || [];
+                const pivotSecondary = groupPivotSecondary || [];
+
+                const symbolCusipMap = {};
+                for (const key in _bg_results) {
+                    const item = _bg_results[key];
+                    if (
+                        item &&
+                        item.symbol &&
+                        item.cusip &&
+                        item.cusip !== "custom" &&
+                        item.cusip !== "None"
+                    ) {
+                        symbolCusipMap[item.symbol] = item.cusip;
+                    }
+                }
+
+                // standard columns
+                for (const col of headerCols) {
+                    let v = dta[col.key];
+                    if (
+                        col.key === "cusip" &&
+                        (!v || v === "custom" || v === "None")
+                    ) {
+                        if (symbolCusipMap[dta.symbol]) {
+                            v = symbolCusipMap[dta.symbol];
+                            // optional: persist fix
+                            dta.cusip = v;
+                        }
+                    }
+
+                    if (col.raw) {
+                        txt1 += `<td>${(v === null || v === undefined || v === "") ? "n.d" : v}</td>`;
+                    } else {
+                        txt1 += `<td>${fmt(v)}</td>`;
+                    }
+                }
+
+                // primary pivots
+                if (dta.Pivot && typeof dta.Pivot === "object") {
+                    for (const pp of pivotPrimary) {
+                        if (pp === "Pivot Point") {
+                            txt1 += `<td>n.d</td>`;
+                        } else {
+                            txt1 += `<td>${fmt(dta.Pivot[pp])}</td>`;
+                        }
+                    }
+                } else {
+                    txt1 += `<td>n.d</td>`;
+                }
+
+                // netPosition
+                txt1 += `<td>${(dta.netPosition === null || dta.netPosition === undefined || dta.netPosition === "") ? "n.d" : dta.netPosition}</td>`;
+
+                // secondary pivots
+                if (pivotSecondary.length > 0) {
+                    if (dta.Pivot1 && typeof dta.Pivot1 === "object") {
+                        for (const pp of pivotSecondary) txt1 += `<td>${fmt(dta.Pivot1[pp])}</td>`;
+                    } else {
+                        for (let i = 0; i < pivotSecondary.length; i++) txt1 += `<td>n.d</td>`;
+                    }
+                }
+
+                // change color cell
+                const tdAddColor = decision === "UP" ? "<td style='background: #4caf50'>" :
+                                   decision === "DOWN" ? "<td style='background: #f44336'>" :
+                                   "<td>";
+                txt1 += `${tdAddColor}${decision}</td>`;
+
+                // place order button
+                const totalIdBuySell = idBuySell + secondIdBuySell;
+                txt1 += `<td><button type='button' id='${totalIdBuySell}' data-toggle='modal' data-target='#exampleModalCenter' class='buttonbuysell' onclick='addButtonBuy(${idPlaceOrder}, ${totalIdBuySell})'>click</button></td>`;
+
+                txt1 += "</tr>";
+
+                secondIdBuySell += 1;
+                idPlaceOrder += 1;
+            } // end inner for
+
+            if (rows && rows.length > 0) {
+                txt1 += "</tbody></table>";
+            }
+        } // end outer for
+
+        const result = response?.result;
+
+        let hasLiveAtThatLevel = false;
+
+        if (result && typeof result === "object") {
+            for (const k in result) {
+                const group = result[k];
+
+                if (group && typeof group === "object" && ("Live" in group)) {
+                    hasLiveAtThatLevel = true;
+                    break;
+                }
+            }
+        }
+
+        if (!hasLiveAtThatLevel) {
+            let hasSignal = false;
+            for (const groupKey in msg) {
+                const rows = Array.isArray(msg[groupKey])
+                    ? msg[groupKey]
+                    : Object.values(msg[groupKey] || {});
+                for (const dta of rows) {
+                    if (dta.signal === "yes") {
+                        hasSignal = true;
+                        break;
+                    }
+                }
+                if (hasSignal) break;
+            }
+            if (hasSignal) {
+                playBeep(2);
+            }
+        }
+
+        // append to DOM
+        var para = document.createElement("H3");
+        para.innerHTML = etf;
+        document.getElementById("add1").appendChild(para);
+        var thetable = document.createElement("DIV");
+        thetable.innerHTML = txt1;
+        document.getElementById("add1").appendChild(thetable);
+        var space = document.createElement("H4");
+        space.innerHTML = "<br><br>";
+        document.getElementById("add1").appendChild(space);
+
+        try {
+            var st = document.getElementById("SortingTable" + tableId);
+            if (st) st.innerHTML = "Change <select id='filterText" + tableId + "' style='display:inline-block; color:black;' onchange='filterText(" + tableId + ")'> <option disabled selected>Select</option> <option value='UP' >UP</option> <option value='DOWN'>DOWN</option> <option value='all'>All</option> </select>";
+        } catch (e) { /* ignore */ }
+
+        // adjust font-size based on number of columns (defensive)
+        try {
+            var el = document.getElementsByClassName("rsult" + tableId)[0];
+            if (el) {
+                var numberofcolumns = el.children[0].children[0].children.length;
+                el.style.fontSize = (numberofcolumns <= 17) ? "11px" : "9.2px";
+            }
+        } catch (e) {
+            // ignore
+        }
+
+        tableId += 1;
+    } // end for each etf
+}
+</script>
+
+
+
+<script type="text/javascript">
+	  var morca;
+	  var morcae;
+	  $(document).ready(function() {
+
+	  	 $(function(){
+        	$("#firstFormToFlask, #csvimportdataform").on('submit', function(ev){
+        		var myIdOfTheFunction = this.id;
+        		/*event.preventDefault(); */
+        		document.getElementById("WarningData").innerHTML = "";
+        		document.getElementById("IBForm").innerHTML = "";
+        		document.getElementById("validator").innerHTML = "";
+        		document.getElementById("add1").innerHTML = "";
+
+        		if (myIdOfTheFunction == "csvimportdataform") {
+                  $("#firstFormToFlask").removeData("movers-active");
+				  //const formData = new FormData($(this)[0]);
+				  var formData = new FormData($(this)[0]);
+				  formData.append('data', $("#firstFormToFlask").serialize());
+				  var sendDataToFlask = formData;
+				  var myCache = false;
+				  var myContentType = false;
+				  var myProcessData = false;
+
+				} else {
+					 var sendDataToFlask = $("#firstFormToFlask").serialize();
+					 var myCache = true;
+					 var myContentType = "application/json; charset=utf-8";
+					 var myProcessData = true;
+				}
+
+                if (
+                    $("#firstFormToFlask").data("movers-active") === true
+                    ||
+                    document.getElementById("AddFinancialInstrument").style.display == "block"
+                ) {
+
+                    var myCache = false;
+                    var myContentType = "application/json; charset=utf-8";
+                    var myProcessData = false;
+
+                    let securitiesPayload;
+
+                    if ($("#firstFormToFlask").data("movers-active") === true && moversSymbols) {
+
+                        securitiesPayload = {
+                            securities: moversSymbols.map((sym, index) => ({
+                                ticker: sym,
+                                cusip: "custom" + index
+                            }))
+                        };
+
+                    } else {
+
+                        securitiesPayload = formatInstrument();
+
+                    }
+
+                    var sendDataToFlask = JSON.stringify({
+                        forms: $("#firstFormToFlask").serializeArray(),
+                        tickers: securitiesPayload
+                    });
+                }
+
+        		/*
+        		var validationResult = ValidationFunction();
+        		console.log(validationResult, " RRR");
+        		*/
+
+
+        		if (ValidationFunction() == false){
+        			ev.preventDefault();
+        		} else {
+
+
+        		document.getElementById("validator").classList.add("loader");
+
+        		var mycache
+
+        		$.ajax({
+	                url: '/something',
+	                data: sendDataToFlask,
+	                type: 'POST',
+	                contentType: myContentType,
+				    cache: myCache,
+				    processData: myProcessData,
+                    success: function(response){
+                        document.getElementById("validator").classList.remove("loader");
+                        renderResultsFromBackend(response);
+
+                        if (window.__bg_onManualRunFinished) {
+                            window.__bg_onManualRunFinished();
+                        }
+                    },
+
+	                error: function(error){
+	                	morcae = error;
+	                    console.log(error);
+
+	                }
+            		});
+            		ev.preventDefault();
+            	}
+
+        	});
+        });
+	 });
+
+</script>
+<script type="text/javascript">
+
+	/*
+	var createForm = document.getElementById("createForm");
+
+	var createSecondForm = "<form id='secondForm'>";
+    createSecondForm += "<table id='responsive-data-table' class='table dt-responsive nowrap' style='margin: 10px; table-layout:fixed;'>";
+    createSecondForm += "<caption>Send Braker Orders</caption>";
+    createSecondForm += "<thead> <tr> <th>Ticker</th> <th>Cusip</th> <th>Limit Price</th> <th>Target Profit %</th> <th>Stop Loss %</th> <th>Quantity</th> <th>Submit</th> </tr> </thead>";
+    createSecondForm += "<tbody> <tr>";
+    createSecondForm += "<td style='width:100%;'>" + "<input id = 'tickerOrder' type='text' style='width:100px;'>" + "</td>";
+    createSecondForm += "<td>" + "<input id = 'cusipOrder' type='text' style='width:110px;'>" + "</td>";
+    createSecondForm += "<td>" + "<input id = 'limitPrice' type='text' style='width:85px;'>" + "</td>";
+    createSecondForm += "<td>" + "<input id = 'highBraket' type='text' style='width:85px;'>" + "</td>";
+    createSecondForm += "<td>" + "<input id = 'lowBraket'  type='text' style='width:85px;'>" + "</td>";
+    createSecondForm += "<td>" + "<input id = 'quantity'  type='text'>" + "</td>";
+    createSecondForm += "<td>" + "<button id = 'mybutton' type='button'>Submit</button>" + "</td>";
+    createSecondForm += "</tr> </tbody>";
+    createSecondForm += "</table";
+    createSecondForm += "</form>";
+	createForm.innerHTML = createSecondForm;
+	createForm.style.display = "inline";
+	*/
+
+
+
+	$(function(){
+		$('#mybutton').click(function(){
+			document.getElementById("notConnected").innerHTML = "";
+			document.getElementById("notConnected").classList.add("loader");
+			var tickerOrder = $('#tickerOrder').val();
+			var cusipOrder = $('#cusipOrder').val();
+			var limitPrice = $('#limitPrice').val();
+			var highBraket = $('#highBraket').val();
+			var lowBraket = $('#lowBraket').val();
+			var quantity = $('#quantity').val();
+			var sendOrderToIB = {"tickerOrder": tickerOrder, "cusipOrder": cusipOrder, "limitPrice": limitPrice, "highBraket": highBraket, "lowBraket": lowBraket, "quantity":quantity}
+			$.ajax({
+				url: '/sendorders',
+				data: sendOrderToIB,
+				type: 'POST',
+				success: function(response){
+					if (response["Connection"] == "There was not connection with Interactive Brokers. Please try again") {
+						document.getElementById("notConnected").classList.remove("loader");
+						var connectionSelrver = document.createElement("H4");
+						connectionSelrver.innerHTML = response["Connection"];
+						document.getElementById("notConnected").appendChild(connectionSelrver);
+					} else {
+						document.getElementById("notConnected").classList.remove("loader");
+						var connectionSelrver = document.createElement("H4");
+						connectionSelrver.innerHTML = "Order Sent";
+						document.getElementById("notConnected").appendChild(connectionSelrver);
+					}
+				},
+				error: function(error){
+					console.log(error);
+				}
+			});
+		});
+	});
+
+
+
+
+	$(function(){
+		$('#sendOrderToFlask').click(function(){
+			document.getElementById("notConnected").innerHTML = "";
+			document.getElementById("notConnected").classList.add("loader");
+			//mystock nshare bracketLimit longshortside pricelimit supportlimit stoplosslimit resistencelimit
+			var tickerOrder = document.getElementsByClassName("mystock")[0].value;
+			var limitPrice = document.getElementsByClassName("pricelimit")[0].value;
+			var bracketlimit = document.getElementsByClassName("bracketLimit")[0].value;
+			var longshort = document.getElementsByClassName("longshortside")[0].value;
+			var highBraket = document.getElementsByClassName("resistencelimit")[0].value;
+			var lowBraket = document.getElementsByClassName("supportlimit")[0].value;
+			var quantity = document.getElementsByClassName("nshare")[0].value;
+			var stoplosslimit = document.getElementsByClassName("stoplosslimit")[0].value;
+
+			var sendOrderToIB = {"tickerOrder": tickerOrder, "limitPrice": limitPrice, "bracketlimit": bracketlimit, "longshort": longshort, "highBraket": highBraket, "lowBraket": lowBraket, "quantity":quantity, "stoplosslimit": stoplosslimit};
+
+
+			$.ajax({
+				url: '/sendorders',
+				data: sendOrderToIB,
+				type: 'POST',
+				success: function(response){
+					if (response["Connection"] == "There was not connection with Interactive Brokers. Please try again") {
+						document.getElementById("notConnected").classList.remove("loader");
+						var connectionSelrver = document.createElement("H4");
+						connectionSelrver.innerHTML = response["Connection"];
+						document.getElementById("notConnected").appendChild(connectionSelrver);
+					} else {
+						document.getElementById("notConnected").classList.remove("loader");
+						var connectionSelrver = document.createElement("H4");
+						connectionSelrver.innerHTML = "Order Sent";
+						document.getElementById("notConnected").appendChild(connectionSelrver);
+					}
+				},
+				error: function(error){
+					console.log(error);
+				}
+			});
+		});
+	});
+
+</script>
+
+
+
+
+
+
+
+<script>
+
+
+function filterText(nInt)
+	{
+		var rex = new RegExp($('#filterText'+ nInt).val());
+		if(rex =="/all/"){clearFilter(nInt)}else{
+			$('.content'+nInt).hide();
+			$('.content'+ nInt).filter(function() {
+				console.log("WWWWWWWWWWWWW", rex);
+				console.log(rex.test($(this).text()));
+
+			return rex.test($(this).text());
+			}).show();
+	}
+	}
+
+function clearFilter(nInt)
+	{
+		$('.filterText'+ nInt).val('');
+		$('.content' + nInt).show();
+	}
+
+
+
+
+
+function addButtonBuy (nelm, idtouse) {
+												var currentId = idtouse.id;
+											  	var nameTicker = document.getElementById(currentId).parentElement.parentElement.children[0].innerHTML;
+
+												var stockName = nameTicker;//document.getElementById(currentId).parentElement.children[1].innerHTML;
+												var longshort = "LONG" //document.getElementsByClassName("LongShort")[0].value";
+												var parentChildren = 7 //document.getElementById("appendFormIndicator").children.length;
+												var actualPrice = document.getElementById(currentId).parentElement.parentElement.children[2].innerHTML  //document.getElementById(currentId).parentElement.children[2].innerHTML;
+												var supporT = (parseFloat(actualPrice) * 0.99).toFixed(2) //(actualPrice)toFixed(2)
+												var resistencE = (parseFloat(actualPrice) * 1.01).toFixed(2) //(actualPrice)toFixed(2)
+												var startDiv = "<div class = 'buysell'>";
+												var startForm = "<form id = 'formToSendToFlask'>";
+												var divBuySell = "<div class = 'buysell'>";
+												var divStock = "<div class = 'makeColum'> <label class='labelbuysell'>Stock</label> <input type='text' value=" +stockName + " class = 'buysellinput mystock'></div>";
+												var divNShare = "<div class = 'makeColum'> <label class='labelbuysell'>N Share</label> <input type='number' value='1' class = 'buysellinput nshare'></div>";
+												var divBrackteLimit = "<div class = 'makeColum'> <label class='labelbuysell'>Type</label> <select class = 'buysellSelect bracketLimit' id = 'changevalues" + nelm + "'> <option value='bracket' selected=''>Bracket </option> <option value='limit'>Limit</option> </select> </div>";
+												var divBuySell = "<div class = 'makeColum'> <label class='labelbuysell'>Side</label> <select class = 'buysellSelect longshortside' onchange='SupportResistenceChange()'> <option value='long' selected=''>Long </option> <option value='short'>Short</option> </select> </div>";
+												var thecurrentPrice = "<div class = 'makeColum'> <label class='labelbuysell'>Price</label> <input type='number' value='" + actualPrice + "' class = 'buysellinput pricelimit' onchange='SupportResistenceChange()'></div>";
+
+												var supportLevel = "<div class = 'makeColum'> <label class='labelbuysell'>Stop</label> <input type='number' value='" + supporT + "' class = 'buysellinput supportlimit' id = 'support" + nelm + "'></div>";
+											  	var StopLoss = "<div class = 'makeColum'> <label class='labelbuysell'>StopLoss(%)</label> <input type='number' value='10' class = 'buysellinput stoplosslimit'></div>";
+											  	var resistenceLevel = "<div class = 'makeColum'> <label class='labelbuysell'>Target</label> <input type='number' value='" + resistencE +"' class = 'buysellinput resistencelimit' id = 'resistence" + nelm + "'></div>";
+											  	var fast_ema = "<div class = 'makeColum'> <label class='labelbuysell'>FastEMA</label> <input type='number' value='13' class = 'buysellinput'></div>";
+											  	var send = "<div class = 'makeColum'> <label class='labelbuysell'>Order</label> <button class = 'buysellinput' id = 'sendToFlask" + parentChildren + "'>Send</button></div>";
+											  	var send1 = "<div class = 'makeColum'> <label class='labelbuysell'>Order</label> <button class = 'buysellinput'>Send</button></div>";
+											  	var divBuySellClose = "</div>";
+											  	var endForm = "</form>";
+											  	var endDiv = "</div>";
+											  	//mystock nshare bracketLimit longshortside pricelimit supportlimit stoplosslimit resistencelimit
+											  	var secondPart = "<div class='secondPart'> <div class='makeColum1'> <label class='labelbuysell'>Support %</label> <input type='number' value='1' class='percentageClass' onchange='SupportResistenceChange()'> </div> <div class='makeColum1'> <label class='labelbuysell'>Resist %</label> <input type='number' value='1' class='percentageClass' onchange='SupportResistenceChange()'> </div> </div>";
+
+											  	var elementToAppend = startForm + startDiv  + divStock + divNShare + divBrackteLimit + divBuySell + thecurrentPrice + supportLevel + StopLoss + resistenceLevel + fast_ema + send  + endDiv + endForm + secondPart; // + send1;
+											  	document.getElementById("elementToAppendBuySell").innerHTML = elementToAppend;
+											  	/*
+											  	myelement = document.createElement("DIV");
+											  	myelement.setAttribute("class", "buysell");
+											  	myelement.innerHTML = elementToAppend;
+											  	document.getElementById("elfeo").appendChild(myelement);
+											  	*/
+											  	document.getElementById('changevalues' + nelm).addEventListener("change", changeOptions);
+
+											  	event.preventDefault();
+											  	//nelm = nelm + 1;
+											}
+
+
+
+
+
+
+
+
+
+
+</script>
+
+<script>
+function AddInstrument() {
+        $("#firstFormToFlask").removeData("movers-active");
+		var firstdivElem = document.createElement("DIV");
+		firstdivElem.setAttribute("class", "securityRow");
+		txtt = "";
+		txtt += "<div class='securityName'> <label class='subtitleSecurity'>Ticker</label> <input type='text' class='subtitleSecurityInput'> </div>";
+		txtt += "<div class='securityName'> <label class='subtitleSecurity'>Cusip</label> <input type='text' class='subtitleSecurityInput'> </div>";
+		firstdivElem.innerHTML = txtt;
+		document.getElementById("addcustomfields").appendChild(firstdivElem);
+
+}
+
+document.getElementById("ComparisonPivotPoint").addEventListener("change", changeInput1);
+//AverageVolume  ComparisonAverageVolume  PercentageAverageVolume
+
+
+
+
+function changeInput1() {
+  var x = document.getElementById(this.id);
+  if ( x.id == "ComparisonPivotPoint" ) {
+    if ( x.value == "between" ) {
+      document.getElementById("changePP").innerHTML = {{ Param.PivotPoint|tojson }} + {{ Param.PercentagePivotPoint(value = '0')|tojson }};
+      document.getElementById("percentagePP").innerHTML =  {{ Param.PivotPoint1|tojson }} + {{ Param.PercentagePivotPoint1(value = '0')|tojson }};
+    } else if ( x.value != "between" ) {
+    	if ( document.getElementById("PercentagePivotPoint1") != null ) {
+    		document.getElementById("changePP").innerHTML = {{ Param.PivotPoint|tojson }};
+    		document.getElementById("percentagePP").innerHTML = {{ Param.PercentagePivotPoint(value = '0')|tojson }};
+    	}
+    }
+  }
+}
+
+document.getElementById("ComparisonPrice").addEventListener("change", changeInput2);
+
+function changeInput2() {
+  var x = document.getElementById(this.id);
+  if ( x.id == "ComparisonPrice" ) {
+    if ( x.value == "between" ) {
+      document.getElementById("ChangePric").innerHTML = {{ Param.Pricelevel(class_ = 'Pricelevel')|tojson }} + {{ Param.PercentagePrice(class_ = 'PercentagePrice', value = '0')|tojson }};
+      document.getElementById("PercentagePric").innerHTML =  {{ Param.Pricelevel1(class_ = 'Pricelevel1')|tojson }} + "<br>" + {{ Param.PercentagePrice1(class_ = 'PercentagePrice1', value = '1000')|tojson }};
+    } else if ( x.value != "between" ) {
+    	if ( document.getElementById("PercentagePrice1") != null ) {
+    		document.getElementById("ChangePric").innerHTML =  {{ Param.Pricelevel(class_ = 'Pricelevel')|tojson }};
+    		document.getElementById("PercentagePric").innerHTML = {{ Param.PercentagePrice(class_ = 'PercentagePrice', value = '10')|tojson }};
+    	}
+    }
+  }
+}
+</script>
+
+<script>
+const BG_RESULTS_POLL_MS = {{ cfg_dict.get("bg_results_poll_ms", 5000) | int }};
+</script>
+
+<script>
+/*
+ Background scanner frontend glue
+ - requires jQuery (already included in page)
+ - integrates with your existing /something submit workflow
+ - keeps "Start" disabled until at least one successful run (user submitted)
+ - when user submits again, if background is running it restarts scan with new tickers
+ - polls /background/results while running to update UI and beep on new signals
+*/
+
+(function($){
+  // state
+  let _bg_enabled = false;
+  let _bg_was_running_before_manual = false;
+  let _bg_poll_timer = null;
+  let _bg_poll_ms = BG_RESULTS_POLL_MS; // poll /background/results every x seconds while running
+  let _bg_lastSecurities = null; // {cusip: [...], ticker: [...], CUSTOM: [...] } - derived from latest results DOM
+  let _bg_lastForm = null;      // form data object to be passed to /background/start
+  let _bg_interval_seconds = null;
+  let _bg_is_starting = false;
+  let _bg_user_stopped = false;   // user explicitly stopped – never auto-restart
+  let _bg_last_run_time = null;
+  let _bg_run_count = 0;
+
+  const _bg_unique_id = Date.now() + "_" + Math.floor(Math.random() * 1000000);
+
+  function flashUpdate(element, newValue) {
+      if (element.text() !== newValue) {
+          element.text(newValue);
+          element.addClass("flash-update");
+          setTimeout(function () {
+              element.removeClass("flash-update");
+          }, 800);
+      }
+  }
+
+  // helper: create form object from current main form
+  function buildFormObjectFromPage(){
+    // serializeArray -> {name: value}
+    const arr = $("#firstFormToFlask").serializeArray();
+    const obj = {};
+    for (const p of arr) {
+      obj[p.name] = p.value;
+    }
+    return obj;
+  }
+
+  // helper: extract tickers/cusips from results DOM after /something runs
+  // It walks the generated tables inside #add1 and reads first two columns (Ticker, Cusip)
+  function buildSecuritiesFromResultsDOM(){
+    const securities = { cusip: [], ticker: [], CSV: [] };
+    try {
+      // find each generated table
+      $("#add1 table").each(function(){
+        $(this).find("tbody tr").each(function(){
+          // first two <td>s are Ticker / Cusip (guarded)
+          const tds = $(this).find("td");
+          if (tds.length < 2) return;
+          const ticker = tds.eq(0).text().trim();
+          const cusip  = tds.eq(1).text().trim();
+          if (!ticker) return;
+          // avoid duplicates
+          if (!securities.ticker.includes(ticker)) {
+            securities.ticker.push(ticker);
+          }
+          if (cusip && !securities.cusip.includes(cusip)) {
+            securities.cusip.push(cusip);
+          }
+          securities.CSV.push({ cusip: cusip || ("custom_" + ticker), ticker: ticker, change: 0 });
+        });
+      });
+    } catch (e) {
+      console.error("buildSecuritiesFromResultsDOM error", e);
+    }
+    return securities;
+  }
+
+  // UI helpers
+  function setBgStatus(text){
+    $("#bg_status_text").text(text);
+  }
+  function setBgMessage(text, isError){
+    $("#bg_message").text(text || "");
+    $("#bg_message").css("color", isError ? "#c00" : "#2b7a0b");
+  }
+  function setLastRun(ts){
+      flashUpdate(
+          $("#bg_last_run"),
+          ts
+              ? new Date(ts*1000).toLocaleString() + " (Run count: " + _bg_run_count + ")"
+              : "never"
+      );
+  }
+  function setLastUpdated(ts){
+    $("#bg_last_updated").text(ts ? new Date(ts*1000).toLocaleString() : "never");
+  }
+
+  // called right after a successful /something run
+  function onSuccessfulRunResponse(){
+    // build securities snapshot from DOM (robust)
+    const sec = buildSecuritiesFromResultsDOM();
+    _bg_lastSecurities = sec;
+
+    // store form object
+    _bg_lastForm = buildFormObjectFromPage();
+
+    // enable Start button (was disabled until first run)
+    $("#bg_toggle").prop("disabled", false);
+    $("#bg_force_restart").show();
+
+    // if background currently running, restart with the same interval
+    if (_bg_was_running_before_manual === true && _bg_user_stopped === false) {
+      // stop then start with new tickers (preserve interval)
+      // small debounce to avoid spamming stops/starts if user clicks multiple times
+      if (!_bg_is_starting) {
+        _bg_is_starting = true;
+        // stop then start with last interval
+        const currentIntervalValue = $("#bg_interval_value").val();
+        const currentIntervalUnit = $("#bg_interval_unit").val();
+        // stop
+        $.ajax({ url: "/background/stop", type: "POST" }).always(function(){
+          // start after short delay to ensure server cleaned up
+          setTimeout(function(){
+            startBackgroundScanner(currentIntervalValue, currentIntervalUnit, _bg_lastForm, _bg_lastSecurities)
+            .always(function(){ _bg_is_starting = false; });
+            setBgMessage("", false);
+          }, 600);
+        });
+      }
+    }
+    // restart background only if it was running before manual submit
+    if (_bg_was_running_before_manual) {
+
+        _bg_was_running_before_manual = false;
+
+        const v = $("#bg_interval_value").val();
+        const u = $("#bg_interval_unit").val();
+
+        setTimeout(function(){
+            startBackgroundScanner(
+                v,
+                u,
+                _bg_lastForm,
+                _bg_lastSecurities
+            ).always(function(){
+                $("#bg_toggle").text("Stop");
+                setBgMessage("Scanner running", false);
+            });
+        }, 500);
+    }
+  }
+
+  // Start scanner AJAX call
+  function startBackgroundScanner(value, unit, formObj, securitiesObj){
+    if (!formObj || !securitiesObj) {
+      setBgMessage("Missing form or securities. Run the screening once first.", true);
+      return $.Deferred().reject().promise();
+    }
+
+    // prepare payload
+    const payload = {
+      value: Number(value),
+      unit: unit,
+      form: formObj,
+      securities: securitiesObj,
+      tab_unique_id: _bg_unique_id
+    };
+
+    setBgMessage("Starting background scanner...", false);
+    setBgStatus("starting");
+
+    return $.ajax({
+      url: "/background/start",
+      type: "POST",
+      contentType: "application/json; charset=utf-8",
+      data: JSON.stringify(payload),
+      timeout: 20000
+    }).done(function(resp){
+      _bg_enabled = true;
+      // convert to seconds for book-keeping
+      const secs = (unit === "seconds" ? value : unit === "minutes" ? value*60 : value*3600);
+      _bg_interval_seconds = secs;
+      setBgStatus("running");
+      setBgMessage("Scanner running", false);
+      // start polling
+      startPollingResults();
+    }).fail(function(xhr){
+      if (xhr && xhr.status === 409) {
+        setBgMessage("Scanner already running (server returned 409).", true);
+      } else {
+        setBgMessage("Failed to start scanner: " + (xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : xhr.statusText || "error"), true);
+      }
+      setBgStatus("stopped");
+    });
+  }
+
+  // Stop scanner AJAX call
+  function stopBackgroundScanner(){
+    setBgMessage("Stopping...", false);
+    setBgStatus("stopping");
+    _bg_last_run_time = null;
+    _bg_run_count = 0;
+    return $.ajax({ url: "/background/stop", type: "POST", timeout: 10000 })
+      .always(function(){
+        _bg_enabled = false;
+        setBgStatus("stopped");
+        setBgMessage("", false);
+        stopPollingResults();
+      });
+  }
+
+  // Polling loop to get /background/results
+  function startPollingResults(){
+    stopPollingResults();
+    // initial one immediately
+    pollOnceBackgroundResults();
+    _bg_poll_timer = setInterval(pollOnceBackgroundResults, _bg_poll_ms);
+  }
+  function stopPollingResults(){
+    if (_bg_poll_timer) {
+      clearInterval(_bg_poll_timer);
+      _bg_poll_timer = null;
+    }
+  }
+
+    // Poll once
+    function pollOnceBackgroundResults(){
+
+         $("#bg_client_last_poll").text(new Date().toLocaleString());
+
+        $.ajax({
+            url: "/background/results",
+            type: "GET",
+            dataType: "json",
+            timeout: 8000
+        })
+        .done(function(resp){
+
+            if (!resp) return;
+
+            let last_run_time = resp.last_run_time;
+            if (last_run_time) {
+                if(last_run_time !== _bg_last_run_time) {
+                    _bg_last_run_time = last_run_time;
+                    _bg_run_count++;
+                }
+                setLastRun(last_run_time);
+                const dateStr = new Date(last_run_time * 1000).toLocaleString() + " (Run count: " + _bg_run_count + ")";
+                flashUpdate(
+                    $("#bg_backend_last_run"), dateStr
+                );
+            }
+
+            setLastUpdated(Math.floor(Date.now()/1000));
+
+            if (resp.warning && Object.keys(resp.warning).length > 0) {
+                $("#bg_latest_summary").text(
+                    "Warnings: " + JSON.stringify(resp.warning).slice(0,200)
+                );
+            } else {
+                $("#bg_latest_summary").text(
+                    "Results: " + (resp.results ? Object.keys(resp.results).length + " symbols" : "no results")
+                );
+            }
+
+            if (resp.beep) {
+                playBeep(2);
+                $("#bg_status").fadeOut(120).fadeIn(120);
+            }
+
+            // -------------------------------------------------------
+            // >>> ADAPTER LAYER (THIS IS THE IMPORTANT PART)
+            // -------------------------------------------------------
+            if (
+                resp.results &&
+                typeof resp.results === "object" &&
+                Object.keys(resp.results).length > 0   // <<< VERY IMPORTANT GUARD
+            ) {
+                _bg_results = resp.results;
+                const wrapped = {
+                    result: {
+                        "Background scan": {
+                            "Live": {}
+                        }
+                    },
+                    warning: resp.warning || {}
+                };
+
+                for (const k in resp.results) {
+                    const item = resp.results[k];
+                    const rowKey = (item && (item.symbol || item.cusip))
+                        ? (item.symbol || item.cusip)
+                        : k;
+
+                    wrapped.result["Background scan"]["Live"][rowKey] = item;
+                }
+
+                if (_bg_enabled) {
+                    setBgStatus("running");
+                    setBgMessage("Scanner running", false);
+                }
+                renderResultsFromBackend(wrapped);
+            }
+
+        })
+        .fail(function(xhr){
+            setBgMessage(
+                "Polling error: " + (xhr.statusText || "network"),
+                true
+            );
+        });
+    }
+
+  // wire UI events
+  function wireUi(){
+    // click start/stop toggle
+    $("#bg_toggle").on("click", function(e){
+      e.preventDefault();   // <- stops the button from submitting the form
+      const $btn = $(this);
+      if (!_bg_enabled) {
+        // attempt to start
+        _bg_user_stopped = false;
+        const v = $("#bg_interval_value").val();
+        const u = $("#bg_interval_unit").val();
+        // validation
+        if (!v || Number(v) < 1) {
+          setBgMessage("Interval value must be >= 1", true);
+          return;
+        }
+        if (!_bg_lastForm || !_bg_lastSecurities) {
+          setBgMessage("Run the screening once (click Run) so the app knows the tickers to watch.", true);
+          return;
+        }
+        // start
+        startBackgroundScanner(v, u, _bg_lastForm, _bg_lastSecurities)
+          .always(function(){
+            // if success, flip button label
+            if (_bg_enabled) {
+              $btn.text("Stop");
+            }
+          });
+          $("#validator").addClass("loader");
+          // Scroll after 1 second
+          setTimeout(function () {
+            const target = document.querySelector("#firstFormToFlask > div.card-panel.section-fade");
+            if (target) {
+                target.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start"
+                });
+            }
+        }, 1000);
+      } else {
+        // hard user stop → behave as if it was never started since page load
+        _bg_was_running_before_manual = false;
+        _bg_user_stopped = true;
+
+        stopBackgroundScanner().always(function(){
+            $btn.text("Start");
+        });
+      }
+    });
+
+    $("#bg_force_restart").on("click", function(){
+      if (!_bg_lastForm || !_bg_lastSecurities) {
+        setBgMessage("No last run available. Run the screening once.", true);
+        return;
+      }
+      // restart preserving selected interval
+      const v = $("#bg_interval_value").val();
+      const u = $("#bg_interval_unit").val();
+      // stop then start
+      stopBackgroundScanner().always(function(){
+        setTimeout(function(){
+          startBackgroundScanner(v,u,_bg_lastForm,_bg_lastSecurities).always(function(){
+            $("#bg_toggle").text("Stop");
+            setBgStatus("running");
+            setBgMessage("Scanner running", false);
+          });
+        }, 500);
+      });
+    });
+  }
+
+    function hookManualSubmitStopStart(){
+
+        $("#firstFormToFlask, #csvimportdataform").on("submit.bgscanner", function(){
+
+            // If user has manually stopped the scanner, treat it as never running
+            if (_bg_user_stopped === true) {
+                _bg_was_running_before_manual = false;
+                return;
+            }
+
+            if (_bg_enabled) {
+                _bg_was_running_before_manual = true;
+
+                // stop background before manual run
+                stopBackgroundScanner();
+            } else {
+                _bg_was_running_before_manual = false;
+            }
+
+        });
+
+    }
+
+
+  // When the main form successfully completes a /something AJAX call the page already builds the results.
+  // We will intercept that moment by hooking into the existing submit success code path.
+  // Since your page currently constructs `mydata = response["result"]` and then builds DOM inside #add1,
+  // we rely on that DOM being present and call buildSecuritiesFromResultsDOM() from outside.
+  // So we need to observe DOM changes inside #add1 and react.
+  function watchResultsDomMutations(){
+    const target = document.getElementById("add1");
+    if (!target) return;
+    const observer = new MutationObserver(function(mutations){
+      // call onSuccessfulRunResponse when new results are added
+      // simple heuristic: if #add1 has >= 1 table we consider a successful run
+      if ($("#add1 table").length > 0) {
+        // allow the page to finish building (short delay)
+        setTimeout(function(){ onSuccessfulRunResponse(); }, 350);
+      }
+    });
+    observer.observe(target, { childList: true, subtree: true });
+  }
+
+  // initialize on DOM ready
+  $(function(){
+    wireUi();
+    watchResultsDomMutations();
+    hookManualSubmitStopStart();
+    // start UI disabled until we have lastSecurities
+    $("#bg_toggle").prop("disabled", true);
+    setBgStatus("stopped");
+    setBgMessage("", false);
+    // optionally restore status from server on page load
+    $.get("/background/status").done(function(st){
+      if (st && st.enabled) {
+        // we don't know the securities on page load; leave button ON but disabled until user runs screening
+        $("#bg_toggle").text("Stop");
+        _bg_enabled = true;
+        setBgStatus("running");
+        setBgMessage("Scanner running", false);
+        startPollingResults();
+      }
+    }).fail(function(){ /* ignore */ });
+  });
+    window.__bg_onManualRunFinished = function(){
+        onSuccessfulRunResponse();
+    };
+})(jQuery);
+</script>
+
+<script>
+/* Setup Save / Load JS - depends on jQuery (already on page) */
+
+/* helper: gather the current form into an object */
+function getCurrentFormObject() {
+  const arr = $("#firstFormToFlask").serializeArray();
+  const obj = {};
+
+  arr.forEach(({ name, value }) => {
+    if (obj[name] !== undefined) {
+      // If already exists, convert to array
+      if (!Array.isArray(obj[name])) {
+        obj[name] = [obj[name]];
+      }
+      obj[name].push(value);
+    } else {
+      obj[name] = value;
+    }
+  });
+
+  return obj;
+}
+
+/* helper: build securities snapshot from current DOM (re-uses same function used by background code) */
+function buildSecuritiesFromResultsDOM() {
+  // reuse the adapter logic already used in bg code: it reads tables in #add1
+  const securities = { cusip: [], ticker: [], CSV: [] };
+  try {
+    $("#add1 table").each(function(){
+      $(this).find("tbody tr").each(function(){
+        const tds = $(this).find("td");
+        if (tds.length < 2) return;
+        const ticker = tds.eq(0).text().trim();
+        const cusip  = tds.eq(1).text().trim();
+        if (!ticker) return;
+        if (!securities.ticker.includes(ticker)) securities.ticker.push(ticker);
+        if (cusip && !securities.cusip.includes(cusip)) securities.cusip.push(cusip);
+        securities.CSV.push({ cusip: cusip || ("custom_" + ticker), ticker: ticker, change: 0 });
+      });
+    });
+  } catch (e) {
+    console.error("buildSecuritiesFromResultsDOM error", e);
+  }
+  return securities;
+}
+
+/* show small feedback */
+function _showSetupMsg(msg, isErr) {
+  $("#setup_msg").text(msg).css("color", isErr ? "#c00" : "#2b7a0b");
+  setTimeout(() => $("#setup_msg").text(""), 4000);
+}
+
+/* Save Setup */
+$("#save_setup").on("click", function(){
+  const name = prompt("Save setup as (choose a short name):");
+  if (!name) return;
+  const payload = {
+    name: name,
+    overwrite: false,
+    form: getCurrentFormObject(),
+    securities: buildSecuritiesFromResultsDOM()
+  };
+  $.ajax({
+    url: "/setups/save",
+    type: "POST",
+    contentType: "application/json; charset=utf-8",
+    data: JSON.stringify(payload),
+    success: function(resp) {
+      if (resp && resp.ok) {
+        _showSetupMsg("Saved: " + name, false);
+      } else if (resp && resp.exists) {
+        if (confirm("Setup already exists. Overwrite?")) {
+          payload.overwrite = true;
+          $.ajax({
+            url: "/setups/save",
+            type: "POST",
+            contentType: "application/json; charset=utf-8",
+            data: JSON.stringify(payload),
+            success: function(resp2){
+              if (resp2 && resp2.ok) _showSetupMsg("Overwritten: " + name, false);
+            },
+            error: function(){ _showSetupMsg("Save failed", true); }
+          });
+        }
+      } else {
+        _showSetupMsg("Save failed", true);
+      }
+    },
+    error: function(xhr){
+      const msg = (xhr.responseJSON && xhr.responseJSON.error) ? xhr.responseJSON.error : "save failed";
+      _showSetupMsg(msg, true);
+    }
+  });
+});
+
+/* Load Setup: open simple chooser prompt then request and apply */
+$("#load_setup").on("click", function(){
+  $.get("/setups/list").done(function(resp){
+    const setups = (resp && resp.setups) ? resp.setups : [];
+    if (setups.length === 0) {
+      alert("No saved setups found.");
+      return;
+    }
+    // build a simple selection string
+    let choices = "Choose a setup to load:\n\n";
+    setups.forEach((s, idx) => {
+      choices += (idx + 1) + ") " + (s.title || s.name) + " (" +
+        new Date(s.created).toLocaleString("en-US", {
+          month: "short",
+          day: "2-digit",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true
+        }) +
+        ")\n";
+    });
+    const sel = prompt(choices + "\nEnter the number to load:");
+    const i = parseInt(sel) - 1;
+    if (!Number.isFinite(i) || i < 0 || i >= setups.length) return;
+    const chosen = setups[i];
+    // request the chosen setup
+    $.ajax({
+      url: "/setups/load",
+      type: "POST",
+      contentType: "application/json; charset=utf-8",
+      data: JSON.stringify({ name: chosen.name }),
+      success: function(data){
+        if (!data || !data.form) {
+          _showSetupMsg("Invalid setup", true);
+          return;
+        }
+        // Explicitly ignore securities on load
+        delete data.securities;
+        // apply form fields to page
+        const form = data.form;
+        // for each key present in form, try set matching input/select
+        for (const k in form) {
+          if (k === "csrf_token") continue;   // do not load the csrf token
+
+          const el = $("[name='" + k + "']");
+
+          if (el.length > 0) {
+
+            // handle radio / checkbox groups correctly
+            if (el.length > 1 && (el[0].type === "radio" || el[0].type === "checkbox")) {
+
+              el.each(function () {
+                this.checked = (this.value == form[k]);
+              });
+
+            } else {
+              el.val(form[k]);
+            }
+
+            // trigger change for dynamic behaviors
+            el.trigger("change");
+
+          } else {
+
+            // try fields that may be named in other casing (graceful)
+            const alt = $("[name='" + k.toString().replace(/_/g, "") + "']");
+
+            if (alt.length > 0) {
+
+              if (alt.length > 1 && (alt[0].type === "radio" || alt[0].type === "checkbox")) {
+
+                alt.each(function () {
+                  this.checked = (this.value == form[k]);
+                });
+
+              } else {
+                alt.val(form[k]);
+              }
+
+              alt.trigger("change");
+            }
+          }
+        }
+        // If securities present, optionally update DOM or keep for when user runs
+        // (We will not overwrite the add1 DOM here; the user can re-run to refresh)
+        _showSetupMsg("Loaded: " + (data.meta && data.meta.title ? data.meta.title : chosen.name), false);
+      },
+      error: function(xhr){
+        _showSetupMsg("Load failed", true);
+      }
+    });
+  }).fail(function(){ _showSetupMsg("Failed to list setups", true); });
+});
+</script>
+
+<script>
+$("#movers_header").on("click", function () {
+
+    const list = $("#movers_list");
+    const arrow = $("#movers_arrow");
+
+    list.toggle();
+
+    if (list.is(":visible")) {
+        arrow.css("transform", "rotate(90deg)");
+    } else {
+        arrow.css("transform", "rotate(0deg)");
+    }
+});
+
+function toggleIbkrMovers() {
+    const panel = document.getElementById("ibkr-movers-panel");
+
+    if (!panel) return;
+
+    panel.style.display = panel.style.display === "none" ? "block" : "none";
+
+    if (panel.style.display === "none") {
+        $("#firstFormToFlask").removeData("movers-active");
+    }
+}
+
+function loadIbkrMovers() {
+
+    const scan_code = $("#movers_scan_code").val();
+    const min_price = $("#movers_min_price").val();
+    const min_volume = $("#movers_min_volume").val();
+
+    const payload = {
+        scan_code: scan_code,
+        min_price: min_price === "" ? null : Number(min_price),
+        min_volume: min_volume === "" ? null : Number(min_volume)
+    };
+
+    $("#movers_status").text("Loading...");
+    $("#movers_use_btn").hide();
+
+    $.ajax({
+        url: "/scanner/universe",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify(payload),
+        success: function (resp) {
+
+            // Expecting: { rows: [ {rank, symbol}, ... ] }
+
+            if (!resp || !Array.isArray(resp.rows)) {
+                $("#movers_status").text("Invalid scanner response");
+                console.error(resp);
+                return;
+            }
+
+            moversRows = resp.rows;
+            moversSymbols = resp.rows.map(x => x.symbol);
+
+            const count = moversSymbols.length;
+
+            if (count > 0) {
+                $("#movers_status").text(
+                    count + " symbols loaded from IBKR Movers"
+                );
+
+                // Render list
+                const listContainer = $("#movers_list");
+                listContainer.empty();
+
+                moversRows.forEach(row => {
+                    const percentText =
+                        row.percent != null && !isNaN(row.percent)
+                            ? `${Number(row.percent).toFixed(2)}%`
+                            : "Percent change unavailable from IBKR API market data";
+
+                    const conIdText =
+                        row.conId != null && row.conId !== ""
+                            ? `IBKR Contract ID: ${row.conId}`
+                            : "IBKR Contract ID unavailable";
+
+                    listContainer.append(
+                        `<div>
+                            ${Number(row.rank) + 1}.
+                            ${row.symbol}
+                            (${percentText})
+                            (${conIdText})
+                        </div>`
+                    );
+                });
+                $("#movers_use_btn").show();
+            } else {
+                $("#movers_status").text("No symbols returned");
+            }
+        },
+        error: function(xhr){
+            $("#movers_status").text("IBKR Movers unavailable");
+            console.error(xhr);
+        }
+    });
+}
+
+function useMovers() {
+
+    if (!moversSymbols || moversSymbols.length === 0) {
+        $("#movers_status").text("No movers to use");
+        return;
+    }
+
+    if (ValidationFunction() === false) {
+        return;
+    }
+
+    $("#firstFormToFlask").data("movers-active", true);
+    $("#movers_use_btn").hide();
+
+    // Scroll immediately on click
+    const target = document.querySelector("#firstFormToFlask > div.card-panel.section-fade");
+    if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    $("#validator").addClass("loader");
+
+    // Build the securities' list exactly how backend expects
+    const securitiesList = moversSymbols.map((sym, index) => {
+        const row = moversRows.find(r => r.symbol === sym);
+        if (row) {
+            // New logic with conId
+            return {
+                ticker: sym,
+                conId: row.conId,
+                cusip: "custom" + index
+            };
+        } else {
+            // Original logic (no conId)
+            return {
+                ticker: sym,
+                cusip: "custom" + index
+            };
+        }
+    });
+
+    const payload = {
+        forms: $("#firstFormToFlask").serializeArray(),
+        tickers: {
+            securities: securitiesList
+        }
+    };
+
+    $.ajax({
+        url: "/something",
+        type: "POST",
+        contentType: "application/json; charset=utf-8",
+        data: JSON.stringify(payload),
+        processData: false,
+        cache: false,
+        success: function(response){
+
+            $("#validator").removeClass("loader");
+
+            renderResultsFromBackend(response);
+
+            if (window.__bg_onManualRunFinished) {
+                window.__bg_onManualRunFinished();
+            }
+        },
+        error: function(error){
+            $("#validator").removeClass("loader");
+            console.error(error);
+        }
+    });
+}
+</script>
+
+<script>
+function updateCurrentTime() {
+    const now = new Date();
+
+    document.getElementById('bg_now').textContent = now.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+}
+
+updateCurrentTime();
+setInterval(updateCurrentTime, 1000);
+
+window.addEventListener("beforeunload", function () {
+    if (window.navigator.sendBeacon) {
+        const payload = {
+            tab_unique_id: _bg_unique_id
+        };
+        const blob = new Blob(
+            [JSON.stringify(payload)],
+            { type: "application/json" }
+        );
+        navigator.sendBeacon("/background/stop", blob);
+    }
+});
+</script>
+
+	</body>
+</html>

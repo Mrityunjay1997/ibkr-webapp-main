@@ -1,0 +1,220 @@
+table {
+  border-collapse: collapse; }
+
+
+input[type="text"] {
+    height: 40%;
+    width: 140px;
+}
+
+
+form table thead tr {
+    border: 1px solid;
+    background-color: #009879;
+    color: #ffffff;
+    padding: 2px;
+    text-align: left;
+}
+
+
+form table tbody tr {
+    border: 1px solid #dddddd;
+    background-color: #f3f3f3;
+    padding: 2px;
+}
+
+
+#validator {
+    margin-left: 50px;
+}
+
+#resolveThis {
+    width: 120px;
+    margin-left: 5%;
+    background: #858a54;
+}
+
+#UpdatePDf:focus {     
+    background-color:#da8080;    
+}
+
+.inputChange {
+    max-width: 70%;
+    display: flex;
+    flex-wrap: flex;
+}
+
+.internalinputChange {
+    display: flex;
+    flex-wrap: flex;
+}
+
+#PercentageFastSMA {
+    /*width: 140px;*/
+}
+
+#PercentageFastSMA1 {
+    width: 70px;
+    height: 48%;
+}
+
+#PercentageSlowSMA1{
+    width: 70px;
+    height: 48%;
+}
+
+#PercentageVWAP1{
+    width: 70px;
+    height: 48%;
+}
+
+#PercentageRSI1{
+    width: 70px;
+    height: 48%;
+}
+
+#PercentageEMA1{
+    width: 70px;
+    height: 48%;
+}
+
+#PercentageOBV1{
+    width: 70px;
+    height: 48%;
+}
+
+#PercentageATR1{
+    width: 70px;
+    height: 48%;
+}
+
+#PercentagePrevClose1{
+    width: 70px;
+    height: 48%;
+}
+
+#PercentageLowOfDay1{
+    width: 70px;
+    height: 48%;
+}
+
+#PercentageHighOfDay1{
+    width: 70px;
+    height: 48%;
+}
+
+.inputChangediv {
+    max-width: 70%;
+    display: flex;
+    flex-wrap: flex;
+}
+
+.veritclAlign {
+    display: flex;
+    flex-direction: column;
+}
+
+#labeltableth {
+    margin: 0px;
+    font-size: 8px;
+}
+
+#FastSMA {
+    /*width: 140px;*/
+}
+
+#FastSMA1 {
+    width: 70px;
+    height: 48%;
+}
+
+
+/*Table Fontsize */
+.rsult1 {
+    font-size: 11px;
+}
+.rsult2 {
+    font-size: 11px;
+}
+.rsult3 {
+    font-size: 11px;
+}
+.rsult4 {
+    font-size: 11px;
+}
+.rsult5 {
+    font-size: 11px;
+}
+.rsult6 {
+    font-size: 11px;
+}
+
+.secondTableHead {
+    font-size: 11px;
+}
+
+.secondTableBody {
+    font-size: 11px;
+}
+
+/****************************************/
+/*Formating Close Previos Close*/
+.llegoelrastrillo {
+    background: #aab9b6;
+}
+
+.closesymbol {
+    color: white;
+    background: #04362c;
+    font-size: 12px;
+    font-family: Copperplate;
+    padding: 2px;
+    margin-right: 11px;
+}
+
+.selectclose {
+    font-size: 15px;
+    display: inline-flex;
+    margin-bottom: 10px;
+}
+
+.SubmitData{
+    background: #009879;
+    text-align: right;
+    font-size: 15px;
+    margin-right: 30px;
+    margin-top: 15px;
+}
+
+#csvimportdataform {
+    display: none;
+}
+
+#WarningData {
+    display: none;
+}
+
+#customAllform {
+    margin-left: 20px;
+    display: inline-flex;
+    width: 100%;
+}
+
+#allForm {
+    width: 72%;
+    margin-left: 4px;
+}
+
+#customformToUse {
+    /*border-left: solid 1px;*/
+    margin-top: 5px;
+    padding-left: 10px;
+}
+
+#AddFinancialInstrument {
+    display: none;
+}
+
+thead .tableHead {
+    font-size: 13px;
+}
