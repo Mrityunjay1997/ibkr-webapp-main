@@ -85,6 +85,34 @@ class FakeIBapi(IBapi):
         return data
 
 
+def test_getDataResult_success_and_fail():
+    # Success path should mark symbol succeeded and have no warning for the symbol
+    success_api = FakeIBapi("success")
+    success_api.getDataResult(
+        i="123456789",
+        m="AAPL",
+        net_position={"123456789": 0},
+        form={},
+        theid=1,
+    )
+
+    assert "AAPL" in success_api._failure_tracker.succeeded_symbols
+    assert success_api._failure_tracker.failed_symbols == {}
+
+    # Fail path should mark symbol failed and populate warningTicker entry
+    fail_api = FakeIBapi("fail")
+    fail_api.getDataResult(
+        i="123456789",
+        m="AAPL",
+        net_position={"123456789": 0},
+        form={},
+        theid=1,
+    )
+
+    assert "AAPL" in fail_api._failure_tracker.failed_symbols
+    assert fail_api.warningTicker, "warningTicker should contain a failure message"
+
+
 def run_case(mode):
     print("\n==============================")
     print("Running case:", mode)

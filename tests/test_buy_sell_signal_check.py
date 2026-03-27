@@ -34,12 +34,29 @@ def minimal_form():
         "VWAPBool": "value",
         "ComparisonFastSMA": "Not used",
         "SMAFastBool": "value",
+        "ComparisonMediumSMA": "Not used",
+        "SMAMediumBool": "value",
         "ComparisonSlowSMA": "Not used",
         "smaslowyesno": "value",
         "ComparisonRSI": "Not used",
+        "ComparisonFastEMA": "Not used",
+        "FastEMABool": "value",
+        "ComparisonSlowEMA": "Not used",
+        "SlowEMABool": "value",
+        "ComparisonOBV": "Not used",
+        "OBVBool": "value",
+        "ComparisonATR": "Not used",
+        "ATRBool": "value",
+        "PrevCloseBool": "value",
+        "LowOfDayBool": "value",
+        "HighOfDayBool": "value",
+        "PullbackBool": "value",
         "ComparisonPivotPoint": "Not used",
         "pivotPointBool": "value",
         "ComparisonRelativeVolume": "Not used",
+        "SMACrossoverPeriod": "50",
+        "ComparisonSMACrossover": "Not used",
+        "SMACrossoverBool": "value",
     }
 
 
@@ -285,3 +302,104 @@ def test_mixed_conditions_one_false():
 
     # price ok, rsi fails
     assert out["signal"] == "no"
+
+
+# ------------------------------------------------------------------
+# 11) pullback percentage/value behavior
+# ------------------------------------------------------------------
+def test_pullback_value_condition_ok():
+    d = Dummy()
+    data = minimal_data()
+    data.update({
+        "cusip": "X",
+        "close": 90.0,
+        "high": 120.0,
+        "prevClose": 100.0,
+        "pullback": (120.0 - 90.0) / (120.0 - 100.0),  # 1.5
+    })
+
+    form = minimal_form()
+    form.update({
+        "ComparisonPullback": "greater",
+        "PullbackBool": "value",
+        "PercentagePullback": "1.0",
+    })
+
+    out = d.buySellSignalCheck(data, form)
+
+    assert out["signal"] == "yes"
+
+
+# ------------------------------------------------------------------
+# 12) highest high breakout + near-high behavior
+# ------------------------------------------------------------------
+def test_highest_high_breakout_and_near():
+    d = Dummy()
+    data = minimal_data()
+    data.update({
+        "cusip": "X",
+        "close": 101.0,
+        "highestHigh": 100.0,
+    })
+
+    form = minimal_form()
+    form.update({
+        "HighestHighBool": "value",
+        "ComparisonHighestHigh": "greater",
+    })
+
+    out = d.buySellSignalCheck(data, form)
+    assert out["signal"] == "yes"
+
+    data["close"] = 99.5
+    form["HighestHighBool"] = "percentage"
+    form["ComparisonHighestHigh"] = "near"
+    form["PercentageHighestHigh"] = "1.0"  # within 1% of 100 => 99.0..100
+
+    out2 = d.buySellSignalCheck(data, form)
+    assert out2["signal"] == "yes"
+
+
+def test_sma_crossover_50_cross_above_and_below():
+    d = Dummy()
+    data = minimal_data()
+    data.update({
+        "cusip": "X",
+        "prevClose": 99.0,
+        "close": 101.0,
+        "sma50": 100.0,
+        "sma200": 100.0,
+    })
+
+    form = minimal_form()
+    form.update({
+        "SMACrossoverPeriod": "50",
+        "ComparisonSMACrossover": "crossAbove",
+    })
+
+    out = d.buySellSignalCheck(data, form)
+    assert out["signal"] == "yes"
+
+    data["prevClose"] = 101.0
+    data["close"] = 99.0
+    form["ComparisonSMACrossover"] = "crossBelow"
+
+    out2 = d.buySellSignalCheck(data, form)
+    assert out2["signal"] == "yes"
+
+
+def test_scanner_name_propagates_to_result():
+    d = Dummy()
+    data = minimal_data()
+    data.update({
+        "cusip": "X",
+        "close": 10.0,
+    })
+
+    form = minimal_form()
+    form["ScannerName"] = "My Scanner"
+
+    out = d.buySellSignalCheck(data, form)
+
+    assert out["scanner_name"] == "My Scanner"
+    assert d.sendToFlaskIB["X"]["scanner_name"] == "My Scanner"

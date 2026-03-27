@@ -9,6 +9,9 @@ class Config:
         config.read(Path(config_path))
 
         flask_section = config["Flask"] if "Flask" in config else {}
+        #### MY CHANGES FOR DEV /LOCAL #####
+        self.dev_mode = flask_section.get("dev_mode", "false").lower() in ("1", "true", "yes", "on")
+        ########
         self.flask_run_port = int(
             flask_section.get("flask_run_port", 5000)
         )
@@ -75,17 +78,29 @@ class Config:
             ibkr_section.get("location_code", "STK.US")
         )
 
-        self.scale_volume_metrics = ibkr_section.getboolean(
-            "scale_volume_metrics", True
+        self.news_api_provider = str(
+            ibkr_section.get("news_api_provider", "").strip()
         )
-    # changed to true 3/9/2026 testing
-        self.force_min_volume = ibkr_section.getboolean(
-            "force_min_volume", True
+
+        self.news_api_key = str(
+            ibkr_section.get("news_api_key", "").strip()
         )
-#change FALSE to true 3/9/2026 testing
-        self.cache_garbage_collection = ibkr_section.getboolean(
-            "cache_garbage_collection", True
-        )
+
+        def _read_bool(section, key, default):
+            val = section.get(key, default)
+            if isinstance(val, bool):
+                return val
+            if isinstance(val, str):
+                return val.strip().lower() in ("1", "true", "yes", "on")
+            return bool(val)
+
+        self.scale_volume_metrics = _read_bool(ibkr_section, "scale_volume_metrics", True)
+
+        # changed to true 3/9/2026 testing
+        self.force_min_volume = _read_bool(ibkr_section, "force_min_volume", True)
+
+        # change FALSE to true 3/9/2026 testing
+        self.cache_garbage_collection = _read_bool(ibkr_section, "cache_garbage_collection", True)
 
 
 def parse_interval(value: str, *, to: str = "s") -> int:
