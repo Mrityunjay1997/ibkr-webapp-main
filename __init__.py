@@ -17,6 +17,7 @@ from waitress import serve
 from io import TextIOWrapper
 from datetime import datetime, UTC
 from forms import Parameters, SecondSubmit
+from scanners import ScannerConfigManager
 from flask import Flask, render_template, request, jsonify
 
 # -----------------------------------------------------------------------------
@@ -30,6 +31,9 @@ logger = logging.getLogger("ibkr_app")
 
 cfg = Config()
 cfg.setups_dir.mkdir(exist_ok=True)
+
+# Initialize scanner config manager
+scanner_config_manager = ScannerConfigManager(storage_dir="scanner_configs")
 
 
 # -----------------------------------------------------------------------------
@@ -2017,6 +2021,196 @@ def fetch_news():
             "error": "failed to fetch news",
             "symbol": request.args.get('symbol', '')
         }), 500
+
+
+# -------------------------------------------------------------------------
+# SCANNER CONFIG MANAGEMENT ENDPOINTS
+# -------------------------------------------------------------------------
+
+@app.route("/scanner-config/save", methods=["POST"])
+def scanner_config_save():
+    """
+    Save a scanner configuration.
+    
+    Expects JSON:
+    {
+      "name": "My Scanner Config",
+      "form_data": { ... }  # Complete form data from Parameters
+    }
+    
+    Returns:
+    { "success": true|false, "message": "...", "config_name": "..." }
+    """
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"success": False, "message": "JSON payload required"}), 400
+        
+        config_name = payload.get("name", "").strip()
+        form_data = payload.get("form_data", {})
+        
+        if not config_name:
+            return jsonify({"success": False, "message": "Configuration name is required"}), 400
+        
+        if not isinstance(form_data, dict):
+            return jsonify({"success": False, "message": "Form data must be an object"}), 400
+        
+        result = scanner_config_manager.save_scanner_config(config_name, form_data)
+        
+        status_code = 200 if result.get("success") else 400
+        return jsonify(result), status_code
+    
+    except Exception as e:
+        logger.exception("Failed to save scanner config: %s", e)
+        return jsonify({"success": False, "message": "Error saving configuration"}), 500
+
+
+@app.route("/scanner-config/load", methods=["POST"])
+def scanner_config_load():
+    """
+    Load a scanner configuration.
+    
+    Expects JSON:
+    { "name": "My Scanner Config" }
+    
+    Returns:
+    { "success": true|false, "message": "...", "form_data": {...}, "created_at": "...", "updated_at": "..." }
+    """
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"success": False, "message": "JSON payload required"}), 400
+        
+        config_name = payload.get("name", "").strip()
+        
+        if not config_name:
+            return jsonify({"success": False, "message": "Configuration name is required"}), 400
+        
+        result = scanner_config_manager.load_scanner_config(config_name)
+        
+        status_code = 200 if result.get("success") else 404
+        return jsonify(result), status_code
+    
+    except Exception as e:
+        logger.exception("Failed to load scanner config: %s", e)
+        return jsonify({"success": False, "message": "Error loading configuration"}), 500
+
+
+@app.route("/scanner-config/delete", methods=["POST"])
+def scanner_config_delete():
+    """
+    Delete a scanner configuration.
+    
+    Expects JSON:
+    { "name": "My Scanner Config" }
+    
+    Returns:
+    { "success": true|false, "message": "..." }
+    """
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"success": False, "message": "JSON payload required"}), 400
+        
+        config_name = payload.get("name", "").strip()
+        
+        if not config_name:
+            return jsonify({"success": False, "message": "Configuration name is required"}), 400
+        
+        result = scanner_config_manager.delete_scanner_config(config_name)
+        
+        status_code = 200 if result.get("success") else 404
+        return jsonify(result), status_code
+    
+    except Exception as e:
+        logger.exception("Failed to delete scanner config: %s", e)
+        return jsonify({"success": False, "message": "Error deleting configuration"}), 500
+
+
+@app.route("/scanner-config/list", methods=["GET"])
+def scanner_config_list():
+    """
+    List all saved scanner configurations.
+    
+    Returns:
+    { "success": true|false, "message": "...", "configs": [...] }
+    """
+    try:
+        result = scanner_config_manager.list_scanner_configs()
+        status_code = 200 if result.get("success") else 500
+        return jsonify(result), status_code
+    
+    except Exception as e:
+        logger.exception("Failed to list scanner configs: %s", e)
+        return jsonify({
+            "success": False,
+            "message": "Error listing configurations",
+            "configs": []
+        }), 500
+
+
+@app.route("/scanner-config/rename", methods=["POST"])
+def scanner_config_rename():
+    """
+    Rename a scanner configuration.
+    
+    Expects JSON:
+    { "old_name": "Old Name", "new_name": "New Name" }
+    
+    Returns:
+    { "success": true|false, "message": "..." }
+    """
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"success": False, "message": "JSON payload required"}), 400
+        
+        old_name = payload.get("old_name", "").strip()
+        new_name = payload.get("new_name", "").strip()
+        
+        if not old_name or not new_name:
+            return jsonify({"success": False, "message": "Both old_name and new_name are required"}), 400
+        
+        result = scanner_config_manager.rename_scanner_config(old_name, new_name)
+        
+        status_code = 200 if result.get("success") else 400
+        return jsonify(result), status_code
+    
+    except Exception as e:
+        logger.exception("Failed to rename scanner config: %s", e)
+        return jsonify({"success": False, "message": "Error renaming configuration"}), 500
+
+
+@app.route("/scanner-config/duplicate", methods=["POST"])
+def scanner_config_duplicate():
+    """
+    Duplicate a scanner configuration.
+    
+    Expects JSON:
+    { "source_name": "Original Config", "new_name": "Copy of Original Config" }
+    
+    Returns:
+    { "success": true|false, "message": "..." }
+    """
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"success": False, "message": "JSON payload required"}), 400
+        
+        source_name = payload.get("source_name", "").strip()
+        new_name = payload.get("new_name", "").strip()
+        
+        if not source_name or not new_name:
+            return jsonify({"success": False, "message": "Both source_name and new_name are required"}), 400
+        
+        result = scanner_config_manager.duplicate_scanner_config(source_name, new_name)
+        
+        status_code = 200 if result.get("success") else 400
+        return jsonify(result), status_code
+    
+    except Exception as e:
+        logger.exception("Failed to duplicate scanner config: %s", e)
+        return jsonify({"success": False, "message": "Error duplicating configuration"}), 500
 
 
 # -------------------------------------------------------------------------

@@ -598,6 +598,34 @@
                                   <h3>Search for stock meeting variables <span class="badge-soft white-blue">Run</span></h3>
                                   <div class="SubmitData"> {{ Param.submit() }} </div>
                                 </div>
+
+                                <!-- Scanner Configuration Management Panel -->
+                                <div class="card-panel section-fade" style="margin-top:15px;padding:15px;border:1px solid #e5e7eb;border-radius:6px;">
+                                  <h3 style="margin-top:0;">Scanner Configuration Management</h3>
+                                  
+                                  <!-- Save Configuration -->
+                                  <div style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                                    <div style="flex:1;min-width:200px;">
+                                      <input type="text" id="scannerConfigName" placeholder="Enter scanner name (e.g., 'Quick Scalp')" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
+                                    </div>
+                                    <button type="button" class="btn btn-primary badge-soft white-blue" onclick="saveScannerConfig()" style="padding:8px 15px;">Save Config</button>
+                                  </div>
+
+                                  <!-- Load Configuration -->
+                                  <div style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                                    <select id="savedConfigsList" style="flex:1;min-width:200px;padding:8px;border:1px solid #ccc;border-radius:4px;" onchange="onSavedConfigChanged()">
+                                      <option value="">-- Select saved configuration --</option>
+                                    </select>
+                                    <button type="button" class="btn btn-success badge-soft white-blue" onclick="loadScannerConfig()" style="padding:8px 15px;">Load Selected</button>
+                                    <button type="button" class="btn btn-warning badge-soft white-blue" onclick="deleteScannerConfig()" style="padding:8px 15px;">Delete</button>
+                                  </div>
+
+                                  <!-- Saved Configurations Info -->
+                                  <div id="configsInfo" style="font-size:12px;color:#666;"></div>
+                                </div>
+
+                                <!-- End Scanner Configuration Management Panel -->
+
                                 <div id="bg_poll_times" style="margin-top:6px;">
                                     Scanner last run: <span id="bg_backend_last_run">never</span>
                                     &nbsp;|&nbsp;
@@ -2613,6 +2641,202 @@ window.addEventListener("beforeunload", function () {
         );
         navigator.sendBeacon("/background/stop", blob);
     }
+});
+</script>
+
+<script>
+/* ============================================================================
+   SCANNER CONFIGURATION MANAGEMENT
+   
+   Functions to save, load, delete, and manage scanner configurations.
+   Configurations are stored server-side in JSON files.
+============================================================================ */
+
+// Load saved configurations on page load
+function initScannerConfigUI() {
+    refreshScannerConfigsList();
+}
+
+// Refresh the list of saved configurations
+function refreshScannerConfigsList() {
+    $.ajax({
+        url: "/scanner-config/list",
+        type: "GET",
+        dataType: "json",
+        success: function(resp) {
+            const $select = $("#savedConfigsList");
+            const currentValue = $select.val();
+            
+            // Clear existing options except the first one
+            $select.find("option:not(:first)").remove();
+            
+            if (resp.success && resp.configs && resp.configs.length > 0) {
+                resp.configs.forEach(function(config) {
+                    const createdDate = new Date(config.created_at).toLocaleString("en-US", {
+                        month: "short",
+                        day: "2-digit",
+                        year: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true
+                    });
+                    const indicatorsText = config.indicators_enabled > 0 ? 
+                        "(" + config.indicators_enabled + " indicators)" : 
+                        "(custom)";
+                    const option = $("<option></option>")
+                        .attr("value", config.name)
+                        .text(config.name + " " + indicatorsText);
+                    $select.append(option);
+                });
+                
+                $("#configsInfo").text(
+                    "Total configurations: " + resp.configs.length
+                );
+                
+                // Restore previous selection if still available
+                if (currentValue) {
+                    $select.val(currentValue);
+                }
+            } else {
+                $("#configsInfo").text("No saved configurations yet.");
+            }
+        },
+        error: function() {
+            $("#configsInfo").text("Error loading configurations.");
+        }
+    });
+}
+
+// Save current scanner configuration
+function saveScannerConfig() {
+    const configName = $("#scannerConfigName").val().trim();
+    
+    if (!configName) {
+        alert("Please enter a configuration name.");
+        return;
+    }
+    
+    // Gather form data
+    const formData = getCurrentFormObject();
+    
+    $.ajax({
+        url: "/scanner-config/save",
+        type: "POST",
+        contentType: "application/json; charset=utf-8",
+        data: JSON.stringify({
+            name: configName,
+            form_data: formData
+        }),
+        success: function(resp) {
+            if (resp.success) {
+                alert("Configuration '" + configName + "' saved successfully!");
+                // Clear input and refresh list
+                $("#scannerConfigName").val("");
+                refreshScannerConfigsList();
+                // Select the newly saved config
+                setTimeout(function() {
+                    $("#savedConfigsList").val(configName);
+                }, 100);
+            } else {
+                alert("Error: " + resp.message);
+            }
+        },
+        error: function() {
+            alert("Error saving configuration. Please try again.");
+        }
+    });
+}
+
+// Load selected scanner configuration
+function loadScannerConfig() {
+    const configName = $("#savedConfigsList").val();
+    
+    if (!configName) {
+        alert("Please select a configuration to load.");
+        return;
+    }
+    
+    $.ajax({
+        url: "/scanner-config/load",
+        type: "POST",
+        contentType: "application/json; charset=utf-8",
+        data: JSON.stringify({ name: configName }),
+        success: function(resp) {
+            if (resp.success && resp.form_data) {
+                // Apply form fields
+                const form = resp.form_data;
+                
+                for (const k in form) {
+                    if (k === "csrf_token") continue;
+                    
+                    const el = $("[name='" + k + "']");
+                    
+                    if (el.length > 0) {
+                        // Handle radio/checkbox groups
+                        if (el.length > 1 && (el[0].type === "radio" || el[0].type === "checkbox")) {
+                            el.each(function () {
+                                this.checked = (this.value == form[k]);
+                            });
+                        } else {
+                            el.val(form[k]);
+                        }
+                        el.trigger("change");
+                    }
+                }
+                
+                alert("Configuration '" + configName + "' loaded successfully!");
+            } else {
+                alert("Error loading configuration: " + (resp.message || "Unknown error"));
+            }
+        },
+        error: function() {
+            alert("Error loading configuration. Please try again.");
+        }
+    });
+}
+
+// Delete selected scanner configuration
+function deleteScannerConfig() {
+    const configName = $("#savedConfigsList").val();
+    
+    if (!configName) {
+        alert("Please select a configuration to delete.");
+        return;
+    }
+    
+    if (!confirm("Are you sure you want to delete '" + configName + "'? This cannot be undone.")) {
+        return;
+    }
+    
+    $.ajax({
+        url: "/scanner-config/delete",
+        type: "POST",
+        contentType: "application/json; charset=utf-8",
+        data: JSON.stringify({ name: configName }),
+        success: function(resp) {
+            if (resp.success) {
+                alert("Configuration deleted successfully!");
+                refreshScannerConfigsList();
+                $("#scannerConfigName").val("");
+            } else {
+                alert("Error: " + resp.message);
+            }
+        },
+        error: function() {
+            alert("Error deleting configuration. Please try again.");
+        }
+    });
+}
+
+// Handle selection change in dropdown
+function onSavedConfigChanged() {
+    // Optional: Auto-load preview info when selection changes
+    // For now, just a placeholder
+}
+
+// Initialize on document ready
+$(document).ready(function() {
+    initScannerConfigUI();
 });
 </script>
 
