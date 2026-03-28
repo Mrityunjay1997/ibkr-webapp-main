@@ -10,7 +10,7 @@ class Config:
 
         flask_section = config["Flask"] if "Flask" in config else {}
         #### MY CHANGES FOR DEV /LOCAL #####
-        self.dev_mode = flask_section.get("dev_mode", "false").lower() in ("1", "true", "yes", "on")
+        # self.dev_mode = flask_section.get("dev_mode", "false").lower() in ("1", "true", "yes", "on")
         ########
         self.flask_run_port = int(
             flask_section.get("flask_run_port", 5000)
@@ -24,6 +24,12 @@ class Config:
         self.scanner_interval_seconds = parse_interval(flask_section.get("scanner_interval_seconds", "1m"), to="s")
 
         self.setups_dir = Path(flask_section.get("setups_dir", "setups"))
+
+        self.debug_mode = flask_section.get("debug_mode", "false").lower() in ("1", "true", "yes", "on")
+        
+        self.log_max_entries = int(
+            flask_section.get("log_max_entries", 500)
+        )
 
         ibkr_section = config["IBKR"] if "IBKR" in config else {}
 

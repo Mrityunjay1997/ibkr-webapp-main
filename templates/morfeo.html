@@ -181,10 +181,10 @@
 						   			<h4 style="padding-right: 5px;"> Select type of processing: </h4> <div> {{ Param.Procesetf }} </div>
 						   		</div>
 						   		<br>
-                                <div style="margin-bottom: 10px;">
-                                  <label style="font-weight: 600; margin-right: 6px;">Scanner Name:</label>
-                                  {{ Param.ScannerName(class_="form-control", placeholder="Optional label for this scan") }}
-                                </div>
+
+                                <!-- ------------- BACKGROUND SCANNER UI (insert under typeofprocessing) ------------- -->
+                                <div id="background-controls" style="margin-top:10px; padding:8px; border:1px solid #e6e6e6; border-radius:6px;">
+                                  <h4 style="margin:0 0 6px 0;">Background Scanner</h4>
 
                                   <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                                     <label style="margin:0; font-size:0.95rem;">Interval</label>
@@ -198,6 +198,8 @@
 
                                     <button id="bg_force_restart" class="btn btn-sm" title="Restart with last interval" style="padding:6px 10px; display:none;">Restart</button>
 
+                                    <button id="reset_signal_tracking" class="btn btn-sm btn-warning" title="Clear tracked signals for fresh first-time alerts on manual rescan" style="padding:6px 10px;">Reset Audio Tracking</button>
+
                                     <div id="bg_status" style="margin-left:10px; font-weight:600;color:#333;">Status: <span id="bg_status_text">stopped</span></div>
                                   </div>
 
@@ -207,6 +209,13 @@
                                     <div id="bg_message" style="color:#c00; font-weight:600;"></div>
                                   </div>
 
+                                  <!-- Audio alerts and signal tracking info -->
+                                  <div id="audio_alert_info" style="margin-top:10px; padding:8px; background:#f9f9f9; border-radius:4px; border-left:4px solid #007bff; display:none;">
+                                    <div style="font-weight:600; margin-bottom:4px;">🔊 Audio Alert Info:</div>
+                                    <div id="last_alert_details" style="font-size:0.9rem; color:#333;"></div>
+                                    <div id="tracked_symbols_count" style="font-size:0.85rem; color:#666; margin-top:4px;"></div>
+                                  </div>
+
                                   <!-- small visual indicator area -->
                                   <div id="bg_latest_summary" style="margin-top:8px; font-size:0.9rem; color:#333; display:none;"></div>
                                 </div>
@@ -214,11 +223,8 @@
                                 <br>
                                 <hr style="border-top: 1.5px solid #c9c9c9;">
                                 <div style="margin-top:8px; margin-bottom:8px; display:flex; gap:8px; align-items:center;">
-                                    <select id="load_setup_dropdown" style="padding:6px; min-width:200px;">
-                                        <option value="">-- Select a saved setup --</option>
-                                    </select>
-                                    <button id="load_selected_setup" class="btn btn-sm btn-outline-secondary">Load Selected</button>
                                     <button id="save_setup" class="btn btn-sm btn-outline-primary">Save Setup</button>
+                                    <button id="load_setup" class="btn btn-sm btn-outline-secondary">Load Setup</button>
                                     <span id="setup_msg" style="margin-left:8px;color:#2b7a0b;"></span>
                                 </div>
 						   		{% for subfield in Param.CloseBool %}
@@ -261,7 +267,7 @@
 												{% endfor %}
 											</td>
 										</tr>
-                                        <tr>
+                                        <tr data-condition-row="medium-sma-row">
 											<th>{{ Param.MediumSMA.label(class_="LabelHead") }}</th>
                                             <!-- NEW: time frame column for this indicator -->
                                             <td>
@@ -408,7 +414,7 @@
 												{% endfor %}
 											</td>
 										</tr>
-										<tr>
+										<tr data-condition-row="atr-row">
 											<th>{{ Param.ATR.label(class_="LabelHead") }}</th>
                                             <!-- NEW: time frame column for this indicator -->
                                             <td>
@@ -549,19 +555,15 @@
 									<thead class = "secondTableHead">
 										<tr>
 											<th style="padding:10px">Indicator</th>
-											<th style="padding:10px">Time Frame</th>
-											<th style="padding:10px">Type/Level</th>
-											<th style="padding:10px">Sign Indicator</th>
-											<th style="padding:10px">Amount</th>
+											<th style="padding:10px">Variable</th>
+											<th style="padding:10px">Sign </th>
+											<th style="padding:10px">Percentage PP</th>
 											<th style="padding:10px">Percentage/Value</th>
 										</tr>
 									</thead>
 									<tbody class ="secondTableBody">
 										<tr>
 											<th style="padding:10px">Pivot Point</th>
-											<td style="padding:10px">
-												<div alt="Timeframe placeholder">&nbsp;</div>
-											</td>
 											<td style="padding:10px"> <div id = "changePP"> {{ Param.PivotPoint(class_="PivotPoint") }} </div></td>
 											<td style="padding:10px">{{ Param.ComparisonPivotPoint(class_="ComparisonPivotPoint") }}</td>
 											<td style="padding:10px"><div id = "percentagePP"> {{ Param.PercentagePivotPoint(class_="PercentagePivotPoint", value = '0') }} </div> </td>
@@ -576,9 +578,6 @@
 										<tr>
 											<th style="padding:10px">Price Level</th>
 											<td style="padding:10px">
-												<div alt="Timeframe placeholder">&nbsp;</div>
-											</td>
-											<td style="padding:10px">
 												<div id = "ChangePric">
 													{{ Param.Pricelevel(class_="Pricelevel") }}
 												</div>
@@ -590,11 +589,6 @@
 												</div>
 											</td>
 											<td>
-												{% for subfield in Param.priceyesno %}
-														<div class="formatingyesno">
-													    	<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} <div>
-													    </div>
-												{% endfor %}
 											</td>
 										</tr>
 									</tbody>
@@ -677,46 +671,6 @@
 				   			<div class="col-md-11 col-xs-11 col-md-offset-1 slider-text">
 				   			<form>
 				   				<div id="add1" class="card-panel section-fade"></div>
-                                                        <div id="news-panel" class="card-panel section-fade" style="display:none; border:1px solid #ccc; padding:12px; margin-top:12px;">
-                                                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                                                <div style="font-weight:600;">News for <span id="news-symbol">-</span></div>
-                                                                <button id="news-collapse-btn" class="btn btn-sm btn-outline-secondary" onclick="toggleNewsPanel()">Hide</button>
-                                                            </div>
-                                                            
-                                                            <!-- News Filters -->
-                                                            <div style="margin-top:12px; padding:8px; background:#f5f5f5; border-radius:4px;">
-                                                                <div style="font-weight:600; cursor:pointer; user-select:none; margin-bottom:8px;" onclick="toggleNewsFilters()">
-                                                                    ⊕ Filters
-                                                                </div>
-                                                                <div id="news-filters" style="display:none;">
-                                                                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                                                                        <div>
-                                                                            <label style="font-size:0.85rem; font-weight:600;">Max Headlines:</label>
-                                                                            <input type="number" id="news-max-headlines" min="1" max="100" value="25" style="width:100%; padding:4px; border:1px solid #ddd; border-radius:3px;">
-                                                                        </div>
-                                                                        <div>
-                                                                            <label style="font-size:0.85rem; font-weight:600;">Days Back:</label>
-                                                                            <input type="number" id="news-days-back" min="1" max="365" placeholder="All" style="width:100%; padding:4px; border:1px solid #ddd; border-radius:3px;">
-                                                                        </div>
-                                                                        <div style="grid-column:1/-1;">
-                                                                            <label style="font-size:0.85rem; font-weight:600;">Exclude Sources (comma-separated):</label>
-                                                                            <input type="text" id="news-exclude-sources" placeholder="e.g. Bloomberg, Reuters" style="width:100%; padding:4px; border:1px solid #ddd; border-radius:3px;">
-                                                                        </div>
-                                                                        <div style="grid-column:1/-1;">
-                                                                            <label style="display:flex; align-items:center; gap:6px;">
-                                                                                <input type="checkbox" id="news-remove-dups" checked>
-                                                                                <span style="font-size:0.85rem;">Remove Duplicates</span>
-                                                                            </label>
-                                                                        </div>
-                                                                        <div style="grid-column:1/-1;">
-                                                                            <button type="button" id="news-apply-filters" class="btn btn-sm btn-info" style="padding:6px 12px; width:100%;">Apply Filters</button>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            
-                                                            <div id="news-items" style="margin-top:10px;"></div>
-                                                        </div>
 							</form>
 							<br><br><br>
                                 <div id = "createForm" style= "display: none;"></div>
@@ -1001,7 +955,7 @@ function renderResultsFromBackend(response) {
                     headerHtml += pivotPrimary.map(p => `<th>${p}</th>`).join("");
                     headerHtml += "<th>netPosition</th>";
                     if (pivotSecondary.length > 0) headerHtml += pivotSecondary.map(p => `<th>${p}</th>`).join("");
-                    headerHtml += `<th>News</th><th id="SortingTable${tableId}">Change</th><th>Place Order</th>`;
+                    headerHtml += `<th id="SortingTable${tableId}">Change</th><th>Place Order</th>`;
                     headerHtml += "</tr></thead><tbody>";
                     txt1 += headerHtml;
 
@@ -1083,10 +1037,6 @@ function renderResultsFromBackend(response) {
 
                 // netPosition
                 txt1 += `<td>${(dta.netPosition === null || dta.netPosition === undefined || dta.netPosition === "") ? "n.d" : dta.netPosition}</td>`;
-
-                // news button per symbol
-                const safeSymbol = (dta.symbol || "").toString().replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                txt1 += `<td><button class="btn btn-xs btn-info" onclick="loadNewsForSymbol('${safeSymbol}')">News</button></td>`;
 
                 // secondary pivots
                 if (pivotSecondary.length > 0) {
@@ -1182,117 +1132,6 @@ function renderResultsFromBackend(response) {
         tableId += 1;
     } // end for each etf
 }
-
-function toggleNewsPanel() {
-    var panel = document.getElementById('news-panel');
-    if (!panel) return;
-    if (panel.style.display === 'none' || panel.style.display === '') {
-        panel.style.display = 'block';
-        document.getElementById('news-collapse-btn').textContent = 'Hide';
-    } else {
-        panel.style.display = 'none';
-        document.getElementById('news-collapse-btn').textContent = 'Show';
-    }
-}
-
-function toggleNewsFilters() {
-    var filters = document.getElementById('news-filters');
-    if (!filters) return;
-    if (filters.style.display === 'none' || filters.style.display === '') {
-        filters.style.display = 'block';
-    } else {
-        filters.style.display = 'none';
-    }
-}
-
-function renderNews(symbol, articles) {
-    var container = document.getElementById('news-items');
-    var title = document.getElementById('news-symbol');
-    if (!container || !title) return;
-
-    title.textContent = symbol || '-';
-    if (!articles || articles.length === 0) {
-        container.innerHTML = '<p style="margin:0;">No news found for ' + symbol + '.</p>';
-        return;
-    }
-
-    var html = '<ul style="list-style:none; padding:0; margin:0;">';
-    articles.forEach(function(article){
-        var dt = article.publishedAt || article.datetime || article.time || '';
-        var source = article.source || '';
-        var href = article.url || '#';
-        var headline = article.title || 'Untitled';
-
-        html += '<li style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:8px;">';
-        html += '<a href="' + href + '" target="_blank" rel="noopener noreferrer" style="font-weight:600; color:#0066cc;">' + headline + '</a>';
-        html += '<div style="font-size:12px; color:#666; margin-top:2px;">' + (dt ? 'Time: ' + dt + ' | ' : '') + (source ? 'Source: ' + source : '') + '</div>';
-        html += '<div style="margin-top:4px; font-size:12px; color:#333;">' + (article.summary ? article.summary : '') + '</div>';
-        html += '</li>';
-    });
-
-    html += '</ul>';
-    container.innerHTML = html;
-    document.getElementById('news-panel').style.display = 'block';
-    document.getElementById('news-collapse-btn').textContent = 'Hide';
-}
-
-function buildNewsQueryParams() {
-    var params = [];
-    
-    var maxHeadlines = document.getElementById('news-max-headlines').value;
-    if (maxHeadlines) params.push('max_headlines=' + encodeURIComponent(maxHeadlines));
-    
-    var daysBack = document.getElementById('news-days-back').value;
-    if (daysBack) params.push('days_back=' + encodeURIComponent(daysBack));
-    
-    var excludeSources = document.getElementById('news-exclude-sources').value;
-    if (excludeSources) params.push('exclude_sources=' + encodeURIComponent(excludeSources));
-    
-    var removeDups = document.getElementById('news-remove-dups').checked;
-    params.push('remove_dups=' + (removeDups ? 'true' : 'false'));
-    
-    return params.length > 0 ? '&' + params.join('&') : '';
-}
-
-function loadNewsForSymbol(symbol, useFilters) {
-    if (!symbol) return;
-    var panel = document.getElementById('news-panel');
-    var item = document.getElementById('news-items');
-    if (panel) panel.style.display = 'block';
-    if (item) item.innerHTML = '<p>Loading news for ' + symbol + '...</p>';
-    document.getElementById('news-symbol').textContent = symbol;
-
-    var queryParams = useFilters ? buildNewsQueryParams() : '';
-    var url = '/news?symbol=' + encodeURIComponent(symbol) + queryParams;
-    
-    fetch(url)
-        .then(function(resp){ return resp.json(); })
-        .then(function(data){
-            if (!data || !data.news) {
-                renderNews(symbol, []);
-                return;
-            }
-            renderNews(symbol, data.news);
-        })
-        .catch(function(err){
-            renderNews(symbol, []);
-            console.warn('News fetch failed', err);
-        });
-}
-
-// Attach event listener for Apply Filters button
-document.addEventListener('DOMContentLoaded', function(){
-    var applyBtn = document.getElementById('news-apply-filters');
-    if (applyBtn) {
-        applyBtn.addEventListener('click', function(){
-            var symbol = document.getElementById('news-symbol').textContent;
-            if (symbol && symbol !== '-') {
-                loadNewsForSymbol(symbol, true);
-            }
-        });
-    }
-});
-
 </script>
 
 
@@ -1547,9 +1386,6 @@ function clearFilter(nInt)
 
 
 
-
-
-
 // ============================================================
 // SIGNAL CONDITION HIGHLIGHTING
 // Highlights form indicator rows based on condition status
@@ -1585,7 +1421,7 @@ function highlightConditionRows(conditionsStatus) {
         'RelativeVolume': 'relative-volume-row'
     };
 
-    // First, clear all highlights
+    // Clear all highlights first
     clearConditionHighlights();
 
     // Apply highlights based on conditions status
@@ -1593,18 +1429,13 @@ function highlightConditionRows(conditionsStatus) {
         const rowId = conditionRowMap[conditionName];
         if (!rowId) continue;
 
-        const rowElement = document.querySelector(`[data-condition-row="${rowId}"]`) ||
-                          document.getElementById(rowId) ||
-                          document.querySelector(`.${rowId}`);
-
+        const rowElement = document.querySelector(`[data-condition-row="${rowId}"]`);
         if (rowElement) {
             if (met) {
                 rowElement.classList.add('condition-row-met');
-                rowElement.classList.remove('condition-row-not-met');
                 addConditionBadge(rowElement, true, conditionName);
             } else {
                 rowElement.classList.add('condition-row-not-met');
-                rowElement.classList.remove('condition-row-met');
                 addConditionBadge(rowElement, false, conditionName);
             }
         }
@@ -1622,8 +1453,9 @@ function addConditionBadge(rowElement, met, conditionName) {
     const badge = document.createElement('span');
     badge.className = 'condition-badge ' + (met ? 'condition-badge-met' : 'condition-badge-not-met');
     badge.textContent = met ? '✓ MET' : '✗ NOT MET';
+    badge.style.marginLeft = '10px';
     
-    // Find the first cell in the row and append badge to it
+    // Append to the label cell
     const firstCell = rowElement.querySelector('th, td');
     if (firstCell) {
         firstCell.appendChild(badge);
@@ -1639,14 +1471,155 @@ function clearConditionHighlights() {
     });
 }
 
-// Global variable to store current stock's conditions
-let _currentStockConditions = null;
 
-// Helper to get stock data from results table
-function getStockDataFromTable(stockSymbol) {
-    // This will be populated by the results table rendering
-    return _bg_results && _bg_results[stockSymbol];
+// ============================================================
+// AUDIO ALERT SYSTEM
+// Single beep → all conditions met
+// Double beep → all except one
+// Different sound → first-time match
+// ============================================================
+
+const audioContext = (function() {
+    try {
+        return new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+        console.log("Web Audio API not supported");
+        return null;
+    }
+})();
+
+// ============================================================
+// PERSISTENT SIGNAL STATE TRACKING
+// Maintains "previously matched stocks" across page refreshes
+// ============================================================
+
+const SIGNAL_STATE_KEY = "ibkr_matched_signals";
+
+function loadMatchedSignals() {
+    try {
+        const stored = localStorage.getItem(SIGNAL_STATE_KEY);
+        return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch (e) {
+        console.log("Error loading signal state:", e);
+        return new Set();
+    }
 }
+
+function saveMatchedSignals(symbolSet) {
+    try {
+        localStorage.setItem(SIGNAL_STATE_KEY, JSON.stringify(Array.from(symbolSet)));
+    } catch (e) {
+        console.log("Error saving signal state:", e);
+    }
+}
+
+let _lastSignalSymbols = loadMatchedSignals();  // Load persisted matched stocks on page load
+
+function playBeep(frequency = 800, duration = 200) {
+    if (!audioContext) return;
+    
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = frequency;
+    oscillator.type = 'sine';
+    
+    const now = audioContext.currentTime;
+    gainNode.gain.setValueAtTime(0.3, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration / 1000);
+    
+    oscillator.start(now);
+    oscillator.stop(now + duration / 1000);
+}
+
+function playSingleBeep() {
+    // All conditions met - high frequency single beep
+    playBeep(1000, 250);
+}
+
+function playDoubleBeep() {
+    // All except one - medium frequency double beep
+    if (!audioContext) return;
+    
+    const now = audioContext.currentTime;
+    playBeep(800, 150);
+    
+    // Second beep after 200ms
+    setTimeout(() => {
+        playBeep(800, 150);
+    }, 200);
+}
+
+function playFirstTimeAlertSound() {
+    // First-time signal - unique ascending pattern
+    if (!audioContext) return;
+    
+    const now = audioContext.currentTime;
+    // Three ascending tones
+    playBeep(600, 100);
+    setTimeout(() => playBeep(800, 100), 120);
+    setTimeout(() => playBeep(1000, 150), 250);
+}
+
+function triggerAudioAlert(symbol, alertType, wasNewSignal) {
+    if (alertType === "none") return;
+    
+    let alertDescription = "";
+    
+    // First-time signal detection - play special sound
+    if (wasNewSignal && !_lastSignalSymbols.has(symbol)) {
+        _lastSignalSymbols.add(symbol);
+        saveMatchedSignals(_lastSignalSymbols);  // Persist to localStorage
+        playFirstTimeAlertSound();
+        alertDescription = `🎯 NEW SIGNAL: ${symbol} - Ascending tones (🎵 First-time alert)`;
+    }
+    // All conditions met
+    else if (alertType === "single_beep") {
+        playSingleBeep();
+        alertDescription = `✅ ALL CONDITIONS MET: ${symbol} - Single beep (1000Hz)`;
+    }
+    // All except one condition
+    else if (alertType === "double_beep") {
+        playDoubleBeep();
+        alertDescription = `⚠️ ALL EXCEPT ONE: ${symbol} - Double beep (800Hz)`;
+    }
+    // Standard beep
+    else if (alertType === "beep") {
+        playBeep(700, 200);
+        alertDescription = `ℹ️ PARTIAL CONDITIONS: ${symbol} - Standard beep (700Hz)`;
+    }
+    
+    // Update UI with alert info
+    if (alertDescription) {
+        document.getElementById("last_alert_details").textContent = alertDescription;
+        document.getElementById("audio_alert_info").style.display = "block";
+        document.getElementById("tracked_symbols_count").textContent = `Tracked symbols: ${_lastSignalSymbols.size}`;
+    }
+}
+
+function resetSignalTracking() {
+    // Clear tracked signals (useful for manual scanner runs)
+    const clearedCount = _lastSignalSymbols.size;
+    _lastSignalSymbols.clear();
+    saveMatchedSignals(_lastSignalSymbols);  // Clear from localStorage too
+    
+    // Show feedback
+    const infoDiv = document.getElementById("audio_alert_info");
+    document.getElementById("last_alert_details").textContent = `🔄 Signal tracking cleared (${clearedCount} symbol${clearedCount !== 1 ? 's' : ''} reset from persistent storage). All stocks will trigger first-time alerts on next scan.`;
+    document.getElementById("tracked_symbols_count").textContent = `Ready for fresh first-time alerts on manual scan`;
+    infoDiv.style.display = "block";
+    
+    // Auto-hide after 3 seconds
+    setTimeout(() => {
+        if (_lastSignalSymbols.size === 0) {
+            infoDiv.style.display = "none";
+        }
+    }, 3000);
+}
+
 
 // ============================================================
 
@@ -1662,7 +1635,6 @@ function addButtonBuy (nelm, idtouse) {
 		try {
 			const conditions = JSON.parse(conditionsJson);
 			highlightConditionRows(conditions);
-			_currentStockConditions = conditions;
 		} catch (e) {
 			console.log('Could not parse conditions:', e);
 			clearConditionHighlights();
@@ -1731,19 +1703,32 @@ function AddInstrument() {
 document.getElementById("ComparisonPivotPoint").addEventListener("change", changeInput1);
 //AverageVolume  ComparisonAverageVolume  PercentageAverageVolume
 
-
-
-
+<!-- htmlhint inline-script-disabled:false, script-disabled:false -->
+<script>
+  // Variables rendered by Jinja2 template engine server-side
+  var PIVOT_POINT_VAL = {{ Param.PivotPoint|tojson }};
+  var PIVOT_POINT_PERCENT = {{ Param.PercentagePivotPoint(value = '0')|tojson }};
+  var PIVOT_POINT1_VAL = {{ Param.PivotPoint1|tojson }};
+  var PIVOT_POINT1_PERCENT = {{ Param.PercentagePivotPoint1(value = '0')|tojson }};
+  var PRICE_LEVEL_VAL = {{ Param.Pricelevel(class_ = 'Pricelevel')|tojson }};
+  var PRICE_PERCENT_VAL = {{ Param.PercentagePrice(class_ = 'PercentagePrice', value = '0')|tojson }};
+  var PRICE_LEVEL1_VAL = {{ Param.Pricelevel1(class_ = 'Pricelevel1')|tojson }};
+  var PRICE_PERCENT1_VAL = {{ Param.PercentagePrice1(class_ = 'PercentagePrice1', value = '1000')|tojson }};
+  var PRICE_PERCENT_10_VAL = {{ Param.PercentagePrice(class_ = 'PercentagePrice', value = '10')|tojson }};
+  var BG_RESULTS_POLL_MS = {{ cfg_dict.get("bg_results_poll_ms", 5000) | int }};
+</script>
+<!-- / htmlhint -->
+<script>
 function changeInput1() {
   var x = document.getElementById(this.id);
   if ( x.id == "ComparisonPivotPoint" ) {
     if ( x.value == "between" ) {
-      document.getElementById("changePP").innerHTML = {{ Param.PivotPoint|tojson }} + {{ Param.PercentagePivotPoint(value = '0')|tojson }};
-      document.getElementById("percentagePP").innerHTML =  {{ Param.PivotPoint1|tojson }} + {{ Param.PercentagePivotPoint1(value = '0')|tojson }};
+      document.getElementById("changePP").innerHTML = PIVOT_POINT_VAL + PIVOT_POINT_PERCENT;
+      document.getElementById("percentagePP").innerHTML = PIVOT_POINT1_VAL + PIVOT_POINT1_PERCENT;
     } else if ( x.value != "between" ) {
     	if ( document.getElementById("PercentagePivotPoint1") != null ) {
-    		document.getElementById("changePP").innerHTML = {{ Param.PivotPoint|tojson }};
-    		document.getElementById("percentagePP").innerHTML = {{ Param.PercentagePivotPoint(value = '0')|tojson }};
+    		document.getElementById("changePP").innerHTML = PIVOT_POINT_VAL;
+    		document.getElementById("percentagePP").innerHTML = PIVOT_POINT_PERCENT;
     	}
     }
   }
@@ -1755,20 +1740,16 @@ function changeInput2() {
   var x = document.getElementById(this.id);
   if ( x.id == "ComparisonPrice" ) {
     if ( x.value == "between" ) {
-      document.getElementById("ChangePric").innerHTML = {{ Param.Pricelevel(class_ = 'Pricelevel')|tojson }} + {{ Param.PercentagePrice(class_ = 'PercentagePrice', value = '0')|tojson }};
-      document.getElementById("PercentagePric").innerHTML =  {{ Param.Pricelevel1(class_ = 'Pricelevel1')|tojson }} + "<br>" + {{ Param.PercentagePrice1(class_ = 'PercentagePrice1', value = '1000')|tojson }};
+      document.getElementById("ChangePric").innerHTML = PRICE_LEVEL_VAL + PRICE_PERCENT_VAL;
+      document.getElementById("PercentagePric").innerHTML = PRICE_LEVEL1_VAL + "<br>" + PRICE_PERCENT1_VAL;
     } else if ( x.value != "between" ) {
     	if ( document.getElementById("PercentagePrice1") != null ) {
-    		document.getElementById("ChangePric").innerHTML =  {{ Param.Pricelevel(class_ = 'Pricelevel')|tojson }};
-    		document.getElementById("PercentagePric").innerHTML = {{ Param.PercentagePrice(class_ = 'PercentagePrice', value = '10')|tojson }};
+    		document.getElementById("ChangePric").innerHTML = PRICE_LEVEL_VAL;
+    		document.getElementById("PercentagePric").innerHTML = PRICE_PERCENT_10_VAL;
     	}
     }
   }
 }
-</script>
-
-<script>
-const BG_RESULTS_POLL_MS = {{ cfg_dict.get("bg_results_poll_ms", 5000) | int }};
 </script>
 
 <script>
@@ -2072,6 +2053,17 @@ const BG_RESULTS_POLL_MS = {{ cfg_dict.get("bg_results_poll_ms", 5000) | int }};
                     setBgStatus("running");
                     setBgMessage("Scanner running", false);
                 }
+                
+                // Trigger audio alerts for new signals
+                for (const k in resp.results) {
+                    const item = resp.results[k];
+                    if (item && item.symbol && item.signal === "yes") {
+                        const isFirstTime = !_lastSignalSymbols.has(item.symbol);
+                        const alertType = item.alert_type || "beep";
+                        triggerAudioAlert(item.symbol, alertType, isFirstTime);
+                    }
+                }
+                
                 renderResultsFromBackend(wrapped);
             }
 
@@ -2152,6 +2144,10 @@ const BG_RESULTS_POLL_MS = {{ cfg_dict.get("bg_results_poll_ms", 5000) | int }};
           });
         }, 500);
       });
+    });
+
+    $("#reset_signal_tracking").on("click", function(){
+      resetSignalTracking();
     });
   }
 
@@ -2320,103 +2316,99 @@ $("#save_setup").on("click", function(){
   });
 });
 
-/* Populate load setup dropdown on page load */
-$(document).ready(function(){
+/* Load Setup: open simple chooser prompt then request and apply */
+$("#load_setup").on("click", function(){
   $.get("/setups/list").done(function(resp){
     const setups = (resp && resp.setups) ? resp.setups : [];
-    const dropdown = $("#load_setup_dropdown");
-    dropdown.empty();
-    dropdown.append('<option value="">-- Select a setup --</option>');
-    setups.forEach(function(s){
-      const title = s.title || s.name;
-      const dateStr = new Date(s.created).toLocaleString("en-US", {
-        month: "short",
-        day: "2-digit",
-        year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true
-      });
-      const optionText = title + " (" + dateStr + ")";
-      dropdown.append('<option value="' + s.name + '">' + optionText + '</option>');
+    if (setups.length === 0) {
+      alert("No saved setups found.");
+      return;
+    }
+    // build a simple selection string
+    let choices = "Choose a setup to load:\n\n";
+    setups.forEach((s, idx) => {
+      choices += (idx + 1) + ") " + (s.title || s.name) + " (" +
+        new Date(s.created).toLocaleString("en-US", {
+          month: "short",
+          day: "2-digit",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true
+        }) +
+        ")\n";
     });
-  }).fail(function(){
-    console.error("Failed to load setups list for dropdown");
-  });
-});
+    const sel = prompt(choices + "\nEnter the number to load:");
+    const i = parseInt(sel) - 1;
+    if (!Number.isFinite(i) || i < 0 || i >= setups.length) return;
+    const chosen = setups[i];
+    // request the chosen setup
+    $.ajax({
+      url: "/setups/load",
+      type: "POST",
+      contentType: "application/json; charset=utf-8",
+      data: JSON.stringify({ name: chosen.name }),
+      success: function(data){
+        if (!data || !data.form) {
+          _showSetupMsg("Invalid setup", true);
+          return;
+        }
+        // Explicitly ignore securities on load
+        delete data.securities;
+        // apply form fields to page
+        const form = data.form;
+        // for each key present in form, try set matching input/select
+        for (const k in form) {
+          if (k === "csrf_token") continue;   // do not load the csrf token
 
-/* Load selected setup from dropdown */
-$("#load_selected_setup").on("click", function(){
-  const selectedName = $("#load_setup_dropdown").val();
-  if (!selectedName) {
-    _showSetupMsg("Please select a setup to load", true);
-    return;
-  }
-  $.ajax({
-    url: "/setups/load",
-    type: "POST",
-    contentType: "application/json; charset=utf-8",
-    data: JSON.stringify({ name: selectedName }),
-    success: function(data){
-      if (!data || !data.form) {
-        _showSetupMsg("Invalid setup", true);
-        return;
-      }
-      // Explicitly ignore securities on load
-      delete data.securities;
-      // apply form fields to page
-      const form = data.form;
-      // for each key present in form, try set matching input/select
-      for (const k in form) {
-        if (k === "csrf_token") continue;   // do not load the csrf token
+          const el = $("[name='" + k + "']");
 
-        const el = $("[name='" + k + "']");
+          if (el.length > 0) {
 
-        if (el.length > 0) {
+            // handle radio / checkbox groups correctly
+            if (el.length > 1 && (el[0].type === "radio" || el[0].type === "checkbox")) {
 
-          // handle radio / checkbox groups correctly
-          if (el.length > 1 && (el[0].type === "radio" || el[0].type === "checkbox")) {
-
-            el.each(function () {
-              this.checked = (this.value == form[k]);
-            });
-
-          } else {
-            el.val(form[k]);
-          }
-
-          // trigger change for dynamic behaviors
-          el.trigger("change");
-
-        } else {
-
-          // try fields that may be named in other casing (graceful)
-          const alt = $("[name='" + k.toString().replace(/_/g, "") + "']");
-
-          if (alt.length > 0) {
-
-            if (alt.length > 1 && (alt[0].type === "radio" || alt[0].type === "checkbox")) {
-
-              alt.each(function () {
+              el.each(function () {
                 this.checked = (this.value == form[k]);
               });
 
             } else {
-              alt.val(form[k]);
+              el.val(form[k]);
+            }
+
+            // trigger change for dynamic behaviors
+            el.trigger("change");
+
+          } else {
+
+            // try fields that may be named in other casing (graceful)
+            const alt = $("[name='" + k.toString().replace(/_/g, "") + "']");
+
+            if (alt.length > 0) {
+
+              if (alt.length > 1 && (alt[0].type === "radio" || alt[0].type === "checkbox")) {
+
+                alt.each(function () {
+                  this.checked = (this.value == form[k]);
+                });
+
+              } else {
+                alt.val(form[k]);
               }
 
-            alt.trigger("change");
+              alt.trigger("change");
+            }
           }
         }
+        // If securities present, optionally update DOM or keep for when user runs
+        // (We will not overwrite the add1 DOM here; the user can re-run to refresh)
+        _showSetupMsg("Loaded: " + (data.meta && data.meta.title ? data.meta.title : chosen.name), false);
+      },
+      error: function(xhr){
+        _showSetupMsg("Load failed", true);
       }
-      // If securities present, optionally update DOM or keep for when user runs
-      // (We will not overwrite the add1 DOM here; the user can re-run to refresh)
-      _showSetupMsg("Loaded: " + (data.meta && data.meta.title ? data.meta.title : selectedName), false);
-    },
-    error: function(xhr){
-      _showSetupMsg("Load failed", true);
-    }
-  });
+    });
+  }).fail(function(){ _showSetupMsg("Failed to list setups", true); });
 });
 </script>
 

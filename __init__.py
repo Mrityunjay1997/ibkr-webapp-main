@@ -99,43 +99,43 @@ def detect_ibkr_port_from_config(host="127.0.0.1", timeout=1.0):
 
 ####  MY DEV CHNAGES #####
 # # Perform initial port check at startup
-# _detected_port = detect_ibkr_port_from_config()
+_detected_port = detect_ibkr_port_from_config()
 
-# if _detected_port is None:
-#     logger.error(
-#         "IBKR API is not reachable on either configured environment "
-#         "(preferred=%s). Exiting.",
-#         cfg.ibkr_preferred_env,
-#     )
-#     sys.exit(1)
+if _detected_port is None:
+    logger.error(
+        "IBKR API is not reachable on either configured environment "
+        "(preferred=%s). Exiting.",
+        cfg.ibkr_preferred_env,
+    )
+    sys.exit(1)
 
-# # Override configured runtime port with detected one
-# cfg.ibkr_api_port = _detected_port
-# logger.info("Using IBKR API port: %s", cfg.ibkr_api_port)
+# Override configured runtime port with detected one
+cfg.ibkr_api_port = _detected_port
+logger.info("Using IBKR API port: %s", cfg.ibkr_api_port)
 
 #### MY CHanges ######
 
 # Perform initial port check at startup
-if cfg.dev_mode:
-    # In dev mode, skip IBKR connection check and use configured port
-    cfg.ibkr_api_port = cfg.ibkr_paper_port if cfg.ibkr_preferred_env.upper() == "PAPER" else cfg.ibkr_live_port
-    logger.warning("*** DEVELOPMENT MODE ENABLED ***")
-    logger.warning("IBKR connection check skipped. Using configured port: %s", cfg.ibkr_api_port)
-else:
-    # Production mode: require IBKR connection
-    _detected_port = detect_ibkr_port_from_config()
+# if cfg.dev_mode:
+#     # In dev mode, skip IBKR connection check and use configured port
+#     cfg.ibkr_api_port = cfg.ibkr_paper_port if cfg.ibkr_preferred_env.upper() == "PAPER" else cfg.ibkr_live_port
+#     logger.warning("*** DEVELOPMENT MODE ENABLED ***")
+#     logger.warning("IBKR connection check skipped. Using configured port: %s", cfg.ibkr_api_port)
+# else:
+#     # Production mode: require IBKR connection
+#     _detected_port = detect_ibkr_port_from_config()
     
-    if _detected_port is None:
-        logger.error(
-            "IBKR API is not reachable on either configured environment "
-            "(preferred=%s). Exiting.",
-            cfg.ibkr_preferred_env,
-        )
-        sys.exit(1)
+#     if _detected_port is None:
+#         logger.error(
+#             "IBKR API is not reachable on either configured environment "
+#             "(preferred=%s). Exiting.",
+#             cfg.ibkr_preferred_env,
+#         )
+#         sys.exit(1)
     
-    # Override configured runtime port with detected one
-    cfg.ibkr_api_port = _detected_port
-    logger.info("Using IBKR API port: %s", cfg.ibkr_api_port)
+#     # Override configured runtime port with detected one
+#     cfg.ibkr_api_port = _detected_port
+#     logger.info("Using IBKR API port: %s", cfg.ibkr_api_port)
 
 
 # -----------------------------------------------------------------------------

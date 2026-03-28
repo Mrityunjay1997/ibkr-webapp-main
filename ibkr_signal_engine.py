@@ -40,14 +40,256 @@ from resilience import (
     create_retry_context,
 )
 
-# -----------------------------------------------------------------------------
-# Logging - lightweight
-# -----------------------------------------------------------------------------
+# ============================================================================
+# STRUCTURED LOGGING & DEBUGGING
+# ============================================================================
+
+class StructuredLogger:
+    """
+    Centralized structured logging with support for different event types.
+    Allows JSON-style logging for better parsing and debugging.
+    """
+    
+    DEBUG_MODE = False  # Set True to enable verbose debug logging
+    
+    def __init__(self, name="ibkr_app"):
+        self.logger = logging.getLogger(name)
+        self.debug_logs = []  # Optional: retain debug logs in memory
+        self.error_logs = []  # Track errors for analysis
+        self.scanner_logs = []  # Track scanner runs
+        self.fetch_logs = []  # Track data fetches
+    
+    def _should_log(self, level):
+        """Check if message should be logged based on debug mode."""
+        if level == "DEBUG" and not self.DEBUG_MODE:
+            return False
+        return True
+    
+    def _append_log(self, log_type, entry):
+        """Store log in memory for later analysis."""
+        if log_type == "debug":
+            self.debug_logs.append(entry)
+            if len(self.debug_logs) > 1000:  # Keep last 1000
+                self.debug_logs = self.debug_logs[-1000:]
+        elif log_type == "error":
+            self.error_logs.append(entry)
+            if len(self.error_logs) > 500:  # Keep last 500
+                self.error_logs = self.error_logs[-500:]
+        elif log_type == "scanner":
+            self.scanner_logs.append(entry)
+            if len(self.scanner_logs) > 500:  # Keep last 500
+                self.scanner_logs = self.scanner_logs[-500:]
+        elif log_type == "fetch":
+            self.fetch_logs.append(entry)
+            if len(self.fetch_logs) > 500:  # Keep last 500
+                self.fetch_logs = self.fetch_logs[-500:]
+    
+    def scanner_start(self, scan_id, scan_type, num_symbols, config_summary=""):
+        """Log scanner start event."""
+        message = (
+            f"[SCANNER START] id={scan_id} | type={scan_type} | symbols={num_symbols} | "
+            f"config={config_summary} | timestamp={time.time()}"
+        )
+        self.logger.info(message)
+        self._append_log("scanner", {
+            "event": "start",
+            "scan_id": scan_id,
+            "type": scan_type,
+            "symbols": num_symbols,
+            "timestamp": time.time(),
+        })
+    
+    def scanner_complete(self, scan_id, duration_sec, results_count, errors_count=0):
+        """Log scanner completion event."""
+        message = (
+            f"[SCANNER COMPLETE] id={scan_id} | duration={duration_sec:.2f}s | "
+            f"results={results_count} | errors={errors_count}"
+        )
+        self.logger.info(message)
+        self._append_log("scanner", {
+            "event": "complete",
+            "scan_id": scan_id,
+            "duration_sec": duration_sec,
+            "results_count": results_count,
+            "errors_count": errors_count,
+            "timestamp": time.time(),
+        })
+    
+    def scanner_error(self, scan_id, error_msg, error_type=""):
+        """Log scanner error event."""
+        message = (
+            f"[SCANNER ERROR] id={scan_id} | type={error_type} | "
+            f"msg={error_msg}"
+        )
+        self.logger.error(message)
+        self._append_log("error", {
+            "event": "scanner_error",
+            "scan_id": scan_id,
+            "error_type": error_type,
+            "error_msg": error_msg,
+            "timestamp": time.time(),
+        })
+    
+    def data_fetch_start(self, fetch_id, symbol, timeframe, lookback):
+        """Log data fetch start event."""
+        if not self._should_log("DEBUG"):
+            return
+        message = (
+            f"[FETCH START] id={fetch_id} | symbol={symbol} | timeframe={timeframe} | "
+            f"lookback={lookback}"
+        )
+        self.logger.debug(message)
+        self._append_log("fetch", {
+            "event": "start",
+            "fetch_id": fetch_id,
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "lookback": lookback,
+            "timestamp": time.time(),
+        })
+    
+    def data_fetch_complete(self, fetch_id, symbol, timeframe, bar_count, duration_sec, source="api"):
+        """Log data fetch completion event."""
+        message = (
+            f"[FETCH COMPLETE] id={fetch_id} | symbol={symbol} | timeframe={timeframe} | "
+            f"bars={bar_count} | duration={duration_sec:.2f}s | source={source}"
+        )
+        if source == "cache":
+            self.logger.debug(message)
+        else:
+            self.logger.info(message)
+        self._append_log("fetch", {
+            "event": "complete",
+            "fetch_id": fetch_id,
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "bar_count": bar_count,
+            "duration_sec": duration_sec,
+            "source": source,
+            "timestamp": time.time(),
+        })
+    
+    def data_fetch_error(self, fetch_id, symbol, timeframe, error_msg):
+        """Log data fetch error event."""
+        message = (
+            f"[FETCH ERROR] id={fetch_id} | symbol={symbol} | timeframe={timeframe} | "
+            f"error={error_msg}"
+        )
+        self.logger.error(message)
+        self._append_log("error", {
+            "event": "fetch_error",
+            "fetch_id": fetch_id,
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "error_msg": error_msg,
+            "timestamp": time.time(),
+        })
+    
+    def error(self, error_msg, error_type="general", context=""):
+        """Log generic error event."""
+        message = (
+            f"[ERROR] type={error_type} | msg={error_msg} | "
+            f"context={context}"
+        )
+        self.logger.error(message)
+        self._append_log("error", {
+            "event": "error",
+            "error_type": error_type,
+            "error_msg": error_msg,
+            "context": context,
+            "timestamp": time.time(),
+        })
+    
+    def debug(self, message, category=""):
+        """Log debug message."""
+        if not self._should_log("DEBUG"):
+            return
+        full_msg = f"[DEBUG] {category} | {message}" if category else f"[DEBUG] {message}"
+        self.logger.debug(full_msg)
+        self._append_log("debug", {
+            "message": message,
+            "category": category,
+            "timestamp": time.time(),
+        })
+    
+    def info(self, message, category=""):
+        """Log info message."""
+        full_msg = f"[INFO] {category} | {message}" if category else f"[INFO] {message}"
+        self.logger.info(full_msg)
+    
+    def warning(self, message, category=""):
+        """Log warning message."""
+        full_msg = f"[WARNING] {category} | {message}" if category else f"[WARNING] {message}"
+        self.logger.warning(full_msg)
+    
+    def enable_debug(self):
+        """Enable debug logging."""
+        self.DEBUG_MODE = True
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.info("[DEBUG MODE] Enabled")
+    
+    def disable_debug(self):
+        """Disable debug logging."""
+        self.DEBUG_MODE = False
+        self.logger.setLevel(logging.INFO)
+        self.logger.info("[DEBUG MODE] Disabled")
+    
+    def get_scanner_logs(self, limit=None):
+        """Retrieve scanner logs."""
+        logs = self.scanner_logs
+        if limit:
+            logs = logs[-limit:]
+        return logs
+    
+    def get_error_logs(self, limit=None):
+        """Retrieve error logs."""
+        logs = self.error_logs
+        if limit:
+            logs = logs[-limit:]
+        return logs
+    
+    def get_fetch_logs(self, limit=None):
+        """Retrieve fetch logs."""
+        logs = self.fetch_logs
+        if limit:
+            logs = logs[-limit:]
+        return logs
+    
+    def get_debug_logs(self, limit=None):
+        """Retrieve debug logs."""
+        logs = self.debug_logs
+        if limit:
+            logs = logs[-limit:]
+        return logs
+    
+    def get_log_summary(self):
+        """Get summary statistics of all logs."""
+        return {
+            "scanner_events": len(self.scanner_logs),
+            "error_events": len(self.error_logs),
+            "fetch_events": len(self.fetch_logs),
+            "debug_events": len(self.debug_logs),
+            "debug_mode": self.DEBUG_MODE,
+        }
+    
+    def clear_logs(self):
+        """Clear all in-memory logs."""
+        self.debug_logs = []
+        self.error_logs = []
+        self.scanner_logs = []
+        self.fetch_logs = []
+        self.logger.info("[LOGS CLEARED] All in-memory logs cleared")
+
+
+# Initialize standard logging configuration
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
 )
-logger = logging.getLogger("ibkr_app")
+
+# Create centralized structured logger instance
+structured_logger = StructuredLogger("ibkr_app")
+logger = structured_logger.logger  # Keep for backward compatibility
 
 
 def _safe_compare(value, op, threshold):
@@ -316,6 +558,31 @@ class IBapi(EWrapper, EClient):
         self._data_fetcher = self._resilience['data_fetcher']
         self._pct_normalizer = self._resilience['pct_normalizer']
 
+        # ---------------------------
+        # PERFORMANCE: Per-Timeframe Historical Data Cache
+        # Key: (symbol, timeframe) -> {'data': [...bars...], 'timestamp': time.time()}
+        # Reduces redundant API calls when same timeframe requested multiple times
+        # ---------------------------
+        self._historical_cache = {}  # (symbol, timeframe) -> {'data': list, 'timestamp': float}
+        self._historical_cache_ttl = 300  # 5 minutes - cache valid period per timeframe
+        self._cache_lock = threading.Lock()
+        
+        # Track in-flight requests to prevent duplicate API calls
+        self._inflight_requests = {}  # (symbol, timeframe) -> reqId
+        self._inflight_lock = threading.Lock()
+        
+        # Map reqId -> (symbol, timeframe) for caching on historicalDataEnd
+        self._reqid_to_symbol_tf = {}  # reqId -> (symbol, timeframe)
+        
+        # Optimization metrics
+        self._optimization_metrics = {
+            'cache_hits': 0,
+            'cache_misses': 0,
+            'api_calls_avoided': 0,
+            'batch_requests_sent': 0,
+            'inflight_collisions_prevented': 0,
+        }
+
     def _to_dict(self, obj):
         if obj is None:
             return None
@@ -437,6 +704,223 @@ class IBapi(EWrapper, EClient):
         except Exception:
             pass
 
+    # ============================================================
+    # PERFORMANCE OPTIMIZATION: Historical Data Caching
+    # ============================================================
+    
+    def get_cached_historical_data(self, symbol, timeframe):
+        """
+        Retrieve cached historical data if valid (not expired).
+        
+        Args:
+            symbol: str, stock symbol
+            timeframe: str, e.g. '1 min', '5 min', '1 day'
+        
+        Returns:
+            list of bars or None if not cached/expired
+        """
+        cache_key = (symbol, timeframe)
+        
+        with self._cache_lock:
+            if cache_key not in self._historical_cache:
+                self._optimization_metrics['cache_misses'] += 1
+                return None
+            
+            cache_entry = self._historical_cache[cache_key]
+            age = time.time() - cache_entry['timestamp']
+            
+            if age > self._historical_cache_ttl:
+                # Cache expired
+                del self._historical_cache[cache_key]
+                self._optimization_metrics['cache_misses'] += 1
+                return None
+            
+            # Valid cache hit
+            self._optimization_metrics['cache_hits'] += 1
+            self._optimization_metrics['api_calls_avoided'] += 1
+            logger.info(
+                "[CACHE HIT] %s | timeframe=%s | age=%.1fs | bars=%d",
+                symbol,
+                timeframe,
+                age,
+                len(cache_entry['data'])
+            )
+            return cache_entry['data']
+    
+    def store_cached_historical_data(self, symbol, timeframe, bars):
+        """
+        Store historical bars in cache with current timestamp.
+        
+        Args:
+            symbol: str, stock symbol
+            timeframe: str, e.g. '1 min'
+            bars: list of bar data
+        """
+        cache_key = (symbol, timeframe)
+        
+        with self._cache_lock:
+            self._historical_cache[cache_key] = {
+                'data': bars,
+                'timestamp': time.time()
+            }
+            logger.debug(
+                "[CACHE STORE] %s | timeframe=%s | bars=%d",
+                symbol,
+                timeframe,
+                len(bars) if bars else 0
+            )
+    
+    def is_request_inflight(self, symbol, timeframe):
+        """
+        Check if a request for this symbol/timeframe is already in-flight.
+        Prevents duplicate API calls.
+        
+        Returns:
+            reqId if in-flight, None otherwise
+        """
+        request_key = (symbol, timeframe)
+        
+        with self._inflight_lock:
+            return self._inflight_requests.get(request_key)
+    
+    def mark_request_inflight(self, symbol, timeframe, reqId):
+        """Mark a request as in-flight."""
+        request_key = (symbol, timeframe)
+        
+        with self._inflight_lock:
+            if request_key in self._inflight_requests:
+                self._optimization_metrics['inflight_collisions_prevented'] += 1
+                logger.debug(
+                    "[INFLIGHT COLLISION] %s | timeframe=%s | preventing duplicate reqId=%s",
+                    symbol,
+                    timeframe,
+                    reqId
+                )
+                return False
+            
+            self._inflight_requests[request_key] = reqId
+            return True
+    
+    def unmark_request_inflight(self, symbol, timeframe):
+        """Mark request as no longer in-flight."""
+        request_key = (symbol, timeframe)
+        
+        with self._inflight_lock:
+            self._inflight_requests.pop(request_key, None)
+    
+    def get_optimization_metrics(self):
+        """Return current optimization metrics."""
+        return self._optimization_metrics.copy()
+    
+    def reset_optimization_metrics(self):
+        """Reset optimization metrics counters."""
+        for key in self._optimization_metrics:
+            self._optimization_metrics[key] = 0
+        logger.info("[METRICS RESET] Optimization metrics cleared")
+    
+    def cleanup_expired_cache(self):
+        """
+        Cleanup expired cache entries (TTL-based).
+        Returns count of entries removed.
+        """
+        now = time.time()
+        expired_count = 0
+        
+        with self._cache_lock:
+            keys_to_remove = []
+            for cache_key, cache_entry in self._historical_cache.items():
+                age = now - cache_entry['timestamp']
+                if age > self._historical_cache_ttl:
+                    keys_to_remove.append(cache_key)
+            
+            for key in keys_to_remove:
+                del self._historical_cache[key]
+                expired_count += 1
+        
+        if expired_count > 0:
+            logger.info("[CACHE CLEANUP] Removed %d expired cache entries", expired_count)
+        
+        return expired_count
+    
+    def get_cache_status(self):
+        """
+        Get current cache status for monitoring.
+        
+        Returns:
+            dict: {
+                'cached_entries': int,
+                'cache_size_approx_kb': float,
+                'oldest_entry_age_sec': float,
+                'newest_entry_age_sec': float,
+            }
+        """
+        now = time.time()
+        status = {
+            'cached_entries': 0,
+            'cache_size_approx_kb': 0.0,
+            'oldest_entry_age_sec': None,
+            'newest_entry_age_sec': None,
+        }
+        
+        with self._cache_lock:
+            status['cached_entries'] = len(self._historical_cache)
+            
+            ages = []
+            for cache_entry in self._historical_cache.values():
+                age = now - cache_entry['timestamp']
+                ages.append(age)
+                
+                # Approximate size: (bars * ~50 bytes per bar)
+                bars_count = len(cache_entry['data'])
+                status['cache_size_approx_kb'] += (bars_count * 50) / 1024
+            
+            if ages:
+                status['oldest_entry_age_sec'] = max(ages)
+                status['newest_entry_age_sec'] = min(ages)
+        
+        return status
+    
+    def fetch_all_timeframe_data_batched(self, contract, indicator_config, theid, batch_delay_ms=100):
+        """
+        Request historical data for all required timeframes with controlled batching.
+        
+        Batching reduces burst load on IB API by introducing small delays between requests.
+        
+        Args:
+            contract: IB Contract object
+            indicator_config: dict with indicator configurations
+            theid: int, base request ID
+            batch_delay_ms: int, milliseconds to wait between batch requests (default 100ms)
+        
+        Returns:
+            dict: {
+                'timeframe': reqId,
+                ...
+            }
+        """
+        timeframe_lookbacks = self.calculate_lookback_for_indicators(indicator_config)
+        timeframe_to_reqid = {}
+        
+        self._optimization_metrics['batch_requests_sent'] += 1
+        
+        logger.info(
+            "[BATCH REQUEST] %s | timeframes=%d | batch_delay=%dms",
+            getattr(contract, 'symbol', '<unknown>'),
+            len(timeframe_lookbacks),
+            batch_delay_ms
+        )
+        
+        for index, (timeframe, lookback_window) in enumerate(timeframe_lookbacks.items()):
+            reqId = self.fetch_data_for_timeframe(contract, timeframe, lookback_window, theid, index)
+            timeframe_to_reqid[timeframe] = reqId
+            
+            # Insert delay between batch requests (except for cached/reused requests)
+            if index < len(timeframe_lookbacks) - 1:
+                delay_sec = batch_delay_ms / 1000.0
+                time.sleep(delay_sec)
+        
+        return timeframe_to_reqid
+
     @staticmethod
     def _select_best_contract(contracts, requested_symbol=None):
         """
@@ -539,6 +1023,7 @@ class IBapi(EWrapper, EClient):
     def historicalDataEnd(self, req_id: int, start: str, end: str):
         """
         Callback fired when all historical bars for reqId were sent.
+        Stores data in cache for future reuse.
         """
 
         super().historicalDataEnd(req_id, start, end)
@@ -547,6 +1032,27 @@ class IBapi(EWrapper, EClient):
 
         # mark this request as completed
         self.hisdtId[req_id] = True
+        
+        # ============================================================
+        # CACHE: Store historical data for future reuse
+        # ============================================================
+        if req_id in self._reqid_to_symbol_tf:
+            symbol, timeframe = self._reqid_to_symbol_tf[req_id]
+            bars_data = self.HistoricalDt.get(req_id, [])
+            
+            if bars_data:
+                self.store_cached_historical_data(symbol, timeframe, bars_data)
+                logger.debug(
+                    "[CACHE STORED] reqId=%s | %s | timeframe=%s | bars=%d",
+                    req_id,
+                    symbol,
+                    timeframe,
+                    len(bars_data)
+                )
+            
+            # Clean up the mapping
+            del self._reqid_to_symbol_tf[req_id]
+            self.unmark_request_inflight(symbol, timeframe)
 
     def tickPrice(self, req_id, tick_type, price, attrib):
         """
@@ -1005,7 +1511,12 @@ class IBapi(EWrapper, EClient):
 
     def fetch_data_for_timeframe(self, contract, timeframe, lookback_window, theid, timeframe_index):
         """
-        Request historical data for ONE specific timeframe.
+        Request historical data for ONE specific timeframe with caching optimization.
+        
+        Optimization Features:
+        - Check cache first (per-timeframe, TTL-controlled)
+        - Prevent duplicate in-flight requests for same symbol/timeframe
+        - Store results in cache for future reuse
         
         Args:
             contract: IB Contract object
@@ -1017,6 +1528,45 @@ class IBapi(EWrapper, EClient):
         Returns:
             int: The reqId used for this request
         """
+        symbol = getattr(contract, 'symbol', '<unknown>')
+        
+        # ============================================================
+        # OPTIMIZATION 1: Check cache first
+        # ============================================================
+        cached_data = self.get_cached_historical_data(symbol, timeframe)
+        if cached_data is not None:
+            # Use cache instead of API call!
+            reqId = theid * 1000 + timeframe_index
+            self.HistoricalDt[reqId] = cached_data
+            self.hisdtId[reqId] = True  # mark as complete
+            logger.info(
+                "[CACHE SERVED] %s | timeframe=%s | reqId=%s | bars=%d (cache hit)",
+                symbol,
+                timeframe,
+                reqId,
+                len(cached_data)
+            )
+            return reqId
+        
+        # ============================================================
+        # OPTIMIZATION 2: Check for in-flight requests (prevent duplicates)
+        # ============================================================
+        existing_reqId = self.is_request_inflight(symbol, timeframe)
+        if existing_reqId is not None:
+            # Request already in-flight, reuse its reqId
+            self._optimization_metrics['inflight_collisions_prevented'] += 1
+            logger.info(
+                "[REUSE INFLIGHT] %s | timeframe=%s | existing_reqId=%s (avoiding duplicate API call)",
+                symbol,
+                timeframe,
+                existing_reqId
+            )
+            return existing_reqId
+        
+        # ============================================================
+        # Standard API call (not cached, not in-flight)
+        # ============================================================
+        
         TIMEFRAME_TO_IB = {
             "1 min": ("1 min", 60),
             "2 min": ("2 mins", 120),
@@ -1059,13 +1609,22 @@ class IBapi(EWrapper, EClient):
         # Create unique request ID for this timeframe (theid_0, theid_1, etc.)
         reqId = theid * 1000 + timeframe_index
         
+        # Mark as in-flight before making API call
+        if not self.mark_request_inflight(symbol, timeframe, reqId):
+            # Collision detected - another request already marked as inflight
+            # Reuse that request instead
+            return self.is_request_inflight(symbol, timeframe)
+        
         # Initialize storage
         self.HistoricalDt[reqId] = []
         self.hisdtId[reqId] = False
         
+        # Store reqId -> (symbol, timeframe) mapping for later cache storage
+        self._reqid_to_symbol_tf[reqId] = (symbol, timeframe)
+        
         logger.info(
             "[FETCH TIMEFRAME] %s | timeframe=%s | bar_size=%s | timeperiod=%s | lookback=%s | reqId=%s",
-            getattr(contract, 'symbol', '<unknown>'),
+            symbol,
             timeframe,
             ib_bar_size,
             timeperiod,
@@ -1087,8 +1646,8 @@ class IBapi(EWrapper, EClient):
                 [],
             )
         except Exception as e:
-            logger.exception("Failed to request historical data for %s at %s", 
-                           getattr(contract, 'symbol', '<unknown>'), timeframe)
+            logger.exception("Failed to request historical data for %s at %s", symbol, timeframe)
+            self.unmark_request_inflight(symbol, timeframe)
             raise
         
         return reqId
@@ -1097,20 +1656,20 @@ class IBapi(EWrapper, EClient):
         """
         Request historical data for all required timeframes.
         
+        Optimizations:
+        - Uses per-timeframe cache to avoid redundant API calls
+        - Prevents duplicate in-flight requests
+        - Applies batch delay for smoother API load
+        
         Returns:
             dict: {
                 'timeframe': reqId,
                 ...
             }
         """
-        timeframe_lookbacks = self.calculate_lookback_for_indicators(indicator_config)
-        timeframe_to_reqid = {}
-        
-        for index, (timeframe, lookback_window) in enumerate(timeframe_lookbacks.items()):
-            reqId = self.fetch_data_for_timeframe(contract, timeframe, lookback_window, theid, index)
-            timeframe_to_reqid[timeframe] = reqId
-        
-        return timeframe_to_reqid
+        # Use batched variant with default 100ms delay between requests
+        # This reduces burst load on IBKR API and improves overall stability
+        return self.fetch_all_timeframe_data_batched(contract, indicator_config, theid, batch_delay_ms=100)
 
     def wait_for_all_timeframe_data(self, timeframe_to_reqid, timeout_per_tf=10.0):
         """
@@ -2691,6 +3250,23 @@ class IBapi(EWrapper, EClient):
 
         data["signal"] = "yes" if condition else "no"
         data["conditions_status"] = conditions_status  # Include individual condition statuses for UI highlighting
+        
+        # Calculate signal quality metrics for audio alerts
+        total_conditions_met = sum(1 for v in conditions_status.values() if v)
+        total_conditions_checked = len(conditions_status)
+        data["conditions_met"] = total_conditions_met
+        data["conditions_checked"] = total_conditions_checked
+        
+        # Determine alert type based on condition match
+        if condition:  # Signal is good
+            if total_conditions_met == total_conditions_checked:
+                data["alert_type"] = "single_beep"  # All conditions met
+            elif total_conditions_met == total_conditions_checked - 1:
+                data["alert_type"] = "double_beep"  # All except one
+            else:
+                data["alert_type"] = "beep"  # Some conditions met
+        else:
+            data["alert_type"] = "none"
 
         # tag scanner name on every row when provided
         scanner_name = None
@@ -2793,6 +3369,16 @@ class IBapi(EWrapper, EClient):
                 )
                 self.warningTicker[theid] = [m, i, error_msg]
                 self._failure_tracker.mark_failed(m, error_msg, i)
+                
+                # ============================================================
+                # [STRUCTURED LOG] Contract Lookup Error
+                # ============================================================
+                structured_logger.error(
+                    error_msg=error_msg,
+                    error_type="contract_lookup_failed",
+                    context=f"symbol={m}|cusip={i}"
+                )
+                
                 try:
                     self.numberOfTicker -= 1
                 except Exception:
@@ -2846,6 +3432,19 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         # Request historical data
         # -------------------------
+        fetch_id = f"fetch_{theid}_{int(time.time()*1000)}"
+        fetch_start_time = time.time()
+        
+        # ============================================================
+        # [STRUCTURED LOG] Data Fetch Start
+        # ============================================================
+        structured_logger.data_fetch_start(
+            fetch_id=fetch_id,
+            symbol=m,
+            timeframe=getattr(self, 'addFrequency', 'unknown'),
+            lookback=getattr(self, 'maxlength', 252) or 252
+        )
+        
         try:
             self.getData(contract, form, theid)
         except Exception as e:
@@ -2853,6 +3452,17 @@ class IBapi(EWrapper, EClient):
             error_msg = f"Failed to request historical data: {e}"
             self.warningTicker[theid] = [m, i, error_msg]
             self._failure_tracker.mark_failed(m, error_msg, i)
+            
+            # ============================================================
+            # [STRUCTURED LOG] Data Fetch Error
+            # ============================================================
+            structured_logger.data_fetch_error(
+                fetch_id=fetch_id,
+                symbol=m,
+                timeframe=getattr(self, 'addFrequency', 'unknown'),
+                error_msg=str(e)
+            )
+            
             try:
                 self.numberOfTicker -= 1
             except Exception:
@@ -2873,6 +3483,20 @@ class IBapi(EWrapper, EClient):
             contract,
             timeout_sec=self.config.history_lookup_timeout_sec,
             retry_count=2  # Allow 1 retry on timeout
+        )
+        
+        fetch_duration = time.time() - fetch_start_time
+        
+        # ============================================================
+        # [STRUCTURED LOG] Data Fetch Complete
+        # ============================================================
+        structured_logger.data_fetch_complete(
+            fetch_id=fetch_id,
+            symbol=m,
+            timeframe=getattr(self, 'addFrequency', 'unknown'),
+            bar_count=len(history) if history else 0,
+            duration_sec=fetch_duration,
+            source="api"
         )
         
         # Validate row count - track partial failures
@@ -3095,10 +3719,26 @@ class IBapi(EWrapper, EClient):
         # During market hours, clear cache to force fresh CUSIP/contract lookups
         self.clear_contract_cache(force=False)
         
+        num_symbols = len(data.get("ticker", []))
+        scan_id = f"{scan_timestamp}-{id(threading.current_thread())}"
+        
+        # ============================================================
+        # [STRUCTURED LOG] Scanner Start
+        # ============================================================
+        indicators_enabled = [k for k in form.keys() if form[k] and k.startswith(("FastSMA", "SlowSMA", "RSI", "VWAP"))]
+        structured_logger.scanner_start(
+            scan_id=scan_id,
+            scan_type="multi_timeframe",
+            num_symbols=num_symbols,
+            config_summary=f"indicators={len(indicators_enabled)}"
+        )
+        
+        scan_start_time = time.time()
+        
         logger.info(
             "[%s] getFinalResult called | %d symbols, form keys: %s",
             scan_timestamp,
-            len(data.get("ticker", [])),
+            num_symbols,
             list(form.keys()) if form else "none"
         )
 
@@ -3149,6 +3789,20 @@ class IBapi(EWrapper, EClient):
 
         for t in threads:
             t.join()
+
+        # ============================================================
+        # [STRUCTURED LOG] Scanner Complete
+        # ============================================================
+        scan_duration = time.time() - scan_start_time
+        results_count = len([v for v in self.data.values() if v])
+        errors_count = len(self.warningTicker)
+        
+        structured_logger.scanner_complete(
+            scan_id=scan_id,
+            duration_sec=scan_duration,
+            results_count=results_count,
+            errors_count=errors_count
+        )
 
         # Log partial failure summary for this scan cycle
         if hasattr(self, '_failure_tracker'):

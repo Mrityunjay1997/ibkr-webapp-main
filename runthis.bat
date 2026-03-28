@@ -1,7 +1,7 @@
 @ECHO OFF
 SETLOCAL
 
-SET VENV_PATH=VENV\IBKR
+SET VENV_PATH=env
 SET PYTHON=%VENV_PATH%\Scripts\python.exe
 
 REM Make sure venv exists
