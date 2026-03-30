@@ -111,13 +111,15 @@ def test_build_indicator_config():
     return config
 
 
-def test_group_indicators_by_timeframe(config):
+def test_group_indicators_by_timeframe():
     """TEST 2: Group indicators by timeframe"""
-    print("="*70)
+    print("\n" + "="*70)
     print("TEST 2: Group Indicators by Timeframe")
     print("="*70)
     
     ibapi = IBapi()
+    form = create_test_form_mixed_timeframes()
+    config = ibapi.build_indicator_config(form)
     grouped = ibapi.group_indicators_by_timeframe(config)
     
     print(f"✓ Grouped into {len(grouped)} unique timeframes")
@@ -141,13 +143,15 @@ def test_group_indicators_by_timeframe(config):
     return grouped
 
 
-def test_calculate_lookback_for_indicators(config):
+def test_calculate_lookback_for_indicators():
     """TEST 3: Calculate lookback windows per timeframe"""
     print("="*70)
     print("TEST 3: Calculate Lookback Per Timeframe")
     print("="*70)
     
     ibapi = IBapi()
+    form = create_test_form_mixed_timeframes()
+    config = ibapi.build_indicator_config(form)
     lookbacks = ibapi.calculate_lookback_for_indicators(config)
     
     print(f"✓ Calculated lookbacks for {len(lookbacks)} timeframes")

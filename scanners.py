@@ -344,6 +344,7 @@ class ScannerConfigManager:
             }
 
     def rename_scanner_config(self, old_name: str, new_name: str) -> dict:
+
         """
         Rename a scanner configuration.
         
@@ -375,3 +376,122 @@ class ScannerConfigManager:
                 "success": False,
                 "message": f"Error renaming configuration: {str(e)}"
             }
+
+
+class StockListManager:
+    """Manages saving and loading named lists of stock tickers."""
+
+    def __init__(self, storage_dir="stock_lists"):
+        self.storage_dir = Path(storage_dir)
+        self.storage_dir.mkdir(exist_ok=True)
+
+    def _safe_name(self, name: str) -> str:
+        return "".join(c for c in name if c.isalnum() or c in ('-', '_', ' ')).strip()
+
+    def _find_file(self, name: str):
+        potential = self.storage_dir / f"{name}.json"
+        if potential.exists():
+            return potential
+        for f in self.storage_dir.glob("*.json"):
+            try:
+                with open(f, 'r') as fh:
+                    data = json.load(fh)
+                    if data.get("name") == name or data.get("safe_name") == name:
+                        return f
+            except Exception:
+                continue
+        return None
+
+    def save(self, name: str, tickers: list) -> dict:
+        """Save a named list of ticker strings."""
+        if not name or not isinstance(name, str):
+            return {"success": False, "message": "List name is required"}
+
+        safe = self._safe_name(name)
+        if not safe:
+            return {"success": False, "message": "Name must contain alphanumeric characters"}
+
+        if not isinstance(tickers, list):
+            return {"success": False, "message": "Tickers must be a list"}
+
+        # Deduplicate while preserving order
+        seen = set()
+        clean = []
+        for t in tickers:
+            sym = str(t).strip().upper()
+            if sym and sym not in seen:
+                seen.add(sym)
+                clean.append(sym)
+
+        config_file = self.storage_dir / f"{safe}.json"
+        payload = {
+            "name": name,
+            "safe_name": safe,
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+            "tickers": clean,
+        }
+
+        with open(config_file, 'w') as f:
+            json.dump(payload, f, indent=2)
+
+        return {
+            "success": True,
+            "message": f"Stock list '{name}' saved with {len(clean)} tickers",
+            "list_name": name,
+            "ticker_count": len(clean),
+        }
+
+    def load(self, name: str) -> dict:
+        """Load a named stock list."""
+        if not name:
+            return {"success": False, "message": "List name is required"}
+
+        config_file = self._find_file(name)
+        if not config_file:
+            return {"success": False, "message": f"Stock list '{name}' not found"}
+
+        with open(config_file, 'r') as f:
+            data = json.load(f)
+
+        return {
+            "success": True,
+            "message": f"Loaded {len(data.get('tickers', []))} tickers",
+            "list_name": data.get("name"),
+            "tickers": data.get("tickers", []),
+            "created_at": data.get("created_at"),
+            "updated_at": data.get("updated_at"),
+        }
+
+    def delete(self, name: str) -> dict:
+        """Delete a named stock list."""
+        if not name:
+            return {"success": False, "message": "List name is required"}
+
+        config_file = self._find_file(name)
+        if not config_file:
+            return {"success": False, "message": f"Stock list '{name}' not found"}
+
+        os.remove(config_file)
+        return {"success": True, "message": f"Stock list '{name}' deleted"}
+
+    def list_all(self) -> dict:
+        """Return names and metadata for all saved stock lists."""
+        lists = []
+        for f in sorted(self.storage_dir.glob("*.json")):
+            try:
+                with open(f, 'r') as fh:
+                    data = json.load(fh)
+                    lists.append({
+                        "name": data.get("name"),
+                        "ticker_count": len(data.get("tickers", [])),
+                        "created_at": data.get("created_at"),
+                        "updated_at": data.get("updated_at"),
+                    })
+            except Exception:
+                continue
+        return {
+            "success": True,
+            "message": f"Found {len(lists)} stock list(s)",
+            "lists": lists,
+        }

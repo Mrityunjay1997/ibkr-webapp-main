@@ -19,6 +19,7 @@ from wtforms import (
     SelectField,
     BooleanField,
     RadioField,
+    TextAreaField,
 )
 from wtforms.validators import DataRequired
 
@@ -73,7 +74,7 @@ class Parameters(FlaskForm):
     PrevClose = IntegerField("Previous Close")
     LowOfDay = IntegerField("Low of Day")
     HighOfDay = IntegerField("High of Day")
-    HighestHigh = IntegerField("Highest High (N days)")
+    HighestHigh = IntegerField("Break High (N days)")
 
     # ------------------------------------------------------------------
     # Percentage / threshold values for indicators
@@ -538,6 +539,16 @@ class Parameters(FlaskForm):
         default="value",
     )
 
+    ComparisonSMA200Crossover = SelectField(
+        "SMA 200 Crossover",
+        choices=[
+            ("crossAbove", "Cross Above"),
+            ("crossBelow", "Cross Below"),
+            ("Not used", "disabled"),
+        ],
+        default="Not used",
+    )
+
     ComparisonSMA200 = SelectField(
         "Programming Language",
         choices=[
@@ -632,6 +643,24 @@ class Parameters(FlaskForm):
             ("Previous Close", "Previous Close"),
         ],
         default="Close",
+    )
+
+    # ------------------------------------------------------------------
+    # News filter configuration
+    # ------------------------------------------------------------------
+
+    NewsExcludeSources = TextAreaField("Exclude News Sources")
+
+    NewsLookbackHours = IntegerField("News Within (hours)")
+
+    NewsEnabled = SelectField(
+        "News Filter",
+        choices=[
+            ("disabled", "disabled"),
+            ("enabled", "Show News"),
+            ("required", "Require News"),
+        ],
+        default="disabled",
     )
 
     # ------------------------------------------------------------------

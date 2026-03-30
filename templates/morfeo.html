@@ -435,6 +435,26 @@
 												{% endfor %}
 											</td>
 										</tr>
+                                        <tr data-condition-row="highest-high-row">
+                                            <th>{{ Param.HighestHigh.label(class_="LabelHead") }}</th>
+                                            <td>
+                                                <div id="tf_highest_high">{{ Param.HighestHigh_tf(class_="HighestHigh_tf") }}</div>
+                                            </td>
+                                            <td>
+                                                <div id="nchangeinput_breakhigh"> {{ Param.HighestHigh(class_="HighestHigh", value = 5) }} </div>
+                                            </td>
+                                            <th>{{ Param.ComparisonHighestHigh(class_="ComparisonHighestHigh") }}</th>
+                                            <td>
+                                                <div id="changeinput_breakhigh"> {{ Param.PercentageHighestHigh(class_="PercentageHighestHigh", value = '0' ) }} </div>
+                                            </td>
+                                            <td>
+                                                {% for subfield in Param.HighestHighBool %}
+                                                    <div class="formatingyesno">
+                                                        <div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} <div>
+                                                    </div>
+                                                {% endfor %}
+                                            </td>
+                                        </tr>
                                         <tr>
                                             <th>{{ Param.PrevClose.label(class_="LabelHead") }}</th>
                                             <td>
@@ -445,7 +465,7 @@
                                             </td>
                                             <th>{{ Param.ComparisonPrevClose(class_="ComparisonPrevClose") }}</th>
                                             <td>
-                                                <div id="changeinput10"> {{ Param.PercentagePrevClose(class_="PercentagePrevClose", value = 0) }} </div>
+                                                <div id="changePrevClose"> {{ Param.PercentagePrevClose(class_="PercentagePrevClose", value = 0) }} </div>
                                             </td>
                                             <td>
                                                 {% for subfield in Param.PrevCloseBool %}
@@ -466,7 +486,7 @@
                                             </td>
                                             <th>{{ Param.ComparisonLowOfDay(class_="ComparisonLowOfDay") }}</th>
                                             <td>
-                                                <div id="changeinput11"> {{ Param.PercentageLowOfDay(class_="PercentageLowOfDay", value = 0) }} </div>
+                                                <div id="changeLowOfDay"> {{ Param.PercentageLowOfDay(class_="PercentageLowOfDay", value = 0) }} </div>
                                             </td>
                                             <td>
                                                 {% for subfield in Param.LowOfDayBool %}
@@ -487,10 +507,31 @@
                                             </td>
                                             <th>{{ Param.ComparisonHighOfDay(class_="ComparisonHighOfDay") }}</th>
                                             <td>
-                                                <div id="changeinput12"> {{ Param.PercentageHighOfDay(class_="PercentageHighOfDay", value = 0) }} </div>
+                                                <div id="changeHighOfDay"> {{ Param.PercentageHighOfDay(class_="PercentageHighOfDay", value = 0) }} </div>
                                             </td>
                                             <td>
                                                 {% for subfield in Param.HighOfDayBool %}
+                                                    <div class="formatingyesno">
+                                                        <div class="yesno"> {{ subfield }} </div>
+                                                        <div class="yesno"> {{ subfield.label }} <div>
+                                                    </div>
+                                                {% endfor %}
+                                            </td>
+                                        </tr>
+                                        <tr data-condition-row="pullback-row">
+                                            <th>Pullback %</th>
+                                            <td>
+                                                <div id="tf_pullback">{{ Param.Pullback_tf(class_="Pullback_tf") }}</div>
+                                            </td>
+                                            <td>
+                                                <div>&nbsp;</div>
+                                            </td>
+                                            <th>{{ Param.ComparisonPullback(class_="ComparisonPullback") }}</th>
+                                            <td>
+                                                <div id="changePullback">{{ Param.PercentagePullback(class_="PercentagePullback", value = 0) }}</div>
+                                            </td>
+                                            <td>
+                                                {% for subfield in Param.PullbackBool %}
                                                     <div class="formatingyesno">
                                                         <div class="yesno"> {{ subfield }} </div>
                                                         <div class="yesno"> {{ subfield.label }} <div>
@@ -540,6 +581,36 @@
 												{% endfor %}
 											</td>
 										</tr>
+                                        <tr data-condition-row="sma-crossover-row">
+                                            <th>SMA Cross (Daily)</th>
+                                            <td>
+                                                <div>{{ Param.SMACrossoverPeriod(class_="SMACrossoverPeriod") }}</div>
+                                            </td>
+                                            <td>
+                                                <div>&nbsp;</div>
+                                            </td>
+                                            <th>{{ Param.ComparisonSMACrossover(class_="ComparisonSMACrossover") }}</th>
+                                            <td>
+                                                <div>&nbsp;</div>
+                                            </td>
+                                            <td>
+                                            </td>
+                                        </tr>
+                                        <tr data-condition-row="sma200-crossover-row">
+                                            <th>SMA 200 Cross (Daily)</th>
+                                            <td>
+                                                <div>&nbsp;</div>
+                                            </td>
+                                            <td>
+                                                <div>&nbsp;</div>
+                                            </td>
+                                            <th>{{ Param.ComparisonSMA200Crossover(class_="ComparisonSMA200Crossover") }}</th>
+                                            <td>
+                                                <div>&nbsp;</div>
+                                            </td>
+                                            <td>
+                                            </td>
+                                        </tr>
 										<!-- tr>
 											<th>Frequency</th>
 {#											<th>{{ Param.addFrequency(class_="SelectField") }} </th>#}
@@ -593,6 +664,34 @@
 										</tr>
 									</tbody>
 								</table>
+
+								<!-- News Configuration -->
+								<div class="card-panel section-fade" style="margin-top:15px;padding:15px;border:1px solid #e5e7eb;border-radius:6px;">
+									<h4 style="margin-top:0;">News Headlines</h4>
+									<table class="table table-bordered">
+										<thead>
+											<tr>
+												<th style="padding:10px">Setting</th>
+												<th style="padding:10px">Value</th>
+											</tr>
+										</thead>
+										<tbody>
+											<tr>
+												<th style="padding:10px">News Filter</th>
+												<td style="padding:10px">{{ Param.NewsEnabled(class_="NewsEnabled") }}</td>
+											</tr>
+											<tr>
+												<th style="padding:10px">News Within (hours)</th>
+												<td style="padding:10px">{{ Param.NewsLookbackHours(class_="NewsLookbackHours", value='0') }}</td>
+											</tr>
+											<tr>
+												<th style="padding:10px">Exclude News Sources</th>
+												<td style="padding:10px">{{ Param.NewsExcludeSources(class_="NewsExcludeSources", rows='2', cols='40', placeholder='Comma-separated, e.g. Reuters, Bloomberg') }}</td>
+											</tr>
+										</tbody>
+									</table>
+								</div>
+
                                 <div class="card-panel section-fade">
                                   <br>
                                   <h3>Search for stock meeting variables <span class="badge-soft white-blue">Run</span></h3>
@@ -636,6 +735,36 @@
                                 </div>
 
 						   	</form>
+
+                            <!-- Stock List Management Panel -->
+                            <div class="card-panel section-fade" style="margin-top:15px;padding:15px;border:1px solid #e5e7eb;border-radius:6px;">
+                              <h3 style="margin-top:0;">Stock List Management</h3>
+
+                              <!-- Ticker input area -->
+                              <div style="margin-bottom:10px;">
+                                <label style="font-weight:bold;font-size:13px;">Tickers (comma or newline separated):</label>
+                                <textarea id="stockListTickers" rows="3" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-family:monospace;" placeholder="AAPL, MSFT, TSLA, NVDA"></textarea>
+                              </div>
+
+                              <!-- Save -->
+                              <div style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                                <input type="text" id="stockListName" placeholder="Enter list name (e.g., 'Tech Watchlist')" style="flex:1;min-width:200px;padding:8px;border:1px solid #ccc;border-radius:4px;">
+                                <button type="button" class="btn btn-primary badge-soft white-blue" onclick="saveStockList()" style="padding:8px 15px;">Save List</button>
+                              </div>
+
+                              <!-- Load / Delete -->
+                              <div style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                                <select id="savedStockLists" style="flex:1;min-width:200px;padding:8px;border:1px solid #ccc;border-radius:4px;">
+                                  <option value="">-- Select saved stock list --</option>
+                                </select>
+                                <button type="button" class="btn btn-success badge-soft white-blue" onclick="loadStockList()" style="padding:8px 15px;">Load Selected</button>
+                                <button type="button" class="btn btn-info badge-soft white-blue" onclick="useStockList()" style="padding:8px 15px;">Use for Scan</button>
+                                <button type="button" class="btn btn-warning badge-soft white-blue" onclick="deleteStockList()" style="padding:8px 15px;">Delete</button>
+                              </div>
+
+                              <div id="stockListsInfo" style="font-size:12px;color:#666;"></div>
+                            </div>
+                            <!-- End Stock List Management Panel -->
 
 						   	<form name="csvimportdataform" id="csvimportdataform">
 
@@ -983,7 +1112,7 @@ function renderResultsFromBackend(response) {
                     headerHtml += pivotPrimary.map(p => `<th>${p}</th>`).join("");
                     headerHtml += "<th>netPosition</th>";
                     if (pivotSecondary.length > 0) headerHtml += pivotSecondary.map(p => `<th>${p}</th>`).join("");
-                    headerHtml += `<th id="SortingTable${tableId}">Change</th><th>Place Order</th>`;
+                    headerHtml += `<th id="SortingTable${tableId}">Change</th><th>Place Order</th><th>News</th>`;
                     headerHtml += "</tr></thead><tbody>";
                     txt1 += headerHtml;
 
@@ -1085,7 +1214,40 @@ function renderResultsFromBackend(response) {
                 const totalIdBuySell = idBuySell + secondIdBuySell;
                 txt1 += `<td><button type='button' id='${totalIdBuySell}' data-toggle='modal' data-target='#exampleModalCenter' class='buttonbuysell' onclick='addButtonBuy(${idPlaceOrder}, ${totalIdBuySell})'>click</button></td>`;
 
+                // News cell with expandable toggle
+                const newsItems = dta.news_headlines || [];
+                const newsRowId = `news_${tableId}_${secondIdBuySell}`;
+                if (newsItems.length > 0) {
+                    txt1 += `<td style="text-align:center;cursor:pointer;" onclick="var el=document.getElementById('${newsRowId}');el.style.display=el.style.display==='none'?'table-row':'none';">&#9660; ${newsItems.length}</td>`;
+                } else {
+                    txt1 += `<td style="text-align:center;color:#999;">0</td>`;
+                }
+
                 txt1 += "</tr>";
+
+                // Expandable news row (hidden by default)
+                if (newsItems.length > 0) {
+                    const totalCols = headerCols.length + pivotPrimary.length + 1 + pivotSecondary.length + 3; // +1 netPos, +3 change/order/news
+                    txt1 += `<tr id="${newsRowId}" style="display:none;background:#f8f9fa;">`;
+                    txt1 += `<td colspan="${totalCols}" style="padding:8px 15px;">`;
+                    txt1 += `<div style="max-height:250px;overflow-y:auto;">`;
+                    txt1 += `<table style="width:100%;font-size:11px;border-collapse:collapse;">`;
+                    txt1 += `<tr style="border-bottom:1px solid #ddd;"><th style="text-align:left;padding:3px;">Date</th><th style="text-align:left;padding:3px;">Source</th><th style="text-align:left;padding:3px;">Headline</th></tr>`;
+                    for (const article of newsItems) {
+                        const pubDate = article.publishedAt || "";
+                        const source = article.source || "";
+                        const title = article.title || "No title";
+                        const url = article.url || "#";
+                        const safeTitle = title.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+                        const safeSource = source.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+                        txt1 += `<tr style="border-bottom:1px solid #eee;">`;
+                        txt1 += `<td style="padding:3px;white-space:nowrap;">${pubDate}</td>`;
+                        txt1 += `<td style="padding:3px;">${safeSource}</td>`;
+                        txt1 += `<td style="padding:3px;"><a href="${encodeURI(url)}" target="_blank" rel="noopener noreferrer">${safeTitle}</a></td>`;
+                        txt1 += `</tr>`;
+                    }
+                    txt1 += `</table></div></td></tr>`;
+                }
 
                 secondIdBuySell += 1;
                 idPlaceOrder += 1;
@@ -1444,6 +1606,7 @@ function highlightConditionRows(conditionsStatus) {
         'HighOfDay': 'high-of-day-row',
         'HighestHigh': 'highest-high-row',
         'SMACrossover': 'sma-crossover-row',
+        'SMA200Crossover': 'sma200-crossover-row',
         'Pullback': 'pullback-row',
         'PivotPoint': 'pivot-point-row',
         'RelativeVolume': 'relative-volume-row'
@@ -1731,6 +1894,66 @@ function AddInstrument() {
 document.getElementById("ComparisonPivotPoint").addEventListener("change", changeInput1);
 //AverageVolume  ComparisonAverageVolume  PercentageAverageVolume
 
+document.getElementById("ComparisonPullback").addEventListener("change", changeInputPullback);
+
+function changeInputPullback() {
+  var x = document.getElementById(this.id);
+  if ( x.id == "ComparisonPullback" ) {
+    if ( x.value == "between" ) {
+      document.getElementById("changePullback").innerHTML = PULLBACK_PERCENT_VAL + "<br>" + PULLBACK_PERCENT1_VAL;
+    } else if ( x.value != "between" ) {
+      if ( document.getElementById("PercentagePullback1") != null ) {
+        document.getElementById("changePullback").innerHTML = PULLBACK_PERCENT_VAL;
+      }
+    }
+  }
+}
+
+document.getElementById("ComparisonPrevClose").addEventListener("change", changeInputPrevClose);
+
+function changeInputPrevClose() {
+  var x = document.getElementById(this.id);
+  if ( x.id == "ComparisonPrevClose" ) {
+    if ( x.value == "between" ) {
+      document.getElementById("changePrevClose").innerHTML = PREVCLOSE_PERCENT_VAL + "<br>" + PREVCLOSE_PERCENT1_VAL;
+    } else if ( x.value != "between" ) {
+      if ( document.getElementById("PercentagePrevClose1") != null ) {
+        document.getElementById("changePrevClose").innerHTML = PREVCLOSE_PERCENT_VAL;
+      }
+    }
+  }
+}
+
+document.getElementById("ComparisonLowOfDay").addEventListener("change", changeInputLowOfDay);
+
+function changeInputLowOfDay() {
+  var x = document.getElementById(this.id);
+  if ( x.id == "ComparisonLowOfDay" ) {
+    if ( x.value == "between" ) {
+      document.getElementById("changeLowOfDay").innerHTML = LOWOFDAY_PERCENT_VAL + "<br>" + LOWOFDAY_PERCENT1_VAL;
+    } else if ( x.value != "between" ) {
+      if ( document.getElementById("PercentageLowOfDay1") != null ) {
+        document.getElementById("changeLowOfDay").innerHTML = LOWOFDAY_PERCENT_VAL;
+      }
+    }
+  }
+}
+
+document.getElementById("ComparisonHighOfDay").addEventListener("change", changeInputHighOfDay);
+
+function changeInputHighOfDay() {
+  var x = document.getElementById(this.id);
+  if ( x.id == "ComparisonHighOfDay" ) {
+    if ( x.value == "between" ) {
+      document.getElementById("changeHighOfDay").innerHTML = HIGHOFDAY_PERCENT_VAL + "<br>" + HIGHOFDAY_PERCENT1_VAL;
+    } else if ( x.value != "between" ) {
+      if ( document.getElementById("PercentageHighOfDay1") != null ) {
+        document.getElementById("changeHighOfDay").innerHTML = HIGHOFDAY_PERCENT_VAL;
+      }
+    }
+  }
+}
+
 <!-- htmlhint inline-script-disabled:false, script-disabled:false -->
 <script>
   // Variables rendered by Jinja2 template engine server-side
@@ -1743,6 +1966,14 @@ document.getElementById("ComparisonPivotPoint").addEventListener("change", chang
   var PRICE_LEVEL1_VAL = {{ Param.Pricelevel1(class_ = 'Pricelevel1')|tojson }};
   var PRICE_PERCENT1_VAL = {{ Param.PercentagePrice1(class_ = 'PercentagePrice1', value = '1000')|tojson }};
   var PRICE_PERCENT_10_VAL = {{ Param.PercentagePrice(class_ = 'PercentagePrice', value = '10')|tojson }};
+  var PULLBACK_PERCENT_VAL = {{ Param.PercentagePullback(class_ = 'PercentagePullback', value = '0')|tojson }};
+  var PULLBACK_PERCENT1_VAL = {{ Param.PercentagePullback1(class_ = 'PercentagePullback1', value = '0')|tojson }};
+  var PREVCLOSE_PERCENT_VAL = {{ Param.PercentagePrevClose(class_ = 'PercentagePrevClose', value = '0')|tojson }};
+  var PREVCLOSE_PERCENT1_VAL = {{ Param.PercentagePrevClose1(class_ = 'PercentagePrevClose1', value = '0')|tojson }};
+  var LOWOFDAY_PERCENT_VAL = {{ Param.PercentageLowOfDay(class_ = 'PercentageLowOfDay', value = '0')|tojson }};
+  var LOWOFDAY_PERCENT1_VAL = {{ Param.PercentageLowOfDay1(class_ = 'PercentageLowOfDay1', value = '0')|tojson }};
+  var HIGHOFDAY_PERCENT_VAL = {{ Param.PercentageHighOfDay(class_ = 'PercentageHighOfDay', value = '0')|tojson }};
+  var HIGHOFDAY_PERCENT1_VAL = {{ Param.PercentageHighOfDay1(class_ = 'PercentageHighOfDay1', value = '0')|tojson }};
   var BG_RESULTS_POLL_MS = {{ cfg_dict.get("bg_results_poll_ms", 5000) | int }};
 </script>
 <!-- / htmlhint -->
@@ -2653,8 +2884,146 @@ window.addEventListener("beforeunload", function () {
 ============================================================================ */
 
 // Load saved configurations on page load
+// ---- Stock List Management ----
+
+function refreshStockLists() {
+    $.ajax({
+        url: "/stock-list/list",
+        type: "GET",
+        dataType: "json",
+        success: function(resp) {
+            const $select = $("#savedStockLists");
+            const currentValue = $select.val();
+            $select.find("option:not(:first)").remove();
+
+            if (resp.success && resp.lists && resp.lists.length > 0) {
+                resp.lists.forEach(function(item) {
+                    const option = $("<option></option>")
+                        .attr("value", item.name)
+                        .text(item.name + " (" + item.ticker_count + " tickers)");
+                    $select.append(option);
+                });
+                $("#stockListsInfo").text("Total lists: " + resp.lists.length);
+                if (currentValue) $select.val(currentValue);
+            } else {
+                $("#stockListsInfo").text("No saved stock lists yet.");
+            }
+        },
+        error: function() {
+            $("#stockListsInfo").text("Error loading stock lists.");
+        }
+    });
+}
+
+function _parseTickerTextarea() {
+    var raw = $("#stockListTickers").val() || "";
+    return raw.split(/[,\n\r]+/)
+        .map(function(s) { return s.trim().toUpperCase(); })
+        .filter(function(s) { return s.length > 0; });
+}
+
+function saveStockList() {
+    var name = $("#stockListName").val().trim();
+    if (!name) { alert("Please enter a list name."); return; }
+
+    var tickers = _parseTickerTextarea();
+    if (tickers.length === 0) { alert("Please enter at least one ticker."); return; }
+
+    $.ajax({
+        url: "/stock-list/save",
+        type: "POST",
+        contentType: "application/json; charset=utf-8",
+        data: JSON.stringify({ name: name, tickers: tickers }),
+        success: function(resp) {
+            if (resp.success) {
+                alert("Stock list '" + name + "' saved with " + resp.ticker_count + " tickers.");
+                $("#stockListName").val("");
+                refreshStockLists();
+                setTimeout(function() { $("#savedStockLists").val(name); }, 100);
+            } else {
+                alert("Error: " + resp.message);
+            }
+        },
+        error: function() { alert("Error saving stock list."); }
+    });
+}
+
+function loadStockList() {
+    var name = $("#savedStockLists").val();
+    if (!name) { alert("Please select a stock list to load."); return; }
+
+    $.ajax({
+        url: "/stock-list/load",
+        type: "POST",
+        contentType: "application/json; charset=utf-8",
+        data: JSON.stringify({ name: name }),
+        success: function(resp) {
+            if (resp.success && resp.tickers) {
+                $("#stockListTickers").val(resp.tickers.join(", "));
+                alert("Loaded " + resp.tickers.length + " tickers from '" + name + "'.");
+            } else {
+                alert("Error: " + (resp.message || "Unknown error"));
+            }
+        },
+        error: function() { alert("Error loading stock list."); }
+    });
+}
+
+function useStockList() {
+    // Populate the manual instrument fields from the textarea tickers, then trigger scan
+    var tickers = _parseTickerTextarea();
+    if (tickers.length === 0) {
+        alert("No tickers to scan. Load a list or enter tickers first.");
+        return;
+    }
+
+    // Clear existing custom fields
+    $("#addcustomfields").empty();
+    $("#firstFormToFlask").removeData("movers-active");
+
+    // Show the custom instrument area and add rows
+    document.getElementById("AddFinancialInstrument").style.display = "block";
+    tickers.forEach(function(sym) {
+        var row = document.createElement("DIV");
+        row.setAttribute("class", "securityRow");
+        row.innerHTML =
+            "<div class='securityName'><label class='subtitleSecurity'>Ticker</label>" +
+            "<input type='text' class='subtitleSecurityInput' value='" + sym + "'></div>" +
+            "<div class='securityName'><label class='subtitleSecurity'>Cusip</label>" +
+            "<input type='text' class='subtitleSecurityInput'></div>";
+        document.getElementById("addcustomfields").appendChild(row);
+    });
+
+    alert(tickers.length + " tickers loaded into the instrument fields. Click the form submit button to scan.");
+}
+
+function deleteStockList() {
+    var name = $("#savedStockLists").val();
+    if (!name) { alert("Please select a stock list to delete."); return; }
+    if (!confirm("Delete stock list '" + name + "'? This cannot be undone.")) return;
+
+    $.ajax({
+        url: "/stock-list/delete",
+        type: "POST",
+        contentType: "application/json; charset=utf-8",
+        data: JSON.stringify({ name: name }),
+        success: function(resp) {
+            if (resp.success) {
+                alert("Stock list deleted.");
+                refreshStockLists();
+            } else {
+                alert("Error: " + resp.message);
+            }
+        },
+        error: function() { alert("Error deleting stock list."); }
+    });
+}
+
+// ---- Scanner Configuration Management ----
+
 function initScannerConfigUI() {
     refreshScannerConfigsList();
+    refreshStockLists();
 }
 
 // Refresh the list of saved configurations

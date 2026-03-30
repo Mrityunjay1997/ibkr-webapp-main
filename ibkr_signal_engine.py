@@ -31,6 +31,7 @@ from indicators import (
     # pivot_points,
     last_value
 )
+from news_filter import filter_news
 
 from resilience import (
     ExponentialBackoffRetry,
@@ -3067,7 +3068,7 @@ class IBapi(EWrapper, EClient):
             counting_ += 1
 
         # -------------------------
-        # HIGHEST HIGH (N days)
+        # BREAK HIGH (N days) — break or near-break of recent high
         # -------------------------
         highest_high_condition = None
         highest_high = data.get("highestHigh")
@@ -3093,7 +3094,6 @@ class IBapi(EWrapper, EClient):
                         low_limit = float(highest_high) * (1.0 - pct / 100.0)
                         highest_high_condition = (
                             float(data.get("close")) >= low_limit
-                            and float(data.get("close")) <= float(highest_high)
                         )
                 except (TypeError, ValueError):
                     highest_high_condition = False
@@ -3136,6 +3136,31 @@ class IBapi(EWrapper, EClient):
         if sma_crossover_condition is not None:
             conditions_status['SMACrossover'] = sma_crossover_condition
             condition = condition and sma_crossover_condition
+            counting_ += 1
+
+        # -------------------------
+        # SMA 200 CROSSOVER (Previous close vs SMA200, Current price vs SMA200)
+        # -------------------------
+        sma200_crossover_condition = None
+        comp200 = form.get("ComparisonSMA200Crossover", "Not used")
+        sma200_value = data.get("sma200")
+        prev_close_200 = data.get("prevClose")
+        current_close_200 = data.get("close")
+
+        if comp200 != "Not used":
+            if sma200_value is None or prev_close_200 is None or current_close_200 is None:
+                sma200_crossover_condition = False
+            else:
+                if comp200 == "crossAbove":
+                    sma200_crossover_condition = (prev_close_200 < sma200_value and current_close_200 > sma200_value)
+                elif comp200 == "crossBelow":
+                    sma200_crossover_condition = (prev_close_200 > sma200_value and current_close_200 < sma200_value)
+                else:
+                    sma200_crossover_condition = False
+
+        if sma200_crossover_condition is not None:
+            conditions_status['SMA200Crossover'] = sma200_crossover_condition
+            condition = condition and sma200_crossover_condition
             counting_ += 1
 
         # -------------------------
@@ -3274,6 +3299,49 @@ class IBapi(EWrapper, EClient):
             scanner_name = form.get("ScannerName") or form.get("scanner_name")
         if scanner_name is not None and scanner_name != "":
             data["scanner_name"] = str(scanner_name)
+
+        # -------------------------
+        # NEWS HEADLINES
+        # -------------------------
+        news_mode = form.get("NewsEnabled", "disabled") if isinstance(form, dict) else "disabled"
+        data["news_headlines"] = []
+        data["latest_news_ts"] = ""
+
+        if news_mode in ("enabled", "required"):
+            symbol = data.get("symbol") or ""
+            lookback_hrs = None
+            try:
+                lookback_hrs = int(form.get("NewsLookbackHours") or 0)
+            except (TypeError, ValueError):
+                lookback_hrs = 0
+
+            lookback_days = max((lookback_hrs // 24) + 1, 7) if lookback_hrs > 0 else 14
+
+            raw_articles = self.fetch_news_for_symbol(symbol, limit=50, lookback_days=lookback_days)
+
+            excluded_raw = form.get("NewsExcludeSources", "") or ""
+            excluded_list = [s.strip() for s in excluded_raw.split(",") if s.strip()] if excluded_raw else None
+
+            filtered = filter_news(
+                raw_articles,
+                max_headlines=25,
+                excluded_sources=excluded_list,
+                hours_back=lookback_hrs if lookback_hrs > 0 else None,
+                remove_dups=True,
+            )
+
+            data["news_headlines"] = filtered
+            if filtered:
+                data["latest_news_ts"] = filtered[0].get("publishedAt", "") or ""
+
+            # If "required" mode and no news within window, force signal to "no"
+            if news_mode == "required" and len(filtered) == 0:
+                data["signal"] = "no"
+                conditions_status["NewsWithinWindow"] = False
+                data["conditions_status"] = conditions_status
+            elif news_mode == "required":
+                conditions_status["NewsWithinWindow"] = True
+                data["conditions_status"] = conditions_status
 
         if self.config.scale_volume_metrics:
             # create copy for Flask so internal logic stays untouched
@@ -3540,21 +3608,22 @@ class IBapi(EWrapper, EClient):
                 self.warningTicker[theid] = [m, i, f"Indicator/signal error: {e}"]
         else:
             self._failure_tracker.mark_succeeded(m)
-            # not enough rows -> register a warning if not already present
-            if theid not in self.warningTicker:
-                rows = len(history)
-                if self.hisdtId.get(theid, False):
-                    self.warningTicker[theid] = [
-                        self.data.get(theid, [{}])[0].get("symbol", m) if self.data.get(theid) else m,
-                        i,
-                        f"Security number of rows {rows}. Please request less rows",
-                    ]
-                else:
-                    self.warningTicker[theid] = [
-                        self.data.get(theid, [{}])[0].get("symbol", m) if self.data.get(theid) else m,
-                        i,
-                        f"Security number of rows {rows}. Unable to download all data",
-                    ]
+            # Data is valid – run indicators and signal check
+            try:
+                market_data = self._market_data.get(theid) if hasattr(self, '_market_data') else None
+                indic = self.getIndicators(
+                    history,
+                    i,
+                    contract,
+                    form,
+                    net_position.get(i, 0),
+                    m,
+                    market_data=market_data,
+                )
+                indic["cusip"] = resolved_cusip
+                _ = self.buySellSignalCheck(indic, form)
+            except Exception as e:
+                self.warningTicker[theid] = [m, i, f"Indicator/signal error: {e}"]
 
         # -------------------------
         # cleanup & bookkeeping

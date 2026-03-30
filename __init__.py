@@ -17,7 +17,7 @@ from waitress import serve
 from io import TextIOWrapper
 from datetime import datetime, UTC
 from forms import Parameters, SecondSubmit
-from scanners import ScannerConfigManager
+from scanners import ScannerConfigManager, StockListManager
 from flask import Flask, render_template, request, jsonify
 
 # -----------------------------------------------------------------------------
@@ -34,6 +34,7 @@ cfg.setups_dir.mkdir(exist_ok=True)
 
 # Initialize scanner config manager
 scanner_config_manager = ScannerConfigManager(storage_dir="scanner_configs")
+stock_list_manager = StockListManager(storage_dir="stock_lists")
 
 
 # -----------------------------------------------------------------------------
@@ -437,6 +438,14 @@ def something():
         logger.exception("Error during IBAPI.disconnect()")
 
     run_gc()
+
+    # Sort each stock list so stocks with newest news appear first
+    for group_key in sendToHtml:
+        for sub_key in sendToHtml[group_key]:
+            stock_list = sendToHtml[group_key][sub_key]
+            if isinstance(stock_list, list):
+                stock_list.sort(key=lambda x: x.get("latest_news_ts", "") or "", reverse=True)
+
     logger.info(f"Response: {sendToHtml}")
 
     logger.info("Total time to do all operations (Seconds): %s", time.time() - starttime)
@@ -2211,6 +2220,85 @@ def scanner_config_duplicate():
     except Exception as e:
         logger.exception("Failed to duplicate scanner config: %s", e)
         return jsonify({"success": False, "message": "Error duplicating configuration"}), 500
+
+
+# -------------------------------------------------------------------------
+# STOCK LIST MANAGEMENT ENDPOINTS
+# -------------------------------------------------------------------------
+
+@app.route("/stock-list/save", methods=["POST"])
+def stock_list_save():
+    """Save a named list of tickers. Expects JSON: {name, tickers: [...]}"""
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"success": False, "message": "JSON payload required"}), 400
+
+        name = (payload.get("name") or "").strip()
+        tickers = payload.get("tickers", [])
+
+        if not name:
+            return jsonify({"success": False, "message": "List name is required"}), 400
+        if not isinstance(tickers, list):
+            return jsonify({"success": False, "message": "Tickers must be a list"}), 400
+
+        result = stock_list_manager.save(name, tickers)
+        return jsonify(result), 200 if result.get("success") else 400
+
+    except Exception as e:
+        logger.exception("Failed to save stock list: %s", e)
+        return jsonify({"success": False, "message": "Error saving stock list"}), 500
+
+
+@app.route("/stock-list/load", methods=["POST"])
+def stock_list_load():
+    """Load a named stock list. Expects JSON: {name}"""
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"success": False, "message": "JSON payload required"}), 400
+
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return jsonify({"success": False, "message": "List name is required"}), 400
+
+        result = stock_list_manager.load(name)
+        return jsonify(result), 200 if result.get("success") else 404
+
+    except Exception as e:
+        logger.exception("Failed to load stock list: %s", e)
+        return jsonify({"success": False, "message": "Error loading stock list"}), 500
+
+
+@app.route("/stock-list/delete", methods=["POST"])
+def stock_list_delete():
+    """Delete a named stock list. Expects JSON: {name}"""
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"success": False, "message": "JSON payload required"}), 400
+
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return jsonify({"success": False, "message": "List name is required"}), 400
+
+        result = stock_list_manager.delete(name)
+        return jsonify(result), 200 if result.get("success") else 404
+
+    except Exception as e:
+        logger.exception("Failed to delete stock list: %s", e)
+        return jsonify({"success": False, "message": "Error deleting stock list"}), 500
+
+
+@app.route("/stock-list/list", methods=["GET"])
+def stock_list_list():
+    """Return all saved stock list names and metadata."""
+    try:
+        result = stock_list_manager.list_all()
+        return jsonify(result), 200 if result.get("success") else 500
+    except Exception as e:
+        logger.exception("Failed to list stock lists: %s", e)
+        return jsonify({"success": False, "message": "Error listing stock lists"}), 500
 
 
 # -------------------------------------------------------------------------
