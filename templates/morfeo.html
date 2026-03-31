@@ -174,6 +174,33 @@
                                     </button>
                                 </div>
 
+                                <!-- -------- TOP 50 SCANNER LOOP CONTROLS -------- -->
+                                <div id="scanner-loop-controls" style="margin-top:12px; padding:10px; border:1px solid #d0d5dd; border-radius:6px; background:#fafbfc;">
+                                    <h4 style="margin:0 0 8px 0;">Top 50 Scanner Loop</h4>
+                                    <p style="font-size:12px; color:#666; margin:0 0 8px 0;">
+                                        Automatically fetches IBKR Top 50 movers and screens them against your indicator settings on a timer.
+                                    </p>
+                                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                                        <label style="margin:0; font-size:0.95rem;">Interval</label>
+                                        <input id="sl_interval_value" type="number" min="1" value="1" style="width:72px; padding:6px;" />
+                                        <select id="sl_interval_unit" style="padding:6px;">
+                                            <option value="seconds">seconds</option>
+                                            <option value="minutes" selected>minutes</option>
+                                            <option value="hours">hours</option>
+                                        </select>
+                                        <button id="sl_toggle" type="button" class="btn btn-primary badge-soft white-blue" style="padding:6px 12px;">Start Scanner Loop</button>
+                                    </div>
+                                    <div style="margin-top:8px; display:flex; gap:20px; align-items:center; flex-wrap:wrap;">
+                                        <div>Status: <span id="sl_status_text" style="font-weight:600;">stopped</span></div>
+                                        <div>Last run: <span id="sl_last_run">never</span></div>
+                                        <div>Run count: <span id="sl_run_count">0</span></div>
+                                        <div>Movers found: <span id="sl_movers_count">0</span></div>
+                                    </div>
+                                    <div id="sl_message" style="margin-top:4px; color:#c00; font-weight:600;"></div>
+                                    <div id="sl_latest_summary" style="margin-top:4px; font-size:0.9rem; color:#333;"></div>
+                                </div>
+                                <!-- -------- END TOP 50 SCANNER LOOP CONTROLS -------- -->
+
                             </div>
 
 						   	<form class = "myform" id = "firstFormToFlask">
@@ -198,8 +225,6 @@
 
                                     <button id="bg_force_restart" class="btn btn-sm" title="Restart with last interval" style="padding:6px 10px; display:none;">Restart</button>
 
-                                    <button id="reset_signal_tracking" class="btn btn-sm btn-warning" title="Clear tracked signals for fresh first-time alerts on manual rescan" style="padding:6px 10px;">Reset Audio Tracking</button>
-
                                     <div id="bg_status" style="margin-left:10px; font-weight:600;color:#333;">Status: <span id="bg_status_text">stopped</span></div>
                                   </div>
 
@@ -207,13 +232,6 @@
                                     <div>Last run: <span id="bg_last_run">never</span></div>
                                     <div>Last updated results: <span id="bg_last_updated">never</span></div>
                                     <div id="bg_message" style="color:#c00; font-weight:600;"></div>
-                                  </div>
-
-                                  <!-- Audio alerts and signal tracking info -->
-                                  <div id="audio_alert_info" style="margin-top:10px; padding:8px; background:#f9f9f9; border-radius:4px; border-left:4px solid #007bff; display:none;">
-                                    <div style="font-weight:600; margin-bottom:4px;">🔊 Audio Alert Info:</div>
-                                    <div id="last_alert_details" style="font-size:0.9rem; color:#333;"></div>
-                                    <div id="tracked_symbols_count" style="font-size:0.85rem; color:#666; margin-top:4px;"></div>
                                   </div>
 
                                   <!-- small visual indicator area -->
@@ -246,7 +264,7 @@
 										</tr>
 									</thead>
 									<tbody>
-										<tr data-condition-row="fast-sma-row">
+										<tr>
 											<th>{{ Param.FastSMA.label(class_="LabelHead") }}</th>
                                             <!-- NEW: time frame column for this indicator -->
                                             <td>
@@ -267,7 +285,7 @@
 												{% endfor %}
 											</td>
 										</tr>
-                                        <tr data-condition-row="medium-sma-row">
+                                        <tr>
 											<th>{{ Param.MediumSMA.label(class_="LabelHead") }}</th>
                                             <!-- NEW: time frame column for this indicator -->
                                             <td>
@@ -288,7 +306,7 @@
 												{% endfor %}
 											</td>
 										</tr>
-										<tr data-condition-row="slow-sma-row">
+										<tr>
 											<th>{{ Param.SlowSMA.label(class_="LabelHead") }}</th>
                                             <!-- NEW: time frame column for this indicator -->
                                             <td>
@@ -309,7 +327,7 @@
 												{% endfor %}
 											</td>
 										</tr>
-										<tr data-condition-row="vwap-row">
+										<tr>
 											<th>{{ Param.VWAP.label(class_="LabelHead") }}</th>
                                             <!-- NEW: time frame column for this indicator -->
                                             <td>
@@ -330,7 +348,7 @@
 												{% endfor %}
 											</td>
 										</tr>
-										<tr data-condition-row="rsi-row">
+										<tr>
 											<td>{{ Param.RSI.label(class_="LabelHead") }}</td>
                                             <!-- NEW: time frame column for this indicator -->
                                             <td>
@@ -351,7 +369,7 @@
 												{% endfor %}
 											</td>
 										</tr>
-										<tr data-condition-row="fast-ema-row">
+										<tr>
 											<th>{{ Param.FastEMA.label(class_="LabelHead") }}</th>
                                             <!-- NEW: time frame column for this indicator -->
                                             <td>
@@ -372,7 +390,7 @@
 												{% endfor %}
 											</td>
 										</tr>
-										<tr data-condition-row="slow-ema-row">
+										<tr>
 											<th>{{ Param.SlowEMA.label(class_="LabelHead") }}</th>
                                             <!-- NEW: time frame column for this indicator -->
                                             <td>
@@ -393,7 +411,7 @@
 												{% endfor %}
 											</td>
 										</tr>
-										<tr data-condition-row="obv-row">
+										<tr>
 											<th>{{ Param.OBV.label(class_="LabelHead") }}</th>
                                             <!-- NEW: time frame column for this indicator -->
                                             <td>
@@ -414,7 +432,7 @@
 												{% endfor %}
 											</td>
 										</tr>
-										<tr data-condition-row="atr-row">
+										<tr>
 											<th>{{ Param.ATR.label(class_="LabelHead") }}</th>
                                             <!-- NEW: time frame column for this indicator -->
                                             <td>
@@ -435,26 +453,6 @@
 												{% endfor %}
 											</td>
 										</tr>
-                                        <tr data-condition-row="highest-high-row">
-                                            <th>{{ Param.HighestHigh.label(class_="LabelHead") }}</th>
-                                            <td>
-                                                <div id="tf_highest_high">{{ Param.HighestHigh_tf(class_="HighestHigh_tf") }}</div>
-                                            </td>
-                                            <td>
-                                                <div id="nchangeinput_breakhigh"> {{ Param.HighestHigh(class_="HighestHigh", value = 5) }} </div>
-                                            </td>
-                                            <th>{{ Param.ComparisonHighestHigh(class_="ComparisonHighestHigh") }}</th>
-                                            <td>
-                                                <div id="changeinput_breakhigh"> {{ Param.PercentageHighestHigh(class_="PercentageHighestHigh", value = '0' ) }} </div>
-                                            </td>
-                                            <td>
-                                                {% for subfield in Param.HighestHighBool %}
-                                                    <div class="formatingyesno">
-                                                        <div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} <div>
-                                                    </div>
-                                                {% endfor %}
-                                            </td>
-                                        </tr>
                                         <tr>
                                             <th>{{ Param.PrevClose.label(class_="LabelHead") }}</th>
                                             <td>
@@ -465,7 +463,7 @@
                                             </td>
                                             <th>{{ Param.ComparisonPrevClose(class_="ComparisonPrevClose") }}</th>
                                             <td>
-                                                <div id="changePrevClose"> {{ Param.PercentagePrevClose(class_="PercentagePrevClose", value = 0) }} </div>
+                                                <div id="changeinput10"> {{ Param.PercentagePrevClose(class_="PercentagePrevClose", value = 0) }} </div>
                                             </td>
                                             <td>
                                                 {% for subfield in Param.PrevCloseBool %}
@@ -486,7 +484,7 @@
                                             </td>
                                             <th>{{ Param.ComparisonLowOfDay(class_="ComparisonLowOfDay") }}</th>
                                             <td>
-                                                <div id="changeLowOfDay"> {{ Param.PercentageLowOfDay(class_="PercentageLowOfDay", value = 0) }} </div>
+                                                <div id="changeinput11"> {{ Param.PercentageLowOfDay(class_="PercentageLowOfDay", value = 0) }} </div>
                                             </td>
                                             <td>
                                                 {% for subfield in Param.LowOfDayBool %}
@@ -507,31 +505,10 @@
                                             </td>
                                             <th>{{ Param.ComparisonHighOfDay(class_="ComparisonHighOfDay") }}</th>
                                             <td>
-                                                <div id="changeHighOfDay"> {{ Param.PercentageHighOfDay(class_="PercentageHighOfDay", value = 0) }} </div>
+                                                <div id="changeinput12"> {{ Param.PercentageHighOfDay(class_="PercentageHighOfDay", value = 0) }} </div>
                                             </td>
                                             <td>
                                                 {% for subfield in Param.HighOfDayBool %}
-                                                    <div class="formatingyesno">
-                                                        <div class="yesno"> {{ subfield }} </div>
-                                                        <div class="yesno"> {{ subfield.label }} <div>
-                                                    </div>
-                                                {% endfor %}
-                                            </td>
-                                        </tr>
-                                        <tr data-condition-row="pullback-row">
-                                            <th>Pullback %</th>
-                                            <td>
-                                                <div id="tf_pullback">{{ Param.Pullback_tf(class_="Pullback_tf") }}</div>
-                                            </td>
-                                            <td>
-                                                <div>&nbsp;</div>
-                                            </td>
-                                            <th>{{ Param.ComparisonPullback(class_="ComparisonPullback") }}</th>
-                                            <td>
-                                                <div id="changePullback">{{ Param.PercentagePullback(class_="PercentagePullback", value = 0) }}</div>
-                                            </td>
-                                            <td>
-                                                {% for subfield in Param.PullbackBool %}
                                                     <div class="formatingyesno">
                                                         <div class="yesno"> {{ subfield }} </div>
                                                         <div class="yesno"> {{ subfield.label }} <div>
@@ -581,36 +558,6 @@
 												{% endfor %}
 											</td>
 										</tr>
-                                        <tr data-condition-row="sma-crossover-row">
-                                            <th>SMA Cross (Daily)</th>
-                                            <td>
-                                                <div>{{ Param.SMACrossoverPeriod(class_="SMACrossoverPeriod") }}</div>
-                                            </td>
-                                            <td>
-                                                <div>&nbsp;</div>
-                                            </td>
-                                            <th>{{ Param.ComparisonSMACrossover(class_="ComparisonSMACrossover") }}</th>
-                                            <td>
-                                                <div>&nbsp;</div>
-                                            </td>
-                                            <td>
-                                            </td>
-                                        </tr>
-                                        <tr data-condition-row="sma200-crossover-row">
-                                            <th>SMA 200 Cross (Daily)</th>
-                                            <td>
-                                                <div>&nbsp;</div>
-                                            </td>
-                                            <td>
-                                                <div>&nbsp;</div>
-                                            </td>
-                                            <th>{{ Param.ComparisonSMA200Crossover(class_="ComparisonSMA200Crossover") }}</th>
-                                            <td>
-                                                <div>&nbsp;</div>
-                                            </td>
-                                            <td>
-                                            </td>
-                                        </tr>
 										<!-- tr>
 											<th>Frequency</th>
 {#											<th>{{ Param.addFrequency(class_="SelectField") }} </th>#}
@@ -633,6 +580,33 @@
 										</tr>
 									</thead>
 									<tbody class ="secondTableBody">
+										<tr>
+											<th style="padding:10px">Cross Above 200 SMA</th>
+											<td style="padding:10px">&nbsp;</td>
+											<td style="padding:10px">{{ Param.ComparisonCrossAbove200SMA(class_="ComparisonCrossAbove200SMA") }}</td>
+											<td style="padding:10px"><div id="percentageCross200SMA">{{ Param.PercentageCross200SMA(class_="PercentageCross200SMA", value='5') }}</div></td>
+											<td>&nbsp;</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Cross 50 SMA</th>
+											<td style="padding:10px">&nbsp;</td>
+											<td style="padding:10px">{{ Param.ComparisonCross50SMA(class_="ComparisonCross50SMA") }}</td>
+											<td style="padding:10px"><div id="percentageCross50SMA">{{ Param.PercentageCross50SMA(class_="PercentageCross50SMA", value='5') }}</div></td>
+											<td>&nbsp;</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Break High</th>
+											<td style="padding:10px"><div id="changeBreakHigh">{{ Param.BreakHigh(class_="BreakHigh", value='5') }}</div></td>
+											<td style="padding:10px">{{ Param.ComparisonBreakHigh(class_="ComparisonBreakHigh") }}</td>
+											<td style="padding:10px"><div id="percentageBreakHigh">{{ Param.PercentageBreakHigh(class_="PercentageBreakHigh", value='0') }}</div></td>
+											<td>
+												{% for subfield in Param.BreakHighBool %}
+													<div class="formatingyesno">
+														<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} <div>
+													</div>
+												{% endfor %}
+											</td>
+										</tr>
 										<tr>
 											<th style="padding:10px">Pivot Point</th>
 											<td style="padding:10px"> <div id = "changePP"> {{ Param.PivotPoint(class_="PivotPoint") }} </div></td>
@@ -666,65 +640,42 @@
 								</table>
 
 								<!-- News Configuration -->
-								<div class="card-panel section-fade" style="margin-top:15px;padding:15px;border:1px solid #e5e7eb;border-radius:6px;">
-									<h4 style="margin-top:0;">News Headlines</h4>
-									<table class="table table-bordered">
-										<thead>
-											<tr>
-												<th style="padding:10px">Setting</th>
-												<th style="padding:10px">Value</th>
-											</tr>
-										</thead>
-										<tbody>
-											<tr>
-												<th style="padding:10px">News Filter</th>
-												<td style="padding:10px">{{ Param.NewsEnabled(class_="NewsEnabled") }}</td>
-											</tr>
-											<tr>
-												<th style="padding:10px">News Within (hours)</th>
-												<td style="padding:10px">{{ Param.NewsLookbackHours(class_="NewsLookbackHours", value='0') }}</td>
-											</tr>
-											<tr>
-												<th style="padding:10px">Exclude News Sources</th>
-												<td style="padding:10px">{{ Param.NewsExcludeSources(class_="NewsExcludeSources", rows='2', cols='40', placeholder='Comma-separated, e.g. Reuters, Bloomberg') }}</td>
-											</tr>
-										</tbody>
-									</table>
-								</div>
+								<table class="table table-bordered" style="margin-top:15px;">
+									<thead>
+										<tr style="background:#2c3e50; color:#fff;">
+											<th style="padding:10px" colspan="5">News Headlines</th>
+										</tr>
+										<tr>
+											<th style="padding:10px">Setting</th>
+											<th style="padding:10px">Value</th>
+											<th style="padding:10px" colspan="3">&nbsp;</th>
+										</tr>
+									</thead>
+									<tbody>
+										<tr>
+											<th style="padding:10px">Enable News</th>
+											<td style="padding:10px" colspan="4">{{ Param.ComparisonNews(class_="ComparisonNews") }}</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Max Headlines</th>
+											<td style="padding:10px" colspan="4">{{ Param.NewsMaxHeadlines(class_="NewsMaxHeadlines", value='5') }}</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">News Within Hours (0 = any)</th>
+											<td style="padding:10px" colspan="4">{{ Param.NewsWithinHours(class_="NewsWithinHours", value='0') }}</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Exclude Publishers (comma-separated)</th>
+											<td style="padding:10px" colspan="4">{{ Param.NewsExcludePublishers(class_="NewsExcludePublishers", placeholder="e.g. BZ, MT", style="width:100%") }}</td>
+										</tr>
+									</tbody>
+								</table>
 
                                 <div class="card-panel section-fade">
                                   <br>
                                   <h3>Search for stock meeting variables <span class="badge-soft white-blue">Run</span></h3>
                                   <div class="SubmitData"> {{ Param.submit() }} </div>
                                 </div>
-
-                                <!-- Scanner Configuration Management Panel -->
-                                <div class="card-panel section-fade" style="margin-top:15px;padding:15px;border:1px solid #e5e7eb;border-radius:6px;">
-                                  <h3 style="margin-top:0;">Scanner Configuration Management</h3>
-                                  
-                                  <!-- Save Configuration -->
-                                  <div style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-                                    <div style="flex:1;min-width:200px;">
-                                      <input type="text" id="scannerConfigName" placeholder="Enter scanner name (e.g., 'Quick Scalp')" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
-                                    </div>
-                                    <button type="button" class="btn btn-primary badge-soft white-blue" onclick="saveScannerConfig()" style="padding:8px 15px;">Save Config</button>
-                                  </div>
-
-                                  <!-- Load Configuration -->
-                                  <div style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-                                    <select id="savedConfigsList" style="flex:1;min-width:200px;padding:8px;border:1px solid #ccc;border-radius:4px;" onchange="onSavedConfigChanged()">
-                                      <option value="">-- Select saved configuration --</option>
-                                    </select>
-                                    <button type="button" class="btn btn-success badge-soft white-blue" onclick="loadScannerConfig()" style="padding:8px 15px;">Load Selected</button>
-                                    <button type="button" class="btn btn-warning badge-soft white-blue" onclick="deleteScannerConfig()" style="padding:8px 15px;">Delete</button>
-                                  </div>
-
-                                  <!-- Saved Configurations Info -->
-                                  <div id="configsInfo" style="font-size:12px;color:#666;"></div>
-                                </div>
-
-                                <!-- End Scanner Configuration Management Panel -->
-
                                 <div id="bg_poll_times" style="margin-top:6px;">
                                     Scanner last run: <span id="bg_backend_last_run">never</span>
                                     &nbsp;|&nbsp;
@@ -736,36 +687,6 @@
 
 						   	</form>
 
-                            <!-- Stock List Management Panel -->
-                            <div class="card-panel section-fade" style="margin-top:15px;padding:15px;border:1px solid #e5e7eb;border-radius:6px;">
-                              <h3 style="margin-top:0;">Stock List Management</h3>
-
-                              <!-- Ticker input area -->
-                              <div style="margin-bottom:10px;">
-                                <label style="font-weight:bold;font-size:13px;">Tickers (comma or newline separated):</label>
-                                <textarea id="stockListTickers" rows="3" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-family:monospace;" placeholder="AAPL, MSFT, TSLA, NVDA"></textarea>
-                              </div>
-
-                              <!-- Save -->
-                              <div style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-                                <input type="text" id="stockListName" placeholder="Enter list name (e.g., 'Tech Watchlist')" style="flex:1;min-width:200px;padding:8px;border:1px solid #ccc;border-radius:4px;">
-                                <button type="button" class="btn btn-primary badge-soft white-blue" onclick="saveStockList()" style="padding:8px 15px;">Save List</button>
-                              </div>
-
-                              <!-- Load / Delete -->
-                              <div style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-                                <select id="savedStockLists" style="flex:1;min-width:200px;padding:8px;border:1px solid #ccc;border-radius:4px;">
-                                  <option value="">-- Select saved stock list --</option>
-                                </select>
-                                <button type="button" class="btn btn-success badge-soft white-blue" onclick="loadStockList()" style="padding:8px 15px;">Load Selected</button>
-                                <button type="button" class="btn btn-info badge-soft white-blue" onclick="useStockList()" style="padding:8px 15px;">Use for Scan</button>
-                                <button type="button" class="btn btn-warning badge-soft white-blue" onclick="deleteStockList()" style="padding:8px 15px;">Delete</button>
-                              </div>
-
-                              <div id="stockListsInfo" style="font-size:12px;color:#666;"></div>
-                            </div>
-                            <!-- End Stock List Management Panel -->
-
 						   	<form name="csvimportdataform" id="csvimportdataform">
 
 							    <input type="file" name="csvfile" id="csvfile" class="form-control-file csvchildren"/>
@@ -774,6 +695,13 @@
 						</div>
 						<div id = "customformToUse">
 							<button id = "AddFinancialInstrument" onclick="AddInstrument()">Add Instrument</button>
+							<!-- Watchlist (stock list) controls -->
+							<div id="watchlist-controls" style="display:inline-block; margin-left:12px;">
+								<button id="wl_save" class="btn btn-sm btn-outline-primary" type="button">Save List</button>
+								<button id="wl_load" class="btn btn-sm btn-outline-secondary" type="button">Load List</button>
+								<button id="wl_manage" class="btn btn-sm btn-outline-info" type="button">Saved Lists</button>
+								<span id="wl_msg" style="margin-left:8px; font-size:13px;"></span>
+							</div>
 							<div id = "addcustomfields"></div>
 						</div>
 					</div>
@@ -881,7 +809,63 @@
 				});
 			});
 	});
-  // play beep using WebAudio (no files)
+  // --- Sound alert system ---
+  // Track symbols that have already matched all criteria (for first-time detection)
+  var _previouslyMatchedAll = {};
+
+  // Single beep at 880Hz — stock meets ALL criteria
+  function playBeepAll(){
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = 880;
+      gain.gain.value = 0.15;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.18);
+    } catch(e){ console.warn("beep failed", e); }
+  }
+
+  // Rising chime at 660->880->1100Hz — stock meets all criteria for FIRST TIME
+  function playBeepFirstTime(){
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const freqs = [660, 880, 1100];
+      const now = ctx.currentTime;
+      for (let i=0; i<freqs.length; i++){
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = freqs[i];
+        gain.gain.value = 0.13;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + i*0.15);
+        osc.stop(now + i*0.15 + 0.12);
+      }
+    } catch(e){ console.warn("beep failed", e); }
+  }
+
+  // Double beep at 700Hz — stock meets all but one criteria
+  function playBeepAlmostAll(){
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = ctx.currentTime;
+      for (let i=0; i<2; i++){
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = 700;
+        gain.gain.value = 0.12;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + i*0.25);
+        osc.stop(now + i*0.25 + 0.12);
+      }
+    } catch(e){ console.warn("beep failed", e); }
+  }
+
+  // Legacy wrapper kept for backward compat
   function playBeep(times=2){
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1047,9 +1031,22 @@ function renderResultsFromBackend(response) {
         for (const groupKey in msg) {
             let secondIdBuySell = 0;
 
-            const rows = Array.isArray(msg[groupKey])
+            let rows = Array.isArray(msg[groupKey])
                 ? msg[groupKey]
                 : Object.values(msg[groupKey] || {});
+
+            // Sort: stocks with most recent news first
+            rows.sort(function(a, b) {
+                const tA = a.latestNewsTime || "";
+                const tB = b.latestNewsTime || "";
+                if (tA && tB) return tB.localeCompare(tA);
+                if (tA) return -1;
+                if (tB) return 1;
+                return 0;
+            });
+
+            // check if any row has news
+            const hasNews = rows.some(function(r) { return r.newsHeadlines && r.newsHeadlines.length > 0; });
 
             // iterate rows in this group
             for (const dta of rows) {
@@ -1091,6 +1088,8 @@ function renderResultsFromBackend(response) {
                     if ("averageVolume1" in dta) headerCols.push({ key: "averageVolume1", label: "Avg Vol1" });
                     headerCols.push({ key: "relativeVolume", label: "Relative Volume" });
                     if ("relativeVolume1" in dta) headerCols.push({ key: "relativeVolume1", label: "Relative Volume1" });
+                    if ("breakHigh" in dta) headerCols.push({ key: "breakHigh", label: "Break High" });
+                    if ("breakHigh1" in dta) headerCols.push({ key: "breakHigh1", label: "Break High1" });
 
                     // pivot primary
                     const pivotPrimary = [];
@@ -1112,7 +1111,8 @@ function renderResultsFromBackend(response) {
                     headerHtml += pivotPrimary.map(p => `<th>${p}</th>`).join("");
                     headerHtml += "<th>netPosition</th>";
                     if (pivotSecondary.length > 0) headerHtml += pivotSecondary.map(p => `<th>${p}</th>`).join("");
-                    headerHtml += `<th id="SortingTable${tableId}">Change</th><th>Place Order</th><th>News</th>`;
+                    headerHtml += `<th id="SortingTable${tableId}">Change</th><th>Place Order</th>`;
+                    if (hasNews) headerHtml += `<th>News</th>`;
                     headerHtml += "</tr></thead><tbody>";
                     txt1 += headerHtml;
 
@@ -1134,11 +1134,8 @@ function renderResultsFromBackend(response) {
                 const np = Number(dta.netPosition);
                 const decision = Number.isFinite(np) ? (np > 0 ? "UP" : np < 0 ? "DOWN" : "UNCHANGE") : "UNCHANGE";
                 const rowClass = dta.signal === "yes" ? `content${tableId} yescondition` : `content${tableId}`;
-                
-                // Prepare conditions_status data attribute for highlighting
-                const conditionsJson = dta.conditions_status ? JSON.stringify(dta.conditions_status) : '{}';
-                
-                txt1 += `<tr class='${rowClass}' data-conditions-status='${conditionsJson}'>`;
+
+                txt1 += `<tr class='${rowClass}'>`;
 
                 const headerCols = groupHeaderCols || [];
                 const pivotPrimary = groupPivotPrimary || [];
@@ -1158,6 +1155,9 @@ function renderResultsFromBackend(response) {
                     }
                 }
 
+                // variable results for cell coloring
+                const vr = dta.variableResults || {};
+
                 // standard columns
                 for (const col of headerCols) {
                     let v = dta[col.key];
@@ -1172,20 +1172,30 @@ function renderResultsFromBackend(response) {
                         }
                     }
 
+                    // determine cell background from variableResults
+                    let cellStyle = "";
+                    if (col.key in vr) {
+                        cellStyle = vr[col.key] ? " style='background:#4caf50;color:#fff'" : " style='background:#f44336;color:#fff'";
+                    }
+
                     if (col.raw) {
-                        txt1 += `<td>${(v === null || v === undefined || v === "") ? "n.d" : v}</td>`;
+                        txt1 += `<td${cellStyle}>${(v === null || v === undefined || v === "") ? "n.d" : v}</td>`;
                     } else {
-                        txt1 += `<td>${fmt(v)}</td>`;
+                        txt1 += `<td${cellStyle}>${fmt(v)}</td>`;
                     }
                 }
 
                 // primary pivots
                 if (dta.Pivot && typeof dta.Pivot === "object") {
+                    let pivotStyle = "";
+                    if ("Pivot" in vr) {
+                        pivotStyle = vr["Pivot"] ? " style='background:#4caf50;color:#fff'" : " style='background:#f44336;color:#fff'";
+                    }
                     for (const pp of pivotPrimary) {
                         if (pp === "Pivot Point") {
-                            txt1 += `<td>n.d</td>`;
+                            txt1 += `<td${pivotStyle}>n.d</td>`;
                         } else {
-                            txt1 += `<td>${fmt(dta.Pivot[pp])}</td>`;
+                            txt1 += `<td${pivotStyle}>${fmt(dta.Pivot[pp])}</td>`;
                         }
                     }
                 } else {
@@ -1214,39 +1224,54 @@ function renderResultsFromBackend(response) {
                 const totalIdBuySell = idBuySell + secondIdBuySell;
                 txt1 += `<td><button type='button' id='${totalIdBuySell}' data-toggle='modal' data-target='#exampleModalCenter' class='buttonbuysell' onclick='addButtonBuy(${idPlaceOrder}, ${totalIdBuySell})'>click</button></td>`;
 
-                // News cell with expandable toggle
-                const newsItems = dta.news_headlines || [];
-                const newsRowId = `news_${tableId}_${secondIdBuySell}`;
-                if (newsItems.length > 0) {
-                    txt1 += `<td style="text-align:center;cursor:pointer;" onclick="var el=document.getElementById('${newsRowId}');el.style.display=el.style.display==='none'?'table-row':'none';">&#9660; ${newsItems.length}</td>`;
-                } else {
-                    txt1 += `<td style="text-align:center;color:#999;">0</td>`;
+                // news toggle cell
+                const newsItems = dta.newsHeadlines || [];
+                const newsRowId = `newsRow_${tableId}_${secondIdBuySell}`;
+                if (hasNews) {
+                    if (newsItems.length > 0) {
+                        let newsStyle = "";
+                        const vr2 = dta.variableResults || {};
+                        if ("news" in vr2) {
+                            newsStyle = vr2["news"] ? " style='background:#4caf50;color:#fff;cursor:pointer'" : " style='background:#f44336;color:#fff;cursor:pointer'";
+                        } else {
+                            newsStyle = " style='cursor:pointer'";
+                        }
+                        txt1 += `<td${newsStyle} onclick="var el=document.getElementById('${newsRowId}');el.style.display=el.style.display==='none'?'table-row':'none'">&#9660; ${newsItems.length}</td>`;
+                    } else {
+                        txt1 += `<td>-</td>`;
+                    }
                 }
 
                 txt1 += "</tr>";
 
-                // Expandable news row (hidden by default)
-                if (newsItems.length > 0) {
-                    const totalCols = headerCols.length + pivotPrimary.length + 1 + pivotSecondary.length + 3; // +1 netPos, +3 change/order/news
-                    txt1 += `<tr id="${newsRowId}" style="display:none;background:#f8f9fa;">`;
-                    txt1 += `<td colspan="${totalCols}" style="padding:8px 15px;">`;
-                    txt1 += `<div style="max-height:250px;overflow-y:auto;">`;
-                    txt1 += `<table style="width:100%;font-size:11px;border-collapse:collapse;">`;
-                    txt1 += `<tr style="border-bottom:1px solid #ddd;"><th style="text-align:left;padding:3px;">Date</th><th style="text-align:left;padding:3px;">Source</th><th style="text-align:left;padding:3px;">Headline</th></tr>`;
-                    for (const article of newsItems) {
-                        const pubDate = article.publishedAt || "";
-                        const source = article.source || "";
-                        const title = article.title || "No title";
-                        const url = article.url || "#";
-                        const safeTitle = title.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
-                        const safeSource = source.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
-                        txt1 += `<tr style="border-bottom:1px solid #eee;">`;
-                        txt1 += `<td style="padding:3px;white-space:nowrap;">${pubDate}</td>`;
-                        txt1 += `<td style="padding:3px;">${safeSource}</td>`;
-                        txt1 += `<td style="padding:3px;"><a href="${encodeURI(url)}" target="_blank" rel="noopener noreferrer">${safeTitle}</a></td>`;
-                        txt1 += `</tr>`;
+                // expandable news sub-row
+                if (hasNews && newsItems.length > 0) {
+                    const totalCols = (groupHeaderCols || []).length
+                        + (groupPivotPrimary || []).length
+                        + 1 /* netPosition */
+                        + (groupPivotSecondary || []).length
+                        + 2 /* change + place order */
+                        + 1 /* news col */;
+                    txt1 += `<tr id='${newsRowId}' style='display:none;background:#1a1a2e'>`;
+                    txt1 += `<td colspan='${totalCols}' style='padding:8px 15px'>`;
+                    txt1 += `<table style='width:100%;border-collapse:collapse;font-size:11px'>`;
+                    txt1 += `<tr style='border-bottom:1px solid #444'><th style='padding:4px;text-align:left'>Time</th><th style='padding:4px;text-align:left'>Source</th><th style='padding:4px;text-align:left'>Headline</th></tr>`;
+                    for (const ni of newsItems) {
+                        let displayTime = ni.parsedTime || ni.time || "";
+                        try {
+                            if (displayTime.includes("T")) {
+                                const d = new Date(displayTime);
+                                displayTime = d.toLocaleString();
+                            }
+                        } catch(e) {}
+                        // HTML-escape headline to prevent XSS
+                        const escHl = (ni.headline || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+                        const escProv = (ni.provider || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+                        const escTime = displayTime.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+                        const articleLink = ni.articleId ? `<a href='https://www.interactivebrokers.com/en/index.php?f=5765&cntry=&tag=&ib_entity=&src=${encodeURIComponent(ni.provider)}&id=${encodeURIComponent(ni.articleId)}' target='_blank' rel='noopener noreferrer' style='color:#4fc3f7;text-decoration:underline'>${escHl || "link"}</a>` : (escHl || "n/a");
+                        txt1 += `<tr style='border-bottom:1px solid #333'><td style='padding:3px 4px;white-space:nowrap'>${escTime}</td><td style='padding:3px 4px'>${escProv}</td><td style='padding:3px 4px'>${articleLink}</td></tr>`;
                     }
-                    txt1 += `</table></div></td></tr>`;
+                    txt1 += `</table></td></tr>`;
                 }
 
                 secondIdBuySell += 1;
@@ -1274,21 +1299,36 @@ function renderResultsFromBackend(response) {
         }
 
         if (!hasLiveAtThatLevel) {
-            let hasSignal = false;
+            let _soundPlayed = false;
             for (const groupKey in msg) {
                 const rows = Array.isArray(msg[groupKey])
                     ? msg[groupKey]
                     : Object.values(msg[groupKey] || {});
                 for (const dta of rows) {
-                    if (dta.signal === "yes") {
-                        hasSignal = true;
-                        break;
+                    const pc = dta.passCount || 0;
+                    const tc = dta.totalCount || 0;
+                    const sym = dta.symbol || dta.cusip || "";
+
+                    if (tc > 0 && pc === tc) {
+                        // ALL criteria met
+                        if (!_previouslyMatchedAll[sym]) {
+                            // First time this symbol matches all criteria
+                            _previouslyMatchedAll[sym] = true;
+                            if (!_soundPlayed) { playBeepFirstTime(); _soundPlayed = true; }
+                        } else {
+                            // Already matched before — single beep
+                            if (!_soundPlayed) { playBeepAll(); _soundPlayed = true; }
+                        }
+                    } else if (tc > 1 && pc === tc - 1) {
+                        // All but ONE criteria met — double beep
+                        // Remove from previously matched if it was there
+                        delete _previouslyMatchedAll[sym];
+                        if (!_soundPlayed) { playBeepAlmostAll(); _soundPlayed = true; }
+                    } else {
+                        // Does not meet threshold — clear first-time tracking
+                        delete _previouslyMatchedAll[sym];
                     }
                 }
-                if (hasSignal) break;
-            }
-            if (hasSignal) {
-                playBeep(2);
             }
         }
 
@@ -1575,297 +1615,50 @@ function clearFilter(nInt)
 
 
 
-
-// ============================================================
-// SIGNAL CONDITION HIGHLIGHTING
-// Highlights form indicator rows based on condition status
-// Green = Met | Red = Not Met
-// ============================================================
-
-function highlightConditionRows(conditionsStatus) {
-    if (!conditionsStatus || typeof conditionsStatus !== 'object') {
-        clearConditionHighlights();
-        return;
-    }
-
-    // Mapping of condition names to form row identifiers
-    const conditionRowMap = {
-        'AverageVolume': 'average-volume-row',
-        'Price': 'price-row',
-        'VWAP': 'vwap-row',
-        'FastSMA': 'fast-sma-row',
-        'MediumSMA': 'medium-sma-row',
-        'SlowSMA': 'slow-sma-row',
-        'RSI': 'rsi-row',
-        'FastEMA': 'fast-ema-row',
-        'SlowEMA': 'slow-ema-row',
-        'OBV': 'obv-row',
-        'ATR': 'atr-row',
-        'PrevClose': 'prev-close-row',
-        'LowOfDay': 'low-of-day-row',
-        'HighOfDay': 'high-of-day-row',
-        'HighestHigh': 'highest-high-row',
-        'SMACrossover': 'sma-crossover-row',
-        'SMA200Crossover': 'sma200-crossover-row',
-        'Pullback': 'pullback-row',
-        'PivotPoint': 'pivot-point-row',
-        'RelativeVolume': 'relative-volume-row'
-    };
-
-    // Clear all highlights first
-    clearConditionHighlights();
-
-    // Apply highlights based on conditions status
-    for (const [conditionName, met] of Object.entries(conditionsStatus)) {
-        const rowId = conditionRowMap[conditionName];
-        if (!rowId) continue;
-
-        const rowElement = document.querySelector(`[data-condition-row="${rowId}"]`);
-        if (rowElement) {
-            if (met) {
-                rowElement.classList.add('condition-row-met');
-                addConditionBadge(rowElement, true, conditionName);
-            } else {
-                rowElement.classList.add('condition-row-not-met');
-                addConditionBadge(rowElement, false, conditionName);
-            }
-        }
-    }
-}
-
-function addConditionBadge(rowElement, met, conditionName) {
-    // Remove existing badge if present
-    const existingBadge = rowElement.querySelector('.condition-badge');
-    if (existingBadge) {
-        existingBadge.remove();
-    }
-
-    // Create new badge
-    const badge = document.createElement('span');
-    badge.className = 'condition-badge ' + (met ? 'condition-badge-met' : 'condition-badge-not-met');
-    badge.textContent = met ? '✓ MET' : '✗ NOT MET';
-    badge.style.marginLeft = '10px';
-    
-    // Append to the label cell
-    const firstCell = rowElement.querySelector('th, td');
-    if (firstCell) {
-        firstCell.appendChild(badge);
-    }
-}
-
-function clearConditionHighlights() {
-    // Remove all condition-based highlights
-    document.querySelectorAll('.condition-row-met, .condition-row-not-met').forEach(el => {
-        el.classList.remove('condition-row-met', 'condition-row-not-met');
-        const badge = el.querySelector('.condition-badge');
-        if (badge) badge.remove();
-    });
-}
-
-
-// ============================================================
-// AUDIO ALERT SYSTEM
-// Single beep → all conditions met
-// Double beep → all except one
-// Different sound → first-time match
-// ============================================================
-
-const audioContext = (function() {
-    try {
-        return new (window.AudioContext || window.webkitAudioContext)();
-    } catch (e) {
-        console.log("Web Audio API not supported");
-        return null;
-    }
-})();
-
-// ============================================================
-// PERSISTENT SIGNAL STATE TRACKING
-// Maintains "previously matched stocks" across page refreshes
-// ============================================================
-
-const SIGNAL_STATE_KEY = "ibkr_matched_signals";
-
-function loadMatchedSignals() {
-    try {
-        const stored = localStorage.getItem(SIGNAL_STATE_KEY);
-        return stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch (e) {
-        console.log("Error loading signal state:", e);
-        return new Set();
-    }
-}
-
-function saveMatchedSignals(symbolSet) {
-    try {
-        localStorage.setItem(SIGNAL_STATE_KEY, JSON.stringify(Array.from(symbolSet)));
-    } catch (e) {
-        console.log("Error saving signal state:", e);
-    }
-}
-
-let _lastSignalSymbols = loadMatchedSignals();  // Load persisted matched stocks on page load
-
-function playBeep(frequency = 800, duration = 200) {
-    if (!audioContext) return;
-    
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    oscillator.frequency.value = frequency;
-    oscillator.type = 'sine';
-    
-    const now = audioContext.currentTime;
-    gainNode.gain.setValueAtTime(0.3, now);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration / 1000);
-    
-    oscillator.start(now);
-    oscillator.stop(now + duration / 1000);
-}
-
-function playSingleBeep() {
-    // All conditions met - high frequency single beep
-    playBeep(1000, 250);
-}
-
-function playDoubleBeep() {
-    // All except one - medium frequency double beep
-    if (!audioContext) return;
-    
-    const now = audioContext.currentTime;
-    playBeep(800, 150);
-    
-    // Second beep after 200ms
-    setTimeout(() => {
-        playBeep(800, 150);
-    }, 200);
-}
-
-function playFirstTimeAlertSound() {
-    // First-time signal - unique ascending pattern
-    if (!audioContext) return;
-    
-    const now = audioContext.currentTime;
-    // Three ascending tones
-    playBeep(600, 100);
-    setTimeout(() => playBeep(800, 100), 120);
-    setTimeout(() => playBeep(1000, 150), 250);
-}
-
-function triggerAudioAlert(symbol, alertType, wasNewSignal) {
-    if (alertType === "none") return;
-    
-    let alertDescription = "";
-    
-    // First-time signal detection - play special sound
-    if (wasNewSignal && !_lastSignalSymbols.has(symbol)) {
-        _lastSignalSymbols.add(symbol);
-        saveMatchedSignals(_lastSignalSymbols);  // Persist to localStorage
-        playFirstTimeAlertSound();
-        alertDescription = `🎯 NEW SIGNAL: ${symbol} - Ascending tones (🎵 First-time alert)`;
-    }
-    // All conditions met
-    else if (alertType === "single_beep") {
-        playSingleBeep();
-        alertDescription = `✅ ALL CONDITIONS MET: ${symbol} - Single beep (1000Hz)`;
-    }
-    // All except one condition
-    else if (alertType === "double_beep") {
-        playDoubleBeep();
-        alertDescription = `⚠️ ALL EXCEPT ONE: ${symbol} - Double beep (800Hz)`;
-    }
-    // Standard beep
-    else if (alertType === "beep") {
-        playBeep(700, 200);
-        alertDescription = `ℹ️ PARTIAL CONDITIONS: ${symbol} - Standard beep (700Hz)`;
-    }
-    
-    // Update UI with alert info
-    if (alertDescription) {
-        document.getElementById("last_alert_details").textContent = alertDescription;
-        document.getElementById("audio_alert_info").style.display = "block";
-        document.getElementById("tracked_symbols_count").textContent = `Tracked symbols: ${_lastSignalSymbols.size}`;
-    }
-}
-
-function resetSignalTracking() {
-    // Clear tracked signals (useful for manual scanner runs)
-    const clearedCount = _lastSignalSymbols.size;
-    _lastSignalSymbols.clear();
-    saveMatchedSignals(_lastSignalSymbols);  // Clear from localStorage too
-    
-    // Show feedback
-    const infoDiv = document.getElementById("audio_alert_info");
-    document.getElementById("last_alert_details").textContent = `🔄 Signal tracking cleared (${clearedCount} symbol${clearedCount !== 1 ? 's' : ''} reset from persistent storage). All stocks will trigger first-time alerts on next scan.`;
-    document.getElementById("tracked_symbols_count").textContent = `Ready for fresh first-time alerts on manual scan`;
-    infoDiv.style.display = "block";
-    
-    // Auto-hide after 3 seconds
-    setTimeout(() => {
-        if (_lastSignalSymbols.size === 0) {
-            infoDiv.style.display = "none";
-        }
-    }, 3000);
-}
-
-
-// ============================================================
-
-
 function addButtonBuy (nelm, idtouse) {
-	var currentId = idtouse.id;
-	var nameTicker = document.getElementById(currentId).parentElement.parentElement.children[0].innerHTML;
-	
-	// Extract conditions data from the row and highlight form
-	const rowElement = document.getElementById(currentId).parentElement.parentElement;
-	const conditionsJson = rowElement.getAttribute('data-conditions-status');
-	if (conditionsJson) {
-		try {
-			const conditions = JSON.parse(conditionsJson);
-			highlightConditionRows(conditions);
-		} catch (e) {
-			console.log('Could not parse conditions:', e);
-			clearConditionHighlights();
-		}
-	} else {
-		clearConditionHighlights();
-	}
+												var currentId = idtouse.id;
+											  	var nameTicker = document.getElementById(currentId).parentElement.parentElement.children[0].innerHTML;
 
-	var stockName = nameTicker;
-	var longshort = "LONG"
-	var parentChildren = 7
-	var actualPrice = document.getElementById(currentId).parentElement.parentElement.children[2].innerHTML
-	var supporT = (parseFloat(actualPrice) * 0.99).toFixed(2)
-	var resistencE = (parseFloat(actualPrice) * 1.01).toFixed(2)
-	var startDiv = "<div class = 'buysell'>";
-	var startForm = "<form id = 'formToSendToFlask'>";
-	var divBuySell = "<div class = 'buysell'>";
-	var divStock = "<div class = 'makeColum'> <label class='labelbuysell'>Stock</label> <input type='text' value=" +stockName + " class = 'buysellinput mystock'></div>";
-	var divNShare = "<div class = 'makeColum'> <label class='labelbuysell'>N Share</label> <input type='number' value='1' class = 'buysellinput nshare'></div>";
-	var divBrackteLimit = "<div class = 'makeColum'> <label class='labelbuysell'>Type</label> <select class = 'buysellSelect bracketLimit' id = 'changevalues" + nelm + "'> <option value='bracket' selected=''>Bracket </option> <option value='limit'>Limit</option> </select> </div>";
-	var divBuySell = "<div class = 'makeColum'> <label class='labelbuysell'>Side</label> <select class = 'buysellSelect longshortside' onchange='SupportResistenceChange()'> <option value='long' selected=''>Long </option> <option value='short'>Short</option> </select> </div>";
-	var thecurrentPrice = "<div class = 'makeColum'> <label class='labelbuysell'>Price</label> <input type='number' value='" + actualPrice + "' class = 'buysellinput pricelimit' onchange='SupportResistenceChange()'></div>";
+												var stockName = nameTicker;//document.getElementById(currentId).parentElement.children[1].innerHTML;
+												var longshort = "LONG" //document.getElementsByClassName("LongShort")[0].value";
+												var parentChildren = 7 //document.getElementById("appendFormIndicator").children.length;
+												var actualPrice = document.getElementById(currentId).parentElement.parentElement.children[2].innerHTML  //document.getElementById(currentId).parentElement.children[2].innerHTML;
+												var supporT = (parseFloat(actualPrice) * 0.99).toFixed(2) //(actualPrice)toFixed(2)
+												var resistencE = (parseFloat(actualPrice) * 1.01).toFixed(2) //(actualPrice)toFixed(2)
+												var startDiv = "<div class = 'buysell'>";
+												var startForm = "<form id = 'formToSendToFlask'>";
+												var divBuySell = "<div class = 'buysell'>";
+												var divStock = "<div class = 'makeColum'> <label class='labelbuysell'>Stock</label> <input type='text' value=" +stockName + " class = 'buysellinput mystock'></div>";
+												var divNShare = "<div class = 'makeColum'> <label class='labelbuysell'>N Share</label> <input type='number' value='1' class = 'buysellinput nshare'></div>";
+												var divBrackteLimit = "<div class = 'makeColum'> <label class='labelbuysell'>Type</label> <select class = 'buysellSelect bracketLimit' id = 'changevalues" + nelm + "'> <option value='bracket' selected=''>Bracket </option> <option value='limit'>Limit</option> </select> </div>";
+												var divBuySell = "<div class = 'makeColum'> <label class='labelbuysell'>Side</label> <select class = 'buysellSelect longshortside' onchange='SupportResistenceChange()'> <option value='long' selected=''>Long </option> <option value='short'>Short</option> </select> </div>";
+												var thecurrentPrice = "<div class = 'makeColum'> <label class='labelbuysell'>Price</label> <input type='number' value='" + actualPrice + "' class = 'buysellinput pricelimit' onchange='SupportResistenceChange()'></div>";
 
-	var supportLevel = "<div class = 'makeColum'> <label class='labelbuysell'>Stop</label> <input type='number' value='" + supporT + "' class = 'buysellinput supportlimit' id = 'support" + nelm + "'></div>";
-	var StopLoss = "<div class = 'makeColum'> <label class='labelbuysell'>StopLoss(%)</label> <input type='number' value='10' class = 'buysellinput stoplosslimit'></div>";
-	var resistenceLevel = "<div class = 'makeColum'> <label class='labelbuysell'>Target</label> <input type='number' value='" + resistencE +"' class = 'buysellinput resistencelimit' id = 'resistence" + nelm + "'></div>";
-	var fast_ema = "<div class = 'makeColum'> <label class='labelbuysell'>FastEMA</label> <input type='number' value='13' class = 'buysellinput'></div>";
-	var send = "<div class = 'makeColum'> <label class='labelbuysell'>Order</label> <button class = 'buysellinput' id = 'sendToFlask" + parentChildren + "'>Send</button></div>";
-	var send1 = "<div class = 'makeColum'> <label class='labelbuysell'>Order</label> <button class = 'buysellinput'>Send</button></div>";
-	var divBuySellClose = "</div>";
-	var endForm = "</form>";
-	var endDiv = "</div>";
-	var secondPart = "<div class='secondPart'> <div class='makeColum1'> <label class='labelbuysell'>Support %</label> <input type='number' value='1' class='percentageClass' onchange='SupportResistenceChange()'> </div> <div class='makeColum1'> <label class='labelbuysell'>Resist %</label> <input type='number' value='1' class='percentageClass' onchange='SupportResistenceChange()'> </div> </div>";
+												var supportLevel = "<div class = 'makeColum'> <label class='labelbuysell'>Stop</label> <input type='number' value='" + supporT + "' class = 'buysellinput supportlimit' id = 'support" + nelm + "'></div>";
+											  	var StopLoss = "<div class = 'makeColum'> <label class='labelbuysell'>StopLoss(%)</label> <input type='number' value='10' class = 'buysellinput stoplosslimit'></div>";
+											  	var resistenceLevel = "<div class = 'makeColum'> <label class='labelbuysell'>Target</label> <input type='number' value='" + resistencE +"' class = 'buysellinput resistencelimit' id = 'resistence" + nelm + "'></div>";
+											  	var fast_ema = "<div class = 'makeColum'> <label class='labelbuysell'>FastEMA</label> <input type='number' value='13' class = 'buysellinput'></div>";
+											  	var send = "<div class = 'makeColum'> <label class='labelbuysell'>Order</label> <button class = 'buysellinput' id = 'sendToFlask" + parentChildren + "'>Send</button></div>";
+											  	var send1 = "<div class = 'makeColum'> <label class='labelbuysell'>Order</label> <button class = 'buysellinput'>Send</button></div>";
+											  	var divBuySellClose = "</div>";
+											  	var endForm = "</form>";
+											  	var endDiv = "</div>";
+											  	//mystock nshare bracketLimit longshortside pricelimit supportlimit stoplosslimit resistencelimit
+											  	var secondPart = "<div class='secondPart'> <div class='makeColum1'> <label class='labelbuysell'>Support %</label> <input type='number' value='1' class='percentageClass' onchange='SupportResistenceChange()'> </div> <div class='makeColum1'> <label class='labelbuysell'>Resist %</label> <input type='number' value='1' class='percentageClass' onchange='SupportResistenceChange()'> </div> </div>";
 
-	var elementToAppend = startForm + startDiv  + divStock + divNShare + divBrackteLimit + divBuySell + thecurrentPrice + supportLevel + StopLoss + resistenceLevel + fast_ema + send  + divBuySellClose + endForm + secondPart;
-	document.getElementById("elementToAppendBuySell").innerHTML = elementToAppend;
-	document.getElementById('changevalues' + nelm).addEventListener("change", changeOptions);
+											  	var elementToAppend = startForm + startDiv  + divStock + divNShare + divBrackteLimit + divBuySell + thecurrentPrice + supportLevel + StopLoss + resistenceLevel + fast_ema + send  + endDiv + endForm + secondPart; // + send1;
+											  	document.getElementById("elementToAppendBuySell").innerHTML = elementToAppend;
+											  	/*
+											  	myelement = document.createElement("DIV");
+											  	myelement.setAttribute("class", "buysell");
+											  	myelement.innerHTML = elementToAppend;
+											  	document.getElementById("elfeo").appendChild(myelement);
+											  	*/
+											  	document.getElementById('changevalues' + nelm).addEventListener("change", changeOptions);
 
-	event.preventDefault();
-}
+											  	event.preventDefault();
+											  	//nelm = nelm + 1;
+											}
 
 
 
@@ -1894,100 +1687,19 @@ function AddInstrument() {
 document.getElementById("ComparisonPivotPoint").addEventListener("change", changeInput1);
 //AverageVolume  ComparisonAverageVolume  PercentageAverageVolume
 
-document.getElementById("ComparisonPullback").addEventListener("change", changeInputPullback);
 
-function changeInputPullback() {
-  var x = document.getElementById(this.id);
-  if ( x.id == "ComparisonPullback" ) {
-    if ( x.value == "between" ) {
-      document.getElementById("changePullback").innerHTML = PULLBACK_PERCENT_VAL + "<br>" + PULLBACK_PERCENT1_VAL;
-    } else if ( x.value != "between" ) {
-      if ( document.getElementById("PercentagePullback1") != null ) {
-        document.getElementById("changePullback").innerHTML = PULLBACK_PERCENT_VAL;
-      }
-    }
-  }
-}
 
-document.getElementById("ComparisonPrevClose").addEventListener("change", changeInputPrevClose);
 
-function changeInputPrevClose() {
-  var x = document.getElementById(this.id);
-  if ( x.id == "ComparisonPrevClose" ) {
-    if ( x.value == "between" ) {
-      document.getElementById("changePrevClose").innerHTML = PREVCLOSE_PERCENT_VAL + "<br>" + PREVCLOSE_PERCENT1_VAL;
-    } else if ( x.value != "between" ) {
-      if ( document.getElementById("PercentagePrevClose1") != null ) {
-        document.getElementById("changePrevClose").innerHTML = PREVCLOSE_PERCENT_VAL;
-      }
-    }
-  }
-}
-
-document.getElementById("ComparisonLowOfDay").addEventListener("change", changeInputLowOfDay);
-
-function changeInputLowOfDay() {
-  var x = document.getElementById(this.id);
-  if ( x.id == "ComparisonLowOfDay" ) {
-    if ( x.value == "between" ) {
-      document.getElementById("changeLowOfDay").innerHTML = LOWOFDAY_PERCENT_VAL + "<br>" + LOWOFDAY_PERCENT1_VAL;
-    } else if ( x.value != "between" ) {
-      if ( document.getElementById("PercentageLowOfDay1") != null ) {
-        document.getElementById("changeLowOfDay").innerHTML = LOWOFDAY_PERCENT_VAL;
-      }
-    }
-  }
-}
-
-document.getElementById("ComparisonHighOfDay").addEventListener("change", changeInputHighOfDay);
-
-function changeInputHighOfDay() {
-  var x = document.getElementById(this.id);
-  if ( x.id == "ComparisonHighOfDay" ) {
-    if ( x.value == "between" ) {
-      document.getElementById("changeHighOfDay").innerHTML = HIGHOFDAY_PERCENT_VAL + "<br>" + HIGHOFDAY_PERCENT1_VAL;
-    } else if ( x.value != "between" ) {
-      if ( document.getElementById("PercentageHighOfDay1") != null ) {
-        document.getElementById("changeHighOfDay").innerHTML = HIGHOFDAY_PERCENT_VAL;
-      }
-    }
-  }
-}
-
-<!-- htmlhint inline-script-disabled:false, script-disabled:false -->
-<script>
-  // Variables rendered by Jinja2 template engine server-side
-  var PIVOT_POINT_VAL = {{ Param.PivotPoint|tojson }};
-  var PIVOT_POINT_PERCENT = {{ Param.PercentagePivotPoint(value = '0')|tojson }};
-  var PIVOT_POINT1_VAL = {{ Param.PivotPoint1|tojson }};
-  var PIVOT_POINT1_PERCENT = {{ Param.PercentagePivotPoint1(value = '0')|tojson }};
-  var PRICE_LEVEL_VAL = {{ Param.Pricelevel(class_ = 'Pricelevel')|tojson }};
-  var PRICE_PERCENT_VAL = {{ Param.PercentagePrice(class_ = 'PercentagePrice', value = '0')|tojson }};
-  var PRICE_LEVEL1_VAL = {{ Param.Pricelevel1(class_ = 'Pricelevel1')|tojson }};
-  var PRICE_PERCENT1_VAL = {{ Param.PercentagePrice1(class_ = 'PercentagePrice1', value = '1000')|tojson }};
-  var PRICE_PERCENT_10_VAL = {{ Param.PercentagePrice(class_ = 'PercentagePrice', value = '10')|tojson }};
-  var PULLBACK_PERCENT_VAL = {{ Param.PercentagePullback(class_ = 'PercentagePullback', value = '0')|tojson }};
-  var PULLBACK_PERCENT1_VAL = {{ Param.PercentagePullback1(class_ = 'PercentagePullback1', value = '0')|tojson }};
-  var PREVCLOSE_PERCENT_VAL = {{ Param.PercentagePrevClose(class_ = 'PercentagePrevClose', value = '0')|tojson }};
-  var PREVCLOSE_PERCENT1_VAL = {{ Param.PercentagePrevClose1(class_ = 'PercentagePrevClose1', value = '0')|tojson }};
-  var LOWOFDAY_PERCENT_VAL = {{ Param.PercentageLowOfDay(class_ = 'PercentageLowOfDay', value = '0')|tojson }};
-  var LOWOFDAY_PERCENT1_VAL = {{ Param.PercentageLowOfDay1(class_ = 'PercentageLowOfDay1', value = '0')|tojson }};
-  var HIGHOFDAY_PERCENT_VAL = {{ Param.PercentageHighOfDay(class_ = 'PercentageHighOfDay', value = '0')|tojson }};
-  var HIGHOFDAY_PERCENT1_VAL = {{ Param.PercentageHighOfDay1(class_ = 'PercentageHighOfDay1', value = '0')|tojson }};
-  var BG_RESULTS_POLL_MS = {{ cfg_dict.get("bg_results_poll_ms", 5000) | int }};
-</script>
-<!-- / htmlhint -->
-<script>
 function changeInput1() {
   var x = document.getElementById(this.id);
   if ( x.id == "ComparisonPivotPoint" ) {
     if ( x.value == "between" ) {
-      document.getElementById("changePP").innerHTML = PIVOT_POINT_VAL + PIVOT_POINT_PERCENT;
-      document.getElementById("percentagePP").innerHTML = PIVOT_POINT1_VAL + PIVOT_POINT1_PERCENT;
+      document.getElementById("changePP").innerHTML = {{ Param.PivotPoint|tojson }} + {{ Param.PercentagePivotPoint(value = '0')|tojson }};
+      document.getElementById("percentagePP").innerHTML =  {{ Param.PivotPoint1|tojson }} + {{ Param.PercentagePivotPoint1(value = '0')|tojson }};
     } else if ( x.value != "between" ) {
     	if ( document.getElementById("PercentagePivotPoint1") != null ) {
-    		document.getElementById("changePP").innerHTML = PIVOT_POINT_VAL;
-    		document.getElementById("percentagePP").innerHTML = PIVOT_POINT_PERCENT;
+    		document.getElementById("changePP").innerHTML = {{ Param.PivotPoint|tojson }};
+    		document.getElementById("percentagePP").innerHTML = {{ Param.PercentagePivotPoint(value = '0')|tojson }};
     	}
     }
   }
@@ -1999,16 +1711,20 @@ function changeInput2() {
   var x = document.getElementById(this.id);
   if ( x.id == "ComparisonPrice" ) {
     if ( x.value == "between" ) {
-      document.getElementById("ChangePric").innerHTML = PRICE_LEVEL_VAL + PRICE_PERCENT_VAL;
-      document.getElementById("PercentagePric").innerHTML = PRICE_LEVEL1_VAL + "<br>" + PRICE_PERCENT1_VAL;
+      document.getElementById("ChangePric").innerHTML = {{ Param.Pricelevel(class_ = 'Pricelevel')|tojson }} + {{ Param.PercentagePrice(class_ = 'PercentagePrice', value = '0')|tojson }};
+      document.getElementById("PercentagePric").innerHTML =  {{ Param.Pricelevel1(class_ = 'Pricelevel1')|tojson }} + "<br>" + {{ Param.PercentagePrice1(class_ = 'PercentagePrice1', value = '1000')|tojson }};
     } else if ( x.value != "between" ) {
     	if ( document.getElementById("PercentagePrice1") != null ) {
-    		document.getElementById("ChangePric").innerHTML = PRICE_LEVEL_VAL;
-    		document.getElementById("PercentagePric").innerHTML = PRICE_PERCENT_10_VAL;
+    		document.getElementById("ChangePric").innerHTML =  {{ Param.Pricelevel(class_ = 'Pricelevel')|tojson }};
+    		document.getElementById("PercentagePric").innerHTML = {{ Param.PercentagePrice(class_ = 'PercentagePrice', value = '10')|tojson }};
     	}
     }
   }
 }
+</script>
+
+<script>
+const BG_RESULTS_POLL_MS = {{ cfg_dict.get("bg_results_poll_ms", 5000) | int }};
 </script>
 
 <script>
@@ -2312,17 +2028,6 @@ function changeInput2() {
                     setBgStatus("running");
                     setBgMessage("Scanner running", false);
                 }
-                
-                // Trigger audio alerts for new signals
-                for (const k in resp.results) {
-                    const item = resp.results[k];
-                    if (item && item.symbol && item.signal === "yes") {
-                        const isFirstTime = !_lastSignalSymbols.has(item.symbol);
-                        const alertType = item.alert_type || "beep";
-                        triggerAudioAlert(item.symbol, alertType, isFirstTime);
-                    }
-                }
-                
                 renderResultsFromBackend(wrapped);
             }
 
@@ -2404,10 +2109,6 @@ function changeInput2() {
         }, 500);
       });
     });
-
-    $("#reset_signal_tracking").on("click", function(){
-      resetSignalTracking();
-    });
   }
 
     function hookManualSubmitStopStart(){
@@ -2479,6 +2180,210 @@ function changeInput2() {
     };
 })(jQuery);
 </script>
+
+<!-- ===================== TOP 50 SCANNER LOOP JS ===================== -->
+<script>
+(function($){
+  let _sl_enabled = false;
+  let _sl_poll_timer = null;
+  let _sl_poll_ms = BG_RESULTS_POLL_MS;
+  let _sl_last_run_time = null;
+  let _sl_run_count = 0;
+
+  const _sl_unique_id = Date.now() + "_sl_" + Math.floor(Math.random() * 1000000);
+
+  function setSLStatus(text){ $("#sl_status_text").text(text); }
+  function setSLMessage(text, isError){
+    $("#sl_message").text(text || "");
+    $("#sl_message").css("color", isError ? "#c00" : "#2b7a0b");
+  }
+
+  function buildFormObjectFromPage(){
+    const arr = $("#firstFormToFlask").serializeArray();
+    const obj = {};
+    for (const p of arr) { obj[p.name] = p.value; }
+    return obj;
+  }
+
+  function getScannerParams(){
+    return {
+      scan_code: $("#movers_scan_code").val() || "TOP_PERC_GAIN",
+      min_price: parseFloat($("#movers_min_price").val()) || 0.05,
+      min_volume: parseInt($("#movers_min_volume").val()) || 75000
+    };
+  }
+
+  function startScannerLoop(value, unit, formObj, scannerParams){
+    const payload = {
+      value: Number(value),
+      unit: unit,
+      form: formObj,
+      scanner_params: scannerParams,
+      tab_unique_id: _sl_unique_id
+    };
+
+    setSLMessage("Starting scanner loop...", false);
+    setSLStatus("starting");
+
+    return $.ajax({
+      url: "/scanner-loop/start",
+      type: "POST",
+      contentType: "application/json; charset=utf-8",
+      data: JSON.stringify(payload),
+      timeout: 20000
+    }).done(function(resp){
+      _sl_enabled = true;
+      setSLStatus("running");
+      setSLMessage("Scanner loop running", false);
+      startSLPolling();
+    }).fail(function(xhr){
+      if (xhr && xhr.status === 409) {
+        setSLMessage("Scanner loop already running.", true);
+      } else {
+        setSLMessage("Failed to start: " + (xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : xhr.statusText || "error"), true);
+      }
+      setSLStatus("stopped");
+    });
+  }
+
+  function stopScannerLoop(){
+    setSLMessage("Stopping...", false);
+    setSLStatus("stopping");
+    _sl_last_run_time = null;
+    _sl_run_count = 0;
+    return $.ajax({
+      url: "/scanner-loop/stop",
+      type: "POST",
+      contentType: "application/json; charset=utf-8",
+      data: JSON.stringify({ tab_unique_id: _sl_unique_id }),
+      timeout: 10000
+    }).always(function(){
+      _sl_enabled = false;
+      setSLStatus("stopped");
+      setSLMessage("", false);
+      stopSLPolling();
+      $("#sl_run_count").text("0");
+      $("#sl_movers_count").text("0");
+    });
+  }
+
+  function startSLPolling(){
+    stopSLPolling();
+    pollOnceSLResults();
+    _sl_poll_timer = setInterval(pollOnceSLResults, _sl_poll_ms);
+  }
+  function stopSLPolling(){
+    if (_sl_poll_timer) { clearInterval(_sl_poll_timer); _sl_poll_timer = null; }
+  }
+
+  function pollOnceSLResults(){
+    $.ajax({
+      url: "/scanner-loop/results",
+      type: "GET",
+      dataType: "json",
+      timeout: 8000
+    }).done(function(resp){
+      if (!resp) return;
+
+      if (resp.last_run_time) {
+        if (resp.last_run_time !== _sl_last_run_time) {
+          _sl_last_run_time = resp.last_run_time;
+          _sl_run_count = resp.run_count || (_sl_run_count + 1);
+        }
+        $("#sl_last_run").text(new Date(resp.last_run_time * 1000).toLocaleString());
+        $("#sl_run_count").text(_sl_run_count);
+      }
+
+      if (resp.movers) {
+        $("#sl_movers_count").text(resp.movers.length);
+      }
+
+      if (resp.warning && Object.keys(resp.warning).length > 0) {
+        $("#sl_latest_summary").text("Warnings: " + JSON.stringify(resp.warning).slice(0, 200));
+      } else {
+        $("#sl_latest_summary").text(
+          "Results: " + (resp.results ? Object.keys(resp.results).length + " symbols screened" : "no results")
+        );
+      }
+
+      if (resp.beep) {
+        playBeep(2);
+        $("#sl_status_text").fadeOut(120).fadeIn(120);
+      }
+
+      // Render results into the main results area
+      if (resp.results && typeof resp.results === "object" && Object.keys(resp.results).length > 0) {
+        var scanLabel = {
+          "TOP_PERC_GAIN": "Top 50 Gainers",
+          "TOP_PERC_LOSE": "Top 50 Losers"
+        }[resp.scan_code] || resp.scan_code || "Top 50 Scanner Loop";
+
+        const wrapped = {
+          result: {},
+          warning: resp.warning || {}
+        };
+        wrapped.result[scanLabel] = { "Live": {} };
+        for (const k in resp.results) {
+          const item = resp.results[k];
+          const rowKey = (item && (item.symbol || item.cusip)) ? (item.symbol || item.cusip) : k;
+          wrapped.result[scanLabel]["Live"][rowKey] = item;
+        }
+        if (_sl_enabled) {
+          setSLStatus("running");
+          setSLMessage("Scanner loop running", false);
+        }
+        renderResultsFromBackend(wrapped);
+      }
+    }).fail(function(xhr){
+      setSLMessage("Polling error: " + (xhr.statusText || "network"), true);
+    });
+  }
+
+  // Wire UI
+  $(function(){
+    $("#sl_toggle").on("click", function(e){
+      e.preventDefault();
+      const $btn = $(this);
+      if (!_sl_enabled) {
+        const v = $("#sl_interval_value").val();
+        const u = $("#sl_interval_unit").val();
+        if (!v || Number(v) < 1) {
+          setSLMessage("Interval value must be >= 1", true);
+          return;
+        }
+        const formObj = buildFormObjectFromPage();
+        const scannerParams = getScannerParams();
+        startScannerLoop(v, u, formObj, scannerParams).always(function(){
+          if (_sl_enabled) {
+            $btn.text("Stop Scanner Loop");
+            // Scroll to results
+            setTimeout(function(){
+              const target = document.querySelector("#firstFormToFlask > div.card-panel.section-fade");
+              if (target) { target.scrollIntoView({ behavior: "smooth", block: "start" }); }
+            }, 1000);
+          }
+        });
+      } else {
+        stopScannerLoop().always(function(){
+          $btn.text("Start Scanner Loop");
+        });
+      }
+    });
+
+    // Restore state on page load
+    $.get("/scanner-loop/status").done(function(st){
+      if (st && st.enabled) {
+        _sl_enabled = true;
+        $("#sl_toggle").text("Stop Scanner Loop");
+        setSLStatus("running");
+        setSLMessage("Scanner loop running", false);
+        startSLPolling();
+      }
+    }).fail(function(){ /* ignore */ });
+  });
+})(jQuery);
+</script>
+<!-- ===================== END TOP 50 SCANNER LOOP JS ===================== -->
 
 <script>
 /* Setup Save / Load JS - depends on jQuery (already on page) */
@@ -2670,6 +2575,177 @@ $("#load_setup").on("click", function(){
   }).fail(function(){ _showSetupMsg("Failed to list setups", true); });
 });
 </script>
+
+<!-- ============ WATCHLIST (Stock List) JS ============ -->
+<script>
+function _showWlMsg(msg, isErr) {
+  $("#wl_msg").text(msg).css("color", isErr ? "#c00" : "#2b7a0b");
+  setTimeout(() => $("#wl_msg").text(""), 4000);
+}
+
+/* Collect tickers currently in the Manual Instruments panel */
+function _getManualTickers() {
+  const tickers = [];
+  $("#addcustomfields .securityRow").each(function(){
+    const inputs = $(this).find("input");
+    const ticker = (inputs.eq(0).val() || "").trim().toUpperCase();
+    if (ticker) {
+      tickers.push({
+        ticker: ticker,
+        cusip: (inputs.eq(1).val() || "").trim()
+      });
+    }
+  });
+  return tickers;
+}
+
+/* Populate the Manual Instruments panel from a ticker list */
+function _loadTickersToManual(tickers) {
+  // clear existing rows
+  $("#addcustomfields").empty();
+  tickers.forEach(function(t){
+    AddInstrument();
+    const lastRow = $("#addcustomfields .securityRow").last();
+    const inputs = lastRow.find("input");
+    inputs.eq(0).val(t.ticker || "");
+    inputs.eq(1).val(t.cusip || "");
+  });
+}
+
+/* Save List */
+$("#wl_save").on("click", function(){
+  const tickers = _getManualTickers();
+  if (tickers.length === 0) {
+    _showWlMsg("Add tickers first (Manual Instruments)", true);
+    return;
+  }
+
+  const name = prompt("Save stock list as (choose a name):");
+  if (!name) return;
+
+  $.ajax({
+    url: "/watchlists/save",
+    type: "POST",
+    contentType: "application/json; charset=utf-8",
+    data: JSON.stringify({ name: name, overwrite: false, tickers: tickers }),
+    success: function(resp) {
+      if (resp && resp.ok) {
+        _showWlMsg("Saved: " + name + " (" + tickers.length + " tickers)", false);
+      } else if (resp && resp.exists) {
+        if (confirm("List '" + name + "' already exists. Overwrite?")) {
+          $.ajax({
+            url: "/watchlists/save",
+            type: "POST",
+            contentType: "application/json; charset=utf-8",
+            data: JSON.stringify({ name: name, overwrite: true, tickers: tickers }),
+            success: function(r){ if (r && r.ok) _showWlMsg("Overwritten: " + name, false); },
+            error: function(){ _showWlMsg("Save failed", true); }
+          });
+        }
+      } else {
+        _showWlMsg("Save failed", true);
+      }
+    },
+    error: function(xhr){
+      const msg = (xhr.responseJSON && xhr.responseJSON.error) ? xhr.responseJSON.error : "save failed";
+      if (xhr.status === 409) {
+        if (confirm("List already exists. Overwrite?")) {
+          $.ajax({
+            url: "/watchlists/save",
+            type: "POST",
+            contentType: "application/json; charset=utf-8",
+            data: JSON.stringify({ name: name, overwrite: true, tickers: tickers }),
+            success: function(r){ if (r && r.ok) _showWlMsg("Overwritten: " + name, false); },
+            error: function(){ _showWlMsg("Save failed", true); }
+          });
+        }
+      } else {
+        _showWlMsg(msg, true);
+      }
+    }
+  });
+});
+
+/* Load List */
+$("#wl_load").on("click", function(){
+  $.get("/watchlists/list").done(function(resp){
+    const lists = (resp && resp.watchlists) ? resp.watchlists : [];
+    if (lists.length === 0) {
+      alert("No saved stock lists found.");
+      return;
+    }
+    let choices = "Choose a stock list to load:\n\n";
+    lists.forEach(function(s, idx){
+      choices += (idx + 1) + ") " + (s.title || s.name) + " (" + s.count + " tickers, " +
+        new Date(s.created).toLocaleString("en-US", {
+          month: "short", day: "2-digit", year: "numeric",
+          hour: "numeric", minute: "2-digit", hour12: true
+        }) + ")\n";
+    });
+    const sel = prompt(choices + "\nEnter the number to load:");
+    const i = parseInt(sel) - 1;
+    if (!Number.isFinite(i) || i < 0 || i >= lists.length) return;
+    const chosen = lists[i];
+    $.ajax({
+      url: "/watchlists/load",
+      type: "POST",
+      contentType: "application/json; charset=utf-8",
+      data: JSON.stringify({ name: chosen.name }),
+      success: function(data){
+        if (!data || !data.tickers || data.tickers.length === 0) {
+          _showWlMsg("Empty or invalid list", true);
+          return;
+        }
+        _loadTickersToManual(data.tickers);
+        // switch to Manual Instruments tab
+        if (typeof changePage4 === "function") changePage4();
+        else $("#AddFinancialInstrument").closest("#customformToUse").show();
+        _showWlMsg("Loaded: " + (data.meta && data.meta.title ? data.meta.title : chosen.name) +
+                   " (" + data.tickers.length + " tickers)", false);
+      },
+      error: function(){ _showWlMsg("Load failed", true); }
+    });
+  }).fail(function(){ _showWlMsg("Failed to list stock lists", true); });
+});
+
+/* Saved Lists - view & delete */
+$("#wl_manage").on("click", function(){
+  $.get("/watchlists/list").done(function(resp){
+    const lists = (resp && resp.watchlists) ? resp.watchlists : [];
+    if (lists.length === 0) {
+      alert("No saved stock lists found.");
+      return;
+    }
+    let choices = "Saved Stock Lists:\n\n";
+    lists.forEach(function(s, idx){
+      choices += (idx + 1) + ") " + (s.title || s.name) + " — " + s.count + " tickers (" +
+        new Date(s.created).toLocaleString("en-US", {
+          month: "short", day: "2-digit", year: "numeric",
+          hour: "numeric", minute: "2-digit", hour12: true
+        }) + ")\n";
+    });
+    choices += "\nEnter a number to delete that list, or press Cancel:";
+    const sel = prompt(choices);
+    if (!sel) return;
+    const i = parseInt(sel) - 1;
+    if (!Number.isFinite(i) || i < 0 || i >= lists.length) return;
+    const chosen = lists[i];
+    if (!confirm("Delete '" + (chosen.title || chosen.name) + "'?")) return;
+    $.ajax({
+      url: "/watchlists/delete",
+      type: "POST",
+      contentType: "application/json; charset=utf-8",
+      data: JSON.stringify({ name: chosen.name }),
+      success: function(r){
+        if (r && r.ok) _showWlMsg("Deleted: " + (chosen.title || chosen.name), false);
+        else _showWlMsg("Delete failed", true);
+      },
+      error: function(){ _showWlMsg("Delete failed", true); }
+    });
+  }).fail(function(){ _showWlMsg("Failed to list stock lists", true); });
+});
+</script>
+<!-- ============ END WATCHLIST JS ============ -->
 
 <script>
 $("#movers_header").on("click", function () {
@@ -2872,340 +2948,6 @@ window.addEventListener("beforeunload", function () {
         );
         navigator.sendBeacon("/background/stop", blob);
     }
-});
-</script>
-
-<script>
-/* ============================================================================
-   SCANNER CONFIGURATION MANAGEMENT
-   
-   Functions to save, load, delete, and manage scanner configurations.
-   Configurations are stored server-side in JSON files.
-============================================================================ */
-
-// Load saved configurations on page load
-// ---- Stock List Management ----
-
-function refreshStockLists() {
-    $.ajax({
-        url: "/stock-list/list",
-        type: "GET",
-        dataType: "json",
-        success: function(resp) {
-            const $select = $("#savedStockLists");
-            const currentValue = $select.val();
-            $select.find("option:not(:first)").remove();
-
-            if (resp.success && resp.lists && resp.lists.length > 0) {
-                resp.lists.forEach(function(item) {
-                    const option = $("<option></option>")
-                        .attr("value", item.name)
-                        .text(item.name + " (" + item.ticker_count + " tickers)");
-                    $select.append(option);
-                });
-                $("#stockListsInfo").text("Total lists: " + resp.lists.length);
-                if (currentValue) $select.val(currentValue);
-            } else {
-                $("#stockListsInfo").text("No saved stock lists yet.");
-            }
-        },
-        error: function() {
-            $("#stockListsInfo").text("Error loading stock lists.");
-        }
-    });
-}
-
-function _parseTickerTextarea() {
-    var raw = $("#stockListTickers").val() || "";
-    return raw.split(/[,\n\r]+/)
-        .map(function(s) { return s.trim().toUpperCase(); })
-        .filter(function(s) { return s.length > 0; });
-}
-
-function saveStockList() {
-    var name = $("#stockListName").val().trim();
-    if (!name) { alert("Please enter a list name."); return; }
-
-    var tickers = _parseTickerTextarea();
-    if (tickers.length === 0) { alert("Please enter at least one ticker."); return; }
-
-    $.ajax({
-        url: "/stock-list/save",
-        type: "POST",
-        contentType: "application/json; charset=utf-8",
-        data: JSON.stringify({ name: name, tickers: tickers }),
-        success: function(resp) {
-            if (resp.success) {
-                alert("Stock list '" + name + "' saved with " + resp.ticker_count + " tickers.");
-                $("#stockListName").val("");
-                refreshStockLists();
-                setTimeout(function() { $("#savedStockLists").val(name); }, 100);
-            } else {
-                alert("Error: " + resp.message);
-            }
-        },
-        error: function() { alert("Error saving stock list."); }
-    });
-}
-
-function loadStockList() {
-    var name = $("#savedStockLists").val();
-    if (!name) { alert("Please select a stock list to load."); return; }
-
-    $.ajax({
-        url: "/stock-list/load",
-        type: "POST",
-        contentType: "application/json; charset=utf-8",
-        data: JSON.stringify({ name: name }),
-        success: function(resp) {
-            if (resp.success && resp.tickers) {
-                $("#stockListTickers").val(resp.tickers.join(", "));
-                alert("Loaded " + resp.tickers.length + " tickers from '" + name + "'.");
-            } else {
-                alert("Error: " + (resp.message || "Unknown error"));
-            }
-        },
-        error: function() { alert("Error loading stock list."); }
-    });
-}
-
-function useStockList() {
-    // Populate the manual instrument fields from the textarea tickers, then trigger scan
-    var tickers = _parseTickerTextarea();
-    if (tickers.length === 0) {
-        alert("No tickers to scan. Load a list or enter tickers first.");
-        return;
-    }
-
-    // Clear existing custom fields
-    $("#addcustomfields").empty();
-    $("#firstFormToFlask").removeData("movers-active");
-
-    // Show the custom instrument area and add rows
-    document.getElementById("AddFinancialInstrument").style.display = "block";
-    tickers.forEach(function(sym) {
-        var row = document.createElement("DIV");
-        row.setAttribute("class", "securityRow");
-        row.innerHTML =
-            "<div class='securityName'><label class='subtitleSecurity'>Ticker</label>" +
-            "<input type='text' class='subtitleSecurityInput' value='" + sym + "'></div>" +
-            "<div class='securityName'><label class='subtitleSecurity'>Cusip</label>" +
-            "<input type='text' class='subtitleSecurityInput'></div>";
-        document.getElementById("addcustomfields").appendChild(row);
-    });
-
-    alert(tickers.length + " tickers loaded into the instrument fields. Click the form submit button to scan.");
-}
-
-function deleteStockList() {
-    var name = $("#savedStockLists").val();
-    if (!name) { alert("Please select a stock list to delete."); return; }
-    if (!confirm("Delete stock list '" + name + "'? This cannot be undone.")) return;
-
-    $.ajax({
-        url: "/stock-list/delete",
-        type: "POST",
-        contentType: "application/json; charset=utf-8",
-        data: JSON.stringify({ name: name }),
-        success: function(resp) {
-            if (resp.success) {
-                alert("Stock list deleted.");
-                refreshStockLists();
-            } else {
-                alert("Error: " + resp.message);
-            }
-        },
-        error: function() { alert("Error deleting stock list."); }
-    });
-}
-
-// ---- Scanner Configuration Management ----
-
-function initScannerConfigUI() {
-    refreshScannerConfigsList();
-    refreshStockLists();
-}
-
-// Refresh the list of saved configurations
-function refreshScannerConfigsList() {
-    $.ajax({
-        url: "/scanner-config/list",
-        type: "GET",
-        dataType: "json",
-        success: function(resp) {
-            const $select = $("#savedConfigsList");
-            const currentValue = $select.val();
-            
-            // Clear existing options except the first one
-            $select.find("option:not(:first)").remove();
-            
-            if (resp.success && resp.configs && resp.configs.length > 0) {
-                resp.configs.forEach(function(config) {
-                    const createdDate = new Date(config.created_at).toLocaleString("en-US", {
-                        month: "short",
-                        day: "2-digit",
-                        year: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                        hour12: true
-                    });
-                    const indicatorsText = config.indicators_enabled > 0 ? 
-                        "(" + config.indicators_enabled + " indicators)" : 
-                        "(custom)";
-                    const option = $("<option></option>")
-                        .attr("value", config.name)
-                        .text(config.name + " " + indicatorsText);
-                    $select.append(option);
-                });
-                
-                $("#configsInfo").text(
-                    "Total configurations: " + resp.configs.length
-                );
-                
-                // Restore previous selection if still available
-                if (currentValue) {
-                    $select.val(currentValue);
-                }
-            } else {
-                $("#configsInfo").text("No saved configurations yet.");
-            }
-        },
-        error: function() {
-            $("#configsInfo").text("Error loading configurations.");
-        }
-    });
-}
-
-// Save current scanner configuration
-function saveScannerConfig() {
-    const configName = $("#scannerConfigName").val().trim();
-    
-    if (!configName) {
-        alert("Please enter a configuration name.");
-        return;
-    }
-    
-    // Gather form data
-    const formData = getCurrentFormObject();
-    
-    $.ajax({
-        url: "/scanner-config/save",
-        type: "POST",
-        contentType: "application/json; charset=utf-8",
-        data: JSON.stringify({
-            name: configName,
-            form_data: formData
-        }),
-        success: function(resp) {
-            if (resp.success) {
-                alert("Configuration '" + configName + "' saved successfully!");
-                // Clear input and refresh list
-                $("#scannerConfigName").val("");
-                refreshScannerConfigsList();
-                // Select the newly saved config
-                setTimeout(function() {
-                    $("#savedConfigsList").val(configName);
-                }, 100);
-            } else {
-                alert("Error: " + resp.message);
-            }
-        },
-        error: function() {
-            alert("Error saving configuration. Please try again.");
-        }
-    });
-}
-
-// Load selected scanner configuration
-function loadScannerConfig() {
-    const configName = $("#savedConfigsList").val();
-    
-    if (!configName) {
-        alert("Please select a configuration to load.");
-        return;
-    }
-    
-    $.ajax({
-        url: "/scanner-config/load",
-        type: "POST",
-        contentType: "application/json; charset=utf-8",
-        data: JSON.stringify({ name: configName }),
-        success: function(resp) {
-            if (resp.success && resp.form_data) {
-                // Apply form fields
-                const form = resp.form_data;
-                
-                for (const k in form) {
-                    if (k === "csrf_token") continue;
-                    
-                    const el = $("[name='" + k + "']");
-                    
-                    if (el.length > 0) {
-                        // Handle radio/checkbox groups
-                        if (el.length > 1 && (el[0].type === "radio" || el[0].type === "checkbox")) {
-                            el.each(function () {
-                                this.checked = (this.value == form[k]);
-                            });
-                        } else {
-                            el.val(form[k]);
-                        }
-                        el.trigger("change");
-                    }
-                }
-                
-                alert("Configuration '" + configName + "' loaded successfully!");
-            } else {
-                alert("Error loading configuration: " + (resp.message || "Unknown error"));
-            }
-        },
-        error: function() {
-            alert("Error loading configuration. Please try again.");
-        }
-    });
-}
-
-// Delete selected scanner configuration
-function deleteScannerConfig() {
-    const configName = $("#savedConfigsList").val();
-    
-    if (!configName) {
-        alert("Please select a configuration to delete.");
-        return;
-    }
-    
-    if (!confirm("Are you sure you want to delete '" + configName + "'? This cannot be undone.")) {
-        return;
-    }
-    
-    $.ajax({
-        url: "/scanner-config/delete",
-        type: "POST",
-        contentType: "application/json; charset=utf-8",
-        data: JSON.stringify({ name: configName }),
-        success: function(resp) {
-            if (resp.success) {
-                alert("Configuration deleted successfully!");
-                refreshScannerConfigsList();
-                $("#scannerConfigName").val("");
-            } else {
-                alert("Error: " + resp.message);
-            }
-        },
-        error: function() {
-            alert("Error deleting configuration. Please try again.");
-        }
-    });
-}
-
-// Handle selection change in dropdown
-function onSavedConfigChanged() {
-    // Optional: Auto-load preview info when selection changes
-    // For now, just a placeholder
-}
-
-// Initialize on document ready
-$(document).ready(function() {
-    initScannerConfigUI();
 });
 </script>
 

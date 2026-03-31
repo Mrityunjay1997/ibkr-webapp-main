@@ -17,7 +17,6 @@ from waitress import serve
 from io import TextIOWrapper
 from datetime import datetime, UTC
 from forms import Parameters, SecondSubmit
-from scanners import ScannerConfigManager, StockListManager
 from flask import Flask, render_template, request, jsonify
 
 # -----------------------------------------------------------------------------
@@ -31,10 +30,7 @@ logger = logging.getLogger("ibkr_app")
 
 cfg = Config()
 cfg.setups_dir.mkdir(exist_ok=True)
-
-# Initialize scanner config manager
-scanner_config_manager = ScannerConfigManager(storage_dir="scanner_configs")
-stock_list_manager = StockListManager(storage_dir="stock_lists")
+cfg.watchlists_dir.mkdir(exist_ok=True)
 
 
 # -----------------------------------------------------------------------------
@@ -102,8 +98,8 @@ def detect_ibkr_port_from_config(host="127.0.0.1", timeout=1.0):
 
     return None
 
-####  MY DEV CHNAGES #####
-# # Perform initial port check at startup
+
+# Perform initial port check at startup
 _detected_port = detect_ibkr_port_from_config()
 
 if _detected_port is None:
@@ -117,30 +113,6 @@ if _detected_port is None:
 # Override configured runtime port with detected one
 cfg.ibkr_api_port = _detected_port
 logger.info("Using IBKR API port: %s", cfg.ibkr_api_port)
-
-#### MY CHanges ######
-
-# Perform initial port check at startup
-# if cfg.dev_mode:
-#     # In dev mode, skip IBKR connection check and use configured port
-#     cfg.ibkr_api_port = cfg.ibkr_paper_port if cfg.ibkr_preferred_env.upper() == "PAPER" else cfg.ibkr_live_port
-#     logger.warning("*** DEVELOPMENT MODE ENABLED ***")
-#     logger.warning("IBKR connection check skipped. Using configured port: %s", cfg.ibkr_api_port)
-# else:
-#     # Production mode: require IBKR connection
-#     _detected_port = detect_ibkr_port_from_config()
-    
-#     if _detected_port is None:
-#         logger.error(
-#             "IBKR API is not reachable on either configured environment "
-#             "(preferred=%s). Exiting.",
-#             cfg.ibkr_preferred_env,
-#         )
-#         sys.exit(1)
-    
-#     # Override configured runtime port with detected one
-#     cfg.ibkr_api_port = _detected_port
-#     logger.info("Using IBKR API port: %s", cfg.ibkr_api_port)
 
 
 # -----------------------------------------------------------------------------
@@ -340,8 +312,7 @@ def list_setups():
                 "name": p.stem,
                 "filename": p.name,
                 "created": meta.get("created_at") or datetime.fromtimestamp(p.stat().st_mtime).isoformat(),
-                "title": meta.get("title") or p.stem,
-                "scanner_name": meta.get("scanner_name")
+                "title": meta.get("title") or p.stem
             })
     return out
 
@@ -438,14 +409,6 @@ def something():
         logger.exception("Error during IBAPI.disconnect()")
 
     run_gc()
-
-    # Sort each stock list so stocks with newest news appear first
-    for group_key in sendToHtml:
-        for sub_key in sendToHtml[group_key]:
-            stock_list = sendToHtml[group_key][sub_key]
-            if isinstance(stock_list, list):
-                stock_list.sort(key=lambda x: x.get("latest_news_ts", "") or "", reverse=True)
-
     logger.info(f"Response: {sendToHtml}")
 
     logger.info("Total time to do all operations (Seconds): %s", time.time() - starttime)
@@ -677,21 +640,11 @@ def setups_save():
         if p.exists() and not overwrite:
             return jsonify({"error": "setup already exists", "exists": True}), 409
 
-        scanner_name = None
-        if isinstance(form, dict):
-            scanner_name = form.get("ScannerName") or form.get("scanner_name")
-            if scanner_name is not None:
-                scanner_name = str(scanner_name).strip() or None
-
-        meta = {
-            "title": name,
-            "created_at": datetime.now(UTC).isoformat(),
-        }
-        if scanner_name:
-            meta["scanner_name"] = scanner_name
-
         doc = {
-            "meta": meta,
+            "meta": {
+                "title": name,
+                "created_at": datetime.now(UTC).isoformat(),
+            },
             "form": form,
             "securities": securities or {}
         }
@@ -743,6 +696,137 @@ def setups_load():
         return jsonify({"error": "failed to load setup"}), 500
 
 
+# -----------------------
+# Routes: watchlists (stock lists)
+# -----------------------
+def _watchlist_path(name: str) -> Path:
+    return cfg.watchlists_dir / (_sanitize_name(name) + ".json")
+
+
+def list_watchlists():
+    out = []
+    for p in sorted(cfg.watchlists_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+        if p.is_file() and p.suffix == ".json":
+            try:
+                with p.open("r", encoding="utf-8") as fh:
+                    doc = json.load(fh)
+                    meta = doc.get("meta", {})
+                    count = len(doc.get("tickers", []))
+            except Exception:
+                meta = {}
+                count = 0
+            out.append({
+                "name": p.stem,
+                "filename": p.name,
+                "created": meta.get("created_at") or datetime.fromtimestamp(p.stat().st_mtime).isoformat(),
+                "title": meta.get("title") or p.stem,
+                "count": count
+            })
+    return out
+
+
+@app.route("/watchlists/list", methods=["GET"])
+def watchlists_list():
+    try:
+        return jsonify({"watchlists": list_watchlists()}), 200
+    except Exception as e:
+        logger.exception("Failed to list watchlists: %s", e)
+        return jsonify({"error": "failed to list watchlists"}), 500
+
+
+@app.route("/watchlists/save", methods=["POST"])
+def watchlists_save():
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"error": "JSON payload required"}), 400
+
+        name = payload.get("name", "").strip()
+        overwrite = bool(payload.get("overwrite", False))
+        tickers = payload.get("tickers", [])
+
+        if not name:
+            return jsonify({"error": "name is required"}), 400
+        if not isinstance(tickers, list) or len(tickers) == 0:
+            return jsonify({"error": "tickers list is required"}), 400
+
+        safe = _sanitize_name(name)
+        p = _watchlist_path(safe)
+        if p.exists() and not overwrite:
+            return jsonify({"error": "watchlist already exists", "exists": True}), 409
+
+        doc = {
+            "meta": {
+                "title": name,
+                "created_at": datetime.now(UTC).isoformat(),
+            },
+            "tickers": tickers
+        }
+
+        with p.open("w", encoding="utf-8") as fh:
+            json.dump(doc, fh, ensure_ascii=False, indent=2)
+
+        logger.info("Saved watchlist: %s -> %s (%d tickers)", name, p, len(tickers))
+        return jsonify({"ok": True, "name": safe}), 200
+
+    except Exception as e:
+        logger.exception("Failed to save watchlist: %s", e)
+        return jsonify({"error": "failed to save watchlist"}), 500
+
+
+@app.route("/watchlists/load", methods=["POST"])
+def watchlists_load():
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"error": "JSON payload required"}), 400
+        name = payload.get("name", "").strip()
+        if not name:
+            return jsonify({"error": "name required"}), 400
+
+        safe = _sanitize_name(name)
+        p = _watchlist_path(safe)
+        if not p.exists():
+            alt = cfg.watchlists_dir / name
+            if alt.exists():
+                p = alt
+            else:
+                return jsonify({"error": "not found"}), 404
+
+        with p.open("r", encoding="utf-8") as fh:
+            doc = json.load(fh)
+
+        return jsonify(doc), 200
+
+    except Exception as e:
+        logger.exception("Failed to load watchlist: %s", e)
+        return jsonify({"error": "failed to load watchlist"}), 500
+
+
+@app.route("/watchlists/delete", methods=["POST"])
+def watchlists_delete():
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"error": "JSON payload required"}), 400
+        name = payload.get("name", "").strip()
+        if not name:
+            return jsonify({"error": "name required"}), 400
+
+        safe = _sanitize_name(name)
+        p = _watchlist_path(safe)
+        if not p.exists():
+            return jsonify({"error": "not found"}), 404
+
+        p.unlink()
+        logger.info("Deleted watchlist: %s", safe)
+        return jsonify({"ok": True}), 200
+
+    except Exception as e:
+        logger.exception("Failed to delete watchlist: %s", e)
+        return jsonify({"error": "failed to delete watchlist"}), 500
+
+
 # -------------------------------------------------------------------------
 # START OF ADDED BACKGROUND SCANNER CODE
 #
@@ -778,7 +862,6 @@ class BackgroundScanner:
         self.previous_signals = {}  # previous signal states to detect new ones
         self.latest_warning = {}
         self.last_run_time = None
-        self.scanner_name = None
         self._stop_event = threading.Event()
         self._start_request_time = None
 
@@ -917,16 +1000,6 @@ class BackgroundScanner:
         Run a single scan using a persistent IB connection (preferred path).
         If the persistent IB connection is not available the method will raise.
         """
-        # ---- Scan cycle timing ----
-        scan_start_time = time.time()
-        scan_start_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(scan_start_time))
-        
-        logger.info(
-            "[BACKGROUND SCAN] Starting scan cycle at %s | Symbols: %d",
-            scan_start_str,
-            len(securities.get("ticker", []))
-        )
-        
         # Ensure IB is connected (persistent)
         ok = self._ensure_ib_connected()
         if not ok:
@@ -963,21 +1036,8 @@ class BackgroundScanner:
             except Exception:
                 pass
 
-            logger.info(
-                "[BACKGROUND SCAN] Calling getFinalResult (normalized %d tickers)",
-                len(normalized_securities.get("ticker", []))
-            )
-            
             # IMPORTANT: call the IBapi scanning function (this blocks until done)
-            # This is where fresh data is fetched with state reset
             self._ib.getFinalResult(normalized_securities, form)
-
-            # ---- Timing logging ----
-            scan_elapsed = time.time() - scan_start_time
-            logger.info(
-                "[BACKGROUND SCAN] Scan complete in %.2f seconds",
-                scan_elapsed
-            )
 
             # copy results under lock
             with self.lock:
@@ -990,8 +1050,7 @@ class BackgroundScanner:
                     if k is None:
                         fallback = f"custom{random.randint(51, 99)}"
                         clean_results[fallback] = v
-                    else:
-                        clean_results[str(k)] = v
+                    clean_results[str(k)] = v
 
                 # Clean warnings
                 clean_warning = {}
@@ -1001,30 +1060,13 @@ class BackgroundScanner:
                         continue
                     clean_warning[str(k)] = v
 
-# Attach configured scanner name to results if missing
-                if self.scanner_name:
-                    for row in clean_results.values():
-                        if isinstance(row, dict) and "scanner_name" not in row:
-                            row["scanner_name"] = self.scanner_name
-
                 self.latest_results = clean_results
                 self.latest_warning = clean_warning
-                
-                logger.info(
-                    "[BACKGROUND SCAN] Results stored: %d entries, %d warnings",
-                    len(clean_results),
-                    len(clean_warning)
-                )
 
         except Exception as e:
             # If the IB instance produced an error that may indicate a broken connection,
             # disconnect it so a fresh connection will be created on next iteration.
-            scan_elapsed = time.time() - scan_start_time
-            logger.exception(
-                "[BACKGROUND SCAN] Scan FAILED after %.2f seconds: %s",
-                scan_elapsed,
-                e
-            )
+            logger.exception("Background scanner persistent IB getFinalResult exception: %s", e)
             with self.lock:
                 self.latest_warning = {"background_scan": traceback.format_exc()}
             # attempt a safe disconnect - mark IB for recreation on next loop
@@ -1052,11 +1094,7 @@ class BackgroundScanner:
         It runs scans sequentially and waits interval_seconds after each run.
         It ensures that scans do not overlap.
         """
-        logger.info(
-            "[BACKGROUND LOOP START] Scanner initialized with interval=%.1fs | Symbols=%d",
-            self.interval_seconds,
-            len(securities.get("ticker", []))
-        )
+        logger.info("Background scanner loop started")
         # We'll attempt to keep one IB connection for the entire session to avoid client-id collisions.
         # If connecting fails we apply a lightweight backoff and keep trying until stopped.
         global cfg
@@ -1074,9 +1112,7 @@ class BackgroundScanner:
             idle_timeout = 60.0
 
         _ = idle_timeout
-        cycle_number = 0
         while not self._stop_event.is_set():
-            cycle_number += 1
             # # ---- client lease / heartbeat check (new) ----
             # # If the frontend hasn't polled /background/results recently, assume the client has died and stop scanner.
             # try:
@@ -1127,14 +1163,6 @@ class BackgroundScanner:
 
             # After a run, wait interval_seconds unless stop requested
             # Use a chunked wait to respond quickly to stop events
-            next_scan_time = time.time() + self.interval_seconds
-            next_scan_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(next_scan_time))
-            logger.info(
-                "[BACKGROUND LOOP] Waiting %.1f seconds until next scan at %s",
-                self.interval_seconds,
-                next_scan_str
-            )
-            
             start_wait = time.time()
             while True:
                 elapsed = time.time() - start_wait
@@ -1186,12 +1214,6 @@ class BackgroundScanner:
             # configure
             self.enabled = True
             self.interval_seconds = float(interval_seconds)
-            self.scanner_name = None
-            if isinstance(form, dict):
-                name_val = form.get("ScannerName") or form.get("scanner_name")
-                if name_val is not None:
-                    self.scanner_name = str(name_val).strip() or None
-
             self._stop_event.clear()
             self.thread = threading.Thread(target=self._loop, args=(form, securities), daemon=False)
             # non-daemon so we can join it cleanly on stop
@@ -1283,350 +1305,11 @@ class BackgroundScanner:
                 "beep": new_signal_found,
                 "warning": dict(self.latest_warning),
                 "last_run_time": self.last_run_time,
-                "scanner_name": self.scanner_name,
-            }
-
-
-# -------------------------------------------------------------------------
-# UNIFIED SCHEDULER: Coordinate Top 50 scanner + background variable eval
-#
-# Synchronizes multiple scanning/evaluation tasks:
-# - Top 50 price movers scanner (IB universe)
-# - Background variable evaluation (custom symbol scanning)
-# - Prevents overlapping executions with locks
-# - Configurable intervals per task
-# -------------------------------------------------------------------------
-
-
-class UnifiedScheduler:
-    """
-    Unified scheduler for coordinating multiple scanning/evaluation tasks.
-    
-    Manages:
-    - Top 50 scanner (periodic top price movers)
-    - Background scanner (background variable evaluation)
-    
-    Features:
-    - Non-overlapping execution via locks
-    - Configurable intervals per task
-    - Timestamped logging
-    - Status monitoring
-    """
-    
-    def __init__(self):
-        self.enabled = False
-        self.thread = None
-        self.lock = threading.Lock()
-        self._stop_event = threading.Event()
-        
-        # Task configuration (in seconds)
-        self.top50_interval = 300.0  # Default: Top 50 every 5 minutes
-        self.eval_interval = 120.0   # Default: Variable eval every 2 minutes
-        
-        # Separate locks for each task to allow independent scheduling
-        self.top50_lock = threading.Lock()
-        self.eval_lock = threading.Lock()
-        
-        # Task state tracking
-        self.top50_is_running = False
-        self.eval_is_running = False
-        
-        self.top50_last_run = None
-        self.eval_last_run = None
-        
-        self.top50_results = {}
-        self.eval_results = {}
-        
-        self.top50_warnings = {}
-        self.eval_warnings = {}
-        
-        # Top 50 scanner configuration
-        self.top50_config = {
-            "scan_code": "TOP_PERC_GAIN",
-            "num_rows": 50,
-            "above_price": 0.05,
-            "above_volume": 75000,
-            "timeout_sec": 30,
-            "name": "Top 50 movers",
-        }
-        
-        logger.info("[UNIFIED SCHEDULER] Initialized with top50_interval=%.1fs, eval_interval=%.1fs",
-                   self.top50_interval, self.eval_interval)
-    
-    def configure(self, top50_interval=None, eval_interval=None, top50_config=None):
-        """
-        Configure scheduler intervals and task parameters.
-        
-        Args:
-            top50_interval: Top 50 scanner interval in seconds
-            eval_interval: Variable evaluation interval in seconds
-            top50_config: Dict of Top 50 scanner configuration
-        """
-        with self.lock:
-            if top50_interval is not None and top50_interval > 0:
-                self.top50_interval = float(top50_interval)
-                logger.info("[SCHEDULER CONFIG] Top 50 interval updated to %.1fs", self.top50_interval)
-            
-            if eval_interval is not None and eval_interval > 0:
-                self.eval_interval = float(eval_interval)
-                logger.info("[SCHEDULER CONFIG] Eval interval updated to %.1fs", self.eval_interval)
-            
-            if top50_config is not None and isinstance(top50_config, dict):
-                self.top50_config.update(top50_config)
-                logger.info("[SCHEDULER CONFIG] Top 50 config updated: %s", self.top50_config)
-    
-    def _run_top50_scan(self):
-        """
-        Execute Top 50 price movers scan.
-        Protected by top50_lock to prevent overlapping runs.
-        """
-        if not self.top50_lock.acquire(blocking=False):
-            logger.debug("[TOP50] Scan already in progress, skipping this cycle")
-            return
-        
-        try:
-            scan_start = time.time()
-            scan_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(scan_start))
-            logger.info("[TOP50 SCAN START] %s | Config: %s", scan_str, self.top50_config)
-            
-            self.top50_is_running = True
-            
-            try:
-                from ibkr_signal_engine import IBapi
-                IBAPI = IBapi()
-                
-                client_id = random.randint(1000, 9999)
-                IBAPI.connect("127.0.0.1", cfg.ibkr_api_port, client_id)
-                
-                api_thread = threading.Thread(target=IBAPI.run, daemon=True)
-                api_thread.start()
-                
-                IBAPI.checkForConnection()
-                
-                if getattr(IBAPI, "indicateNotCondition", False):
-                    raise RuntimeError("IBKR not connected")
-                
-                # Call the movers request
-                rows = IBAPI.request_price_movers(**self.top50_config)
-                
-                sweep_elapsed = time.time() - scan_start
-                logger.info("[TOP50 SCAN END] Completed in %.2f seconds | Found %d movers",
-                           sweep_elapsed, len(rows) if rows else 0)
-                
-                with self.lock:
-                    # tag scanner name on each top50 row for clarity
-                    if self.top50_config.get("name") and isinstance(rows, list):
-                        name_tag = str(self.top50_config.get("name"))
-                        for row in rows:
-                            if isinstance(row, dict):
-                                row.setdefault("scanner_name", name_tag)
-                    self.top50_results = rows or []
-                    self.top50_warnings = {}
-                
-                try:
-                    IBAPI.disconnect()
-                except Exception:
-                    pass
-                
-            except Exception as e:
-                sweep_elapsed = time.time() - scan_start
-                logger.exception("[TOP50 SCAN FAILED] After %.2f seconds: %s", sweep_elapsed, e)
-                with self.lock:
-                    self.top50_warnings = {"error": str(e), "timestamp": time.time()}
-            
-            finally:
-                try:
-                    run_gc()
-                except Exception:
-                    pass
-                
-                self.top50_last_run = time.time()
-                self.top50_is_running = False
-        
-        finally:
-            self.top50_lock.release()
-    
-    def _run_variable_eval(self, background_scanner):
-        """
-        Execute variable evaluation (run background scanner if configured).
-        Protected by eval_lock to prevent overlapping runs.
-        
-        Args:
-            background_scanner: BackgroundScanner instance
-        """
-        if not self.eval_lock.acquire(blocking=False):
-            logger.debug("[EVAL] Variable evaluation already in progress, skipping this cycle")
-            return
-        
-        try:
-            eval_start = time.time()
-            eval_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(eval_start))
-            
-            self.eval_is_running = True
-            
-            # Check if background scanner is enabled
-            if not background_scanner.enabled:
-                logger.debug("[EVAL] Background scanner not enabled, skipping variable eval")
-                self.eval_is_running = False
-                return
-            
-            logger.info("[EVAL START] %s | Background scanner active", eval_str)
-            
-            try:
-                # The background scanner runs independently
-                # We just log and monitor here
-                with background_scanner.lock:
-                    eval_results = {
-                        "is_running": background_scanner.is_running,
-                        "last_run": background_scanner.last_run_time,
-                        "intervals": background_scanner.interval_seconds,
-                        "ib_connected": background_scanner._ib is not None and \
-                                       background_scanner._ib_thread is not None and \
-                                       background_scanner._ib_thread.is_alive(),
-                    }
-                
-                eval_elapsed = time.time() - eval_start
-                logger.info("[EVAL END] Variable eval monitoring complete in %.2f seconds",
-                           eval_elapsed)
-                
-                with self.lock:
-                    self.eval_results = eval_results
-                    self.eval_warnings = {}
-            
-            except Exception as e:
-                eval_elapsed = time.time() - eval_start
-                logger.exception("[EVAL FAILED] After %.2f seconds: %s", eval_elapsed, e)
-                with self.lock:
-                    self.eval_warnings = {"error": str(e), "timestamp": time.time()}
-            
-            finally:
-                self.eval_last_run = time.time()
-                self.eval_is_running = False
-        
-        finally:
-            self.eval_lock.release()
-    
-    def _loop(self, background_scanner):
-        """
-        Main scheduler loop.
-        Runs Top 50 and variable eval tasks on their configured intervals,
-        preventing overlaps via locks.
-        """
-        logger.info(
-            "[SCHEDULER LOOP START] Running with top50=%.1fs, eval=%.1fs",
-            self.top50_interval,
-            self.eval_interval
-        )
-        
-        cycle = 0
-        top50_next = time.time() + self.top50_interval
-        eval_next = time.time() + self.eval_interval
-        
-        while not self._stop_event.is_set():
-            cycle += 1
-            now = time.time()
-            
-            # Check if Top 50 scan should run
-            if now >= top50_next:
-                logger.info("[SCHEDULER CYCLE %d] Running Top 50 scan", cycle)
-                self._run_top50_scan()
-                top50_next = time.time() + self.top50_interval
-            
-            # Check if variable eval should run
-            if now >= eval_next:
-                logger.info("[SCHEDULER CYCLE %d] Running variable eval", cycle)
-                self._run_variable_eval(background_scanner)
-                eval_next = time.time() + self.eval_interval
-            
-            # Calculate time to next task
-            now = time.time()
-            top50_wait = top50_next - now
-            eval_wait = eval_next - now
-            next_wait = min(top50_wait, eval_wait)
-            next_wait = max(0.1, min(next_wait, 1.0))  # Cap at 1 second
-            
-            # Sleep with stop event check
-            if self._stop_event.wait(next_wait):
-                break
-        
-        logger.info("[SCHEDULER LOOP END] Main loop exiting")
-    
-    def start(self, background_scanner):
-        """
-        Start the unified scheduler.
-        
-        Args:
-            background_scanner: BackgroundScanner instance to coordinate with
-        """
-        with self.lock:
-            if self.enabled:
-                raise RuntimeError("Unified scheduler already running")
-            
-            self.enabled = True
-            self._stop_event.clear()
-            
-            self.thread = threading.Thread(
-                target=self._loop,
-                args=(background_scanner,),
-                daemon=False
-            )
-            self.thread.start()
-            logger.info("[SCHEDULER] Started successfully")
-    
-    def stop(self, wait_timeout=5.0):
-        """
-        Stop the unified scheduler gracefully.
-        
-        Args:
-            wait_timeout: Max seconds to wait for thread to finish
-        """
-        with self.lock:
-            if not self.enabled:
-                return False
-            
-            self.enabled = False
-        
-        # Request stop
-        self._stop_event.set()
-        
-        # Wait for thread
-        if self.thread and self.thread.is_alive():
-            self.thread.join(timeout=wait_timeout)
-        
-        logger.info("[SCHEDULER] Stopped")
-        run_gc()
-        return True
-    
-    def status(self):
-        """Return scheduler status."""
-        with self.lock:
-            return {
-                "enabled": self.enabled,
-                "top50_interval": self.top50_interval,
-                "eval_interval": self.eval_interval,
-                "top50_is_running": self.top50_is_running,
-                "eval_is_running": self.eval_is_running,
-                "top50_last_run": self.top50_last_run,
-                "eval_last_run": self.eval_last_run,
-                "top50_results_count": len(self.top50_results) if self.top50_results else 0,
-                "top50_warnings": dict(self.top50_warnings),
-                "eval_warnings": dict(self.eval_warnings),
-            }
-    
-    def results(self):
-        """Return latest results from all tasks."""
-        with self.lock:
-            return {
-                "top50": list(self.top50_results) if self.top50_results else [],
-                "top50_scanner_name": self.top50_config.get("name"),
-                "eval": dict(self.eval_results) if self.eval_results else {},
-                "timestamp": time.time(),
             }
 
 
 # one global scanner instance
 _background_scanner = BackgroundScanner()
-_unified_scheduler = UnifiedScheduler()
 _background_tab_unique_id = None
 
 
@@ -1736,6 +1419,431 @@ def background_results():
 
 
 # -------------------------------------------------------------------------
+# START OF BACKGROUND TOP 50 SCANNER LOOP
+#
+# - BackgroundTop50Scanner class
+# - /scanner-loop/start  (POST)
+# - /scanner-loop/stop   (POST)
+# - /scanner-loop/status (GET)
+# - /scanner-loop/results (GET)
+#
+# This loop automatically fetches the IBKR Top 50 Movers on a timer,
+# then screens them against the configured indicator variables (form),
+# coordinating with the same signal-check pipeline as the background scanner.
+# -------------------------------------------------------------------------
+
+
+class BackgroundTop50Scanner:
+    """
+    Background loop that:
+    1. Fetches top 50 movers from IBKR scanner (request_price_movers)
+    2. Screens those symbols against configured indicator variables (getFinalResult)
+    3. Repeats at a configurable interval
+    """
+
+    def __init__(self):
+        self.enabled = False
+        self.interval_seconds = 60.0
+        self.thread = None
+        self.lock = threading.Lock()
+        self.is_running = False
+        self.latest_results = {}
+        self.latest_movers = []
+        self.previous_signals = {}
+        self.latest_warning = {}
+        self.last_run_time = None
+        self._stop_event = threading.Event()
+        self._start_request_time = None
+        self._run_count = 0
+        self.scan_code = "TOP_PERC_GAIN"
+
+        # IB connection management (same pattern as BackgroundScanner)
+        self._ib = None
+        self._ib_thread = None
+        self._ib_client_id = None
+        self._ib_lock = threading.Lock()
+        self._ib_connect_backoff = 0.0
+
+        # client heartbeat
+        self.last_client_seen = None
+
+    @staticmethod
+    def parse_interval(value, unit):
+        try:
+            v = int(value)
+        except Exception:
+            return None
+        if v < 1:
+            return None
+        unit = (unit or "seconds").lower()
+        if unit == "seconds":
+            sec = v
+        elif unit == "minutes":
+            sec = v * 60
+        elif unit == "hours":
+            sec = v * 3600
+        else:
+            return None
+        if sec < 1:
+            sec = 1
+        if sec > 7 * 24 * 3600:
+            sec = 7 * 24 * 3600
+        return sec
+
+    def _ensure_ib_connected(self):
+        from ibkr_signal_engine import IBapi
+        global cfg
+
+        with self._ib_lock:
+            if self._ib is not None and self._ib_thread is not None and self._ib_thread.is_alive():
+                return True
+
+            # clean previous resources
+            try:
+                if self._ib is not None:
+                    try:
+                        self._ib.disconnect()
+                    except Exception:
+                        pass
+                    self._ib = None
+                if self._ib_thread is not None and self._ib_thread.is_alive():
+                    self._ib_thread.join(timeout=1.5)
+                    self._ib_thread = None
+            except Exception:
+                logger.exception("Error cleaning previous IB resources (top50)")
+
+            if self._ib_connect_backoff < 1.5:
+                time.sleep(1.0)
+            else:
+                time.sleep(min(5.0, 1.0 + self._ib_connect_backoff))
+
+            try:
+                self._ib = IBapi()
+                self._ib_client_id = random.randint(100000, 199999)
+                logger.debug("Top50 scanner connecting IB with client id %s", self._ib_client_id)
+                self._ib.connect("127.0.0.1", cfg.ibkr_api_port, self._ib_client_id)
+
+                def run_loop():
+                    try:
+                        self._ib.run()
+                    except Exception as err:
+                        logger.exception("Top50 IB run loop exception: %s", err)
+
+                self._ib_thread = threading.Thread(target=run_loop, daemon=False)
+                self._ib_thread.start()
+                time.sleep(0.6)
+                self._ib_connect_backoff = 0.0
+                logger.info("Top50 scanner IB connected (client id %s)", self._ib_client_id)
+                return True
+
+            except Exception as e:
+                logger.exception("Failed to connect IB for top50 scanner: %s", e)
+                with self.lock:
+                    self.latest_warning = {"scanner_loop_connect": str(e)}
+                self._ib_connect_backoff = min(self._ib_connect_backoff + 0.75, 10.0)
+                try:
+                    if self._ib is not None:
+                        self._ib.disconnect()
+                except Exception:
+                    pass
+                self._ib = None
+                self._ib_thread = None
+                return False
+
+    def _disconnect_ib(self):
+        with self._ib_lock:
+            try:
+                if self._ib is not None:
+                    try:
+                        self._ib.disconnect()
+                    except Exception:
+                        pass
+                    self._ib = None
+                if self._ib_thread is not None and self._ib_thread.is_alive():
+                    self._ib_thread.join(timeout=1.0)
+                    self._ib_thread = None
+            except Exception:
+                logger.exception("Error disconnecting IB (top50)")
+
+    def _loop(self, form, scanner_params):
+        logger.info("Top 50 scanner loop started (interval=%.1fs)", self.interval_seconds)
+
+        while not self._stop_event.is_set():
+            if self.is_running:
+                if self._stop_event.wait(0.25):
+                    break
+                continue
+
+            self.is_running = True
+            try:
+                ok = self._ensure_ib_connected()
+                if not ok:
+                    raise RuntimeError("IB not connected for top50 scanner")
+
+                # Step 1: Reset scanner state and fetch top 50 movers
+                self._ib._reset_scanner_state()
+
+                current_scan_code = scanner_params.get("scan_code", "TOP_PERC_GAIN")
+                movers = self._ib.request_price_movers(
+                    timeout_sec=cfg.movers_timeout_sec,
+                    location_code=cfg.location_code,
+                    scan_code=current_scan_code,
+                    above_price=float(scanner_params.get("min_price", 0.05)),
+                    above_volume=int(scanner_params.get("min_volume", 75000)),
+                )
+
+                with self.lock:
+                    self.latest_movers = movers or []
+                    self.scan_code = current_scan_code
+
+                if not movers:
+                    with self.lock:
+                        self.latest_warning = {"scanner_loop": "No movers returned from IBKR scanner"}
+                    self.last_run_time = time.time()
+                    self._run_count += 1
+                else:
+                    # Step 2: Build securities dict from movers
+                    securities = {
+                        "cusip": [],
+                        "ticker": [],
+                        "conId": [],
+                        "CSV": [],
+                    }
+                    for idx, m in enumerate(movers):
+                        cusip = f"custom{idx}"
+                        securities["cusip"].append(cusip)
+                        securities["ticker"].append(m["symbol"])
+                        securities["conId"].append(m.get("conId"))
+                        securities["CSV"].append({
+                            "cusip": cusip,
+                            "ticker": m["symbol"],
+                            "conId": m.get("conId"),
+                            "change": 0,
+                        })
+
+                    # Step 3: Reset screening state and run indicator screening
+                    self._ib._reset_screening_state()
+                    self._ib._reset_scanner_state()
+                    self._ib.addFrequency = form.get("addFrequency")
+                    self._ib.getFinalResult(securities, form)
+
+                    # Step 4: Collect results
+                    with self.lock:
+                        raw_results = getattr(self._ib, "sendToFlaskIB", {}) or {}
+                        raw_warning = getattr(self._ib, "warningTicker", {}) or {}
+
+                        clean_results = {}
+                        for k, v in raw_results.items():
+                            key = str(k) if k is not None else f"custom{random.randint(51, 99)}"
+                            clean_results[key] = v
+
+                        clean_warning = {}
+                        for k, v in raw_warning.items():
+                            if k is None:
+                                continue
+                            clean_warning[str(k)] = v
+
+                        self.latest_results = clean_results
+                        self.latest_warning = clean_warning
+
+                    self.last_run_time = time.time()
+                    self._run_count += 1
+
+            except Exception as e:
+                logger.exception("Top 50 scanner loop error: %s", e)
+                with self.lock:
+                    self.latest_warning = {"scanner_loop": str(e)}
+                # disconnect IB on error so it reconnects next iteration
+                self._disconnect_ib()
+                if self._stop_event.wait(1.0):
+                    break
+
+            finally:
+                self.is_running = False
+
+            # Wait for interval
+            start_wait = time.time()
+            while True:
+                elapsed = time.time() - start_wait
+                remaining = self.interval_seconds - elapsed
+                if remaining <= 0 or self._stop_event.is_set():
+                    break
+                wait_chunk = min(1.0, remaining)
+                if self._stop_event.wait(wait_chunk):
+                    break
+
+        # Cleanup on exit
+        self._disconnect_ib()
+        logger.info("Top 50 scanner loop exiting")
+        run_gc()
+
+    def start(self, interval_seconds, form, scanner_params):
+        if not isinstance(form, dict):
+            raise ValueError("form must be a dict")
+
+        with self.lock:
+            if self.enabled:
+                raise RuntimeError("Top 50 scanner loop already started")
+            self.enabled = True
+            self.interval_seconds = float(interval_seconds)
+            self._stop_event.clear()
+            self._run_count = 0
+            self.thread = threading.Thread(
+                target=self._loop,
+                args=(form, scanner_params),
+                daemon=False,
+            )
+            self.thread.start()
+            self._start_request_time = time.time()
+            logger.info("Top 50 scanner loop started: interval %s seconds", self.interval_seconds)
+
+    def stop(self, wait_timeout=5.0):
+        with self.lock:
+            if not self.enabled:
+                return False
+            self.enabled = False
+            self.latest_results = {}
+            self.previous_signals = {}
+            self.latest_warning = {}
+            self.last_run_time = None
+            self._stop_event.set()
+            self._run_count = 0
+
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=wait_timeout)
+
+        self._disconnect_ib()
+        logger.info("Top 50 scanner loop stopped")
+        run_gc()
+        return True
+
+    def status(self):
+        return {
+            "enabled": self.enabled,
+            "is_running": self.is_running,
+            "interval_seconds": self.interval_seconds,
+            "last_run_time": self.last_run_time,
+            "thread_alive": self.thread.is_alive() if self.thread else False,
+            "ib_connected": (self._ib is not None and self._ib_thread is not None and self._ib_thread.is_alive()),
+            "run_count": self._run_count,
+            "movers_count": len(self.latest_movers),
+        }
+
+    def results(self):
+        try:
+            self.last_client_seen = time.time()
+        except Exception:
+            pass
+
+        with self.lock:
+            new_signal_found = False
+            for cusip, data in self.latest_results.items():
+                prev = self.previous_signals.get(cusip)
+                if prev is None and data.get("signal") == "yes":
+                    new_signal_found = True
+                elif prev is not None and prev.get("signal") != "yes" and data.get("signal") == "yes":
+                    new_signal_found = True
+
+            self.previous_signals = {k: dict(v) for k, v in self.latest_results.items()}
+
+            return {
+                "results": dict(self.latest_results),
+                "movers": list(self.latest_movers),
+                "beep": new_signal_found,
+                "warning": dict(self.latest_warning),
+                "last_run_time": self.last_run_time,
+                "run_count": self._run_count,
+                "scan_code": self.scan_code,
+            }
+
+
+# one global top50 scanner instance
+_bg_top50_scanner = BackgroundTop50Scanner()
+_bg_top50_tab_unique_id = None
+
+
+@app.route("/scanner-loop/start", methods=["POST"])
+def scanner_loop_start():
+    payload = request.get_json(silent=True)
+    if not payload:
+        return jsonify({"error": "JSON payload required"}), 400
+
+    value = payload.get("value")
+    unit = payload.get("unit", "seconds")
+    form = payload.get("form")
+    scanner_params = payload.get("scanner_params", {})
+
+    global _bg_top50_tab_unique_id
+    _bg_top50_tab_unique_id = payload.get("tab_unique_id")
+
+    seconds = BackgroundTop50Scanner.parse_interval(value, unit)
+    if seconds is None:
+        return jsonify({"error": "Invalid interval value/unit"}), 400
+
+    if not isinstance(form, dict):
+        return jsonify({"error": "form object is required"}), 400
+
+    if not isinstance(scanner_params, dict):
+        scanner_params = {}
+
+    try:
+        _bg_top50_scanner.start(seconds, form, scanner_params)
+    except RuntimeError as rte:
+        return jsonify({"error": str(rte)}), 409
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        logger.exception("Failed to start top50 scanner loop: %s", e)
+        return jsonify({"error": "failed to start scanner loop"}), 500
+
+    return jsonify({"status": "started", "interval_seconds": seconds}), 200
+
+
+@app.route("/scanner-loop/stop", methods=["POST"])
+def scanner_loop_stop():
+    try:
+        data = request.get_json(silent=True)
+        global _bg_top50_tab_unique_id
+        if data and "tab_unique_id" in data:
+            if data["tab_unique_id"] != _bg_top50_tab_unique_id:
+                return jsonify({"status": "ignored"}), 200
+        _bg_top50_tab_unique_id = None
+        stopped = _bg_top50_scanner.stop()
+    except Exception as e:
+        logger.exception("Failed to stop top50 scanner loop: %s", e)
+        return jsonify({"error": "failed to stop scanner loop"}), 500
+
+    if not stopped:
+        return jsonify({"status": "not_running"}), 200
+    return jsonify({"status": "stopped"}), 200
+
+
+@app.route("/scanner-loop/status", methods=["GET"])
+def scanner_loop_status():
+    try:
+        status = _bg_top50_scanner.status()
+        return jsonify(status), 200
+    except Exception as e:
+        logger.exception("Failed to get scanner loop status: %s", e)
+        return jsonify({"error": "failed to get status"}), 500
+
+
+@app.route("/scanner-loop/results", methods=["GET"])
+def scanner_loop_results():
+    try:
+        res = _bg_top50_scanner.results()
+        return jsonify(res), 200
+    except Exception as e:
+        logger.exception("Failed to get scanner loop results: %s", e)
+        return jsonify({"error": "failed to get results"}), 500
+
+
+# -------------------------------------------------------------------------
+# END OF BACKGROUND TOP 50 SCANNER LOOP
+# -------------------------------------------------------------------------
+
+
+# -------------------------------------------------------------------------
 # POST /scanner/universe
 #
 # Accepts JSON:
@@ -1818,491 +1926,6 @@ def scanner_universe():
 
 # -------------------------------------------------------------------------
 # END OF NEW /scanner/universe
-# -------------------------------------------------------------------------
-
-
-# -------------------------------------------------------------------------
-# UNIFIED SCHEDULER ENDPOINTS
-#
-# - /scheduler/start     (POST)
-# - /scheduler/stop      (POST)
-# - /scheduler/status    (GET)
-# - /scheduler/results   (GET)
-# - /scheduler/configure (POST)
-#
-# Coordinates Top 50 scanner + background variable evaluation
-# -------------------------------------------------------------------------
-
-@app.route("/scheduler/start", methods=["POST"])
-def scheduler_start():
-    """
-    Start the unified scheduler.
-    
-    Expected JSON payload (optional):
-    {
-        "top50_interval": 300,     # seconds between Top 50 scans
-        "eval_interval": 120,      # seconds between variable evals
-        "top50_config": {
-            "scan_code": "TOP_PERC_GAIN",
-            "num_rows": 50,
-            "above_price": 0.05,
-            "above_volume": 75000
-        }
-    }
-    """
-    try:
-        payload = request.get_json(silent=True) or {}
-        
-        # Extract optional configuration
-        top50_interval = payload.get("top50_interval")
-        eval_interval = payload.get("eval_interval")
-        top50_config = payload.get("top50_config")
-        
-        # Configure if provided
-        if top50_interval or eval_interval or top50_config:
-            _unified_scheduler.configure(
-                top50_interval=top50_interval,
-                eval_interval=eval_interval,
-                top50_config=top50_config
-            )
-        
-        # Start scheduler
-        _unified_scheduler.start(_background_scanner)
-        
-        return jsonify({
-            "status": "started",
-            "top50_interval": _unified_scheduler.top50_interval,
-            "eval_interval": _unified_scheduler.eval_interval
-        }), 200
-    
-    except RuntimeError as e:
-        # Already running
-        return jsonify({"error": str(e)}), 409
-    except Exception as e:
-        logger.exception("Failed to start scheduler: %s", e)
-        return jsonify({"error": "failed to start scheduler"}), 500
-
-
-@app.route("/scheduler/stop", methods=["POST"])
-def scheduler_stop():
-    """Stop the unified scheduler."""
-    try:
-        stopped = _unified_scheduler.stop()
-        if not stopped:
-            return jsonify({"status": "not_running"}), 200
-        return jsonify({"status": "stopped"}), 200
-    except Exception as e:
-        logger.exception("Failed to stop scheduler: %s", e)
-        return jsonify({"error": "failed to stop scheduler"}), 500
-
-
-@app.route("/scheduler/status", methods=["GET"])
-def scheduler_status():
-    """Get unified scheduler status."""
-    try:
-        status = _unified_scheduler.status()
-        return jsonify(status), 200
-    except Exception as e:
-        logger.exception("Failed to get scheduler status: %s", e)
-        return jsonify({"error": "failed to get status"}), 500
-
-
-@app.route("/scheduler/results", methods=["GET"])
-def scheduler_results():
-    """Get latest results from all scheduler tasks."""
-    try:
-        results = _unified_scheduler.results()
-        return jsonify(results), 200
-    except Exception as e:
-        logger.exception("Failed to get scheduler results: %s", e)
-        return jsonify({"error": "failed to get results"}), 500
-
-
-@app.route("/scheduler/configure", methods=["POST"])
-def scheduler_configure():
-    """
-    Reconfigure scheduler intervals and task parameters.
-    Can be called while scheduler is running or stopped.
-    
-    Expected JSON payload:
-    {
-        "top50_interval": 300,     # seconds
-        "eval_interval": 120,      # seconds
-        "top50_config": { ... }
-    }
-    """
-    try:
-        payload = request.get_json(silent=True) or {}
-        
-        top50_interval = payload.get("top50_interval")
-        eval_interval = payload.get("eval_interval")
-        top50_config = payload.get("top50_config")
-        
-        _unified_scheduler.configure(
-            top50_interval=top50_interval,
-            eval_interval=eval_interval,
-            top50_config=top50_config
-        )
-        
-        status = _unified_scheduler.status()
-        return jsonify({
-            "status": "configured",
-            "top50_interval": status["top50_interval"],
-            "eval_interval": status["eval_interval"],
-            "top50_config": _unified_scheduler.top50_config
-        }), 200
-    
-    except Exception as e:
-        logger.exception("Failed to configure scheduler: %s", e)
-        return jsonify({"error": "failed to configure scheduler"}), 500
-
-
-# -------------------------------------------------------------------------
-# NEWS ENDPOINT WITH FILTERING
-# -------------------------------------------------------------------------
-
-@app.route("/news", methods=["GET"])
-def fetch_news():
-    """
-    Fetch news for a symbol with optional filtering.
-    
-    Query parameters:
-    - symbol: Stock symbol (required)
-    - max_headlines: Max number of headlines to return (optional, default: 25)
-    - hours_back: Filter articles from last N hours (optional)
-    - days_back: Filter articles from last N days (optional, takes precedence over hours_back)
-    - exclude_sources: Comma-separated list of source names to exclude (optional)
-    - remove_dups: Whether to remove duplicates by title (optional, default: true)
-    - lookback_days: Days to look back when fetching (optional, default: 14)
-    """
-    try:
-        from news_filter import filter_news
-        
-        symbol = request.args.get('symbol', '').strip().upper()
-        if not symbol:
-            return jsonify({"error": "symbol required"}), 400
-        
-        # Parse filtering parameters
-        max_headlines = request.args.get('max_headlines', type=int)
-        if max_headlines is not None and max_headlines <= 0:
-            max_headlines = None
-        
-        hours_back = request.args.get('hours_back', type=int)
-        days_back = request.args.get('days_back', type=int)
-        
-        # Parse excluded sources (comma-separated)
-        exclude_sources_str = request.args.get('exclude_sources', '').strip()
-        excluded_sources = None
-        if exclude_sources_str:
-            excluded_sources = [s.strip() for s in exclude_sources_str.split(',') if s.strip()]
-        
-        # Parse remove_dups flag
-        remove_dups_str = request.args.get('remove_dups', 'true').lower()
-        remove_dups = remove_dups_str in ('true', '1', 'yes', 'on')
-        
-        # Parse lookback days for fetching
-        lookback_days = request.args.get('lookback_days', 14, type=int)
-        
-        # Fetch raw news
-        api = IBapi()
-        raw_articles = api.fetch_news_for_symbol(symbol, limit=100, lookback_days=lookback_days)
-        
-        # Apply filters
-        filtered_articles = filter_news(
-            raw_articles,
-            max_headlines=max_headlines,
-            excluded_sources=excluded_sources,
-            hours_back=hours_back,
-            days_back=days_back,
-            remove_dups=remove_dups
-        )
-        
-        return jsonify({
-            "symbol": symbol,
-            "total_fetched": len(raw_articles),
-            "total_after_filtering": len(filtered_articles),
-            "news": filtered_articles
-        }), 200
-    
-    except Exception as e:
-        logger.exception("[NEWS] Failed to fetch/filter news for symbol: %s", e)
-        return jsonify({
-            "error": "failed to fetch news",
-            "symbol": request.args.get('symbol', '')
-        }), 500
-
-
-# -------------------------------------------------------------------------
-# SCANNER CONFIG MANAGEMENT ENDPOINTS
-# -------------------------------------------------------------------------
-
-@app.route("/scanner-config/save", methods=["POST"])
-def scanner_config_save():
-    """
-    Save a scanner configuration.
-    
-    Expects JSON:
-    {
-      "name": "My Scanner Config",
-      "form_data": { ... }  # Complete form data from Parameters
-    }
-    
-    Returns:
-    { "success": true|false, "message": "...", "config_name": "..." }
-    """
-    try:
-        payload = request.get_json(silent=True)
-        if not payload:
-            return jsonify({"success": False, "message": "JSON payload required"}), 400
-        
-        config_name = payload.get("name", "").strip()
-        form_data = payload.get("form_data", {})
-        
-        if not config_name:
-            return jsonify({"success": False, "message": "Configuration name is required"}), 400
-        
-        if not isinstance(form_data, dict):
-            return jsonify({"success": False, "message": "Form data must be an object"}), 400
-        
-        result = scanner_config_manager.save_scanner_config(config_name, form_data)
-        
-        status_code = 200 if result.get("success") else 400
-        return jsonify(result), status_code
-    
-    except Exception as e:
-        logger.exception("Failed to save scanner config: %s", e)
-        return jsonify({"success": False, "message": "Error saving configuration"}), 500
-
-
-@app.route("/scanner-config/load", methods=["POST"])
-def scanner_config_load():
-    """
-    Load a scanner configuration.
-    
-    Expects JSON:
-    { "name": "My Scanner Config" }
-    
-    Returns:
-    { "success": true|false, "message": "...", "form_data": {...}, "created_at": "...", "updated_at": "..." }
-    """
-    try:
-        payload = request.get_json(silent=True)
-        if not payload:
-            return jsonify({"success": False, "message": "JSON payload required"}), 400
-        
-        config_name = payload.get("name", "").strip()
-        
-        if not config_name:
-            return jsonify({"success": False, "message": "Configuration name is required"}), 400
-        
-        result = scanner_config_manager.load_scanner_config(config_name)
-        
-        status_code = 200 if result.get("success") else 404
-        return jsonify(result), status_code
-    
-    except Exception as e:
-        logger.exception("Failed to load scanner config: %s", e)
-        return jsonify({"success": False, "message": "Error loading configuration"}), 500
-
-
-@app.route("/scanner-config/delete", methods=["POST"])
-def scanner_config_delete():
-    """
-    Delete a scanner configuration.
-    
-    Expects JSON:
-    { "name": "My Scanner Config" }
-    
-    Returns:
-    { "success": true|false, "message": "..." }
-    """
-    try:
-        payload = request.get_json(silent=True)
-        if not payload:
-            return jsonify({"success": False, "message": "JSON payload required"}), 400
-        
-        config_name = payload.get("name", "").strip()
-        
-        if not config_name:
-            return jsonify({"success": False, "message": "Configuration name is required"}), 400
-        
-        result = scanner_config_manager.delete_scanner_config(config_name)
-        
-        status_code = 200 if result.get("success") else 404
-        return jsonify(result), status_code
-    
-    except Exception as e:
-        logger.exception("Failed to delete scanner config: %s", e)
-        return jsonify({"success": False, "message": "Error deleting configuration"}), 500
-
-
-@app.route("/scanner-config/list", methods=["GET"])
-def scanner_config_list():
-    """
-    List all saved scanner configurations.
-    
-    Returns:
-    { "success": true|false, "message": "...", "configs": [...] }
-    """
-    try:
-        result = scanner_config_manager.list_scanner_configs()
-        status_code = 200 if result.get("success") else 500
-        return jsonify(result), status_code
-    
-    except Exception as e:
-        logger.exception("Failed to list scanner configs: %s", e)
-        return jsonify({
-            "success": False,
-            "message": "Error listing configurations",
-            "configs": []
-        }), 500
-
-
-@app.route("/scanner-config/rename", methods=["POST"])
-def scanner_config_rename():
-    """
-    Rename a scanner configuration.
-    
-    Expects JSON:
-    { "old_name": "Old Name", "new_name": "New Name" }
-    
-    Returns:
-    { "success": true|false, "message": "..." }
-    """
-    try:
-        payload = request.get_json(silent=True)
-        if not payload:
-            return jsonify({"success": False, "message": "JSON payload required"}), 400
-        
-        old_name = payload.get("old_name", "").strip()
-        new_name = payload.get("new_name", "").strip()
-        
-        if not old_name or not new_name:
-            return jsonify({"success": False, "message": "Both old_name and new_name are required"}), 400
-        
-        result = scanner_config_manager.rename_scanner_config(old_name, new_name)
-        
-        status_code = 200 if result.get("success") else 400
-        return jsonify(result), status_code
-    
-    except Exception as e:
-        logger.exception("Failed to rename scanner config: %s", e)
-        return jsonify({"success": False, "message": "Error renaming configuration"}), 500
-
-
-@app.route("/scanner-config/duplicate", methods=["POST"])
-def scanner_config_duplicate():
-    """
-    Duplicate a scanner configuration.
-    
-    Expects JSON:
-    { "source_name": "Original Config", "new_name": "Copy of Original Config" }
-    
-    Returns:
-    { "success": true|false, "message": "..." }
-    """
-    try:
-        payload = request.get_json(silent=True)
-        if not payload:
-            return jsonify({"success": False, "message": "JSON payload required"}), 400
-        
-        source_name = payload.get("source_name", "").strip()
-        new_name = payload.get("new_name", "").strip()
-        
-        if not source_name or not new_name:
-            return jsonify({"success": False, "message": "Both source_name and new_name are required"}), 400
-        
-        result = scanner_config_manager.duplicate_scanner_config(source_name, new_name)
-        
-        status_code = 200 if result.get("success") else 400
-        return jsonify(result), status_code
-    
-    except Exception as e:
-        logger.exception("Failed to duplicate scanner config: %s", e)
-        return jsonify({"success": False, "message": "Error duplicating configuration"}), 500
-
-
-# -------------------------------------------------------------------------
-# STOCK LIST MANAGEMENT ENDPOINTS
-# -------------------------------------------------------------------------
-
-@app.route("/stock-list/save", methods=["POST"])
-def stock_list_save():
-    """Save a named list of tickers. Expects JSON: {name, tickers: [...]}"""
-    try:
-        payload = request.get_json(silent=True)
-        if not payload:
-            return jsonify({"success": False, "message": "JSON payload required"}), 400
-
-        name = (payload.get("name") or "").strip()
-        tickers = payload.get("tickers", [])
-
-        if not name:
-            return jsonify({"success": False, "message": "List name is required"}), 400
-        if not isinstance(tickers, list):
-            return jsonify({"success": False, "message": "Tickers must be a list"}), 400
-
-        result = stock_list_manager.save(name, tickers)
-        return jsonify(result), 200 if result.get("success") else 400
-
-    except Exception as e:
-        logger.exception("Failed to save stock list: %s", e)
-        return jsonify({"success": False, "message": "Error saving stock list"}), 500
-
-
-@app.route("/stock-list/load", methods=["POST"])
-def stock_list_load():
-    """Load a named stock list. Expects JSON: {name}"""
-    try:
-        payload = request.get_json(silent=True)
-        if not payload:
-            return jsonify({"success": False, "message": "JSON payload required"}), 400
-
-        name = (payload.get("name") or "").strip()
-        if not name:
-            return jsonify({"success": False, "message": "List name is required"}), 400
-
-        result = stock_list_manager.load(name)
-        return jsonify(result), 200 if result.get("success") else 404
-
-    except Exception as e:
-        logger.exception("Failed to load stock list: %s", e)
-        return jsonify({"success": False, "message": "Error loading stock list"}), 500
-
-
-@app.route("/stock-list/delete", methods=["POST"])
-def stock_list_delete():
-    """Delete a named stock list. Expects JSON: {name}"""
-    try:
-        payload = request.get_json(silent=True)
-        if not payload:
-            return jsonify({"success": False, "message": "JSON payload required"}), 400
-
-        name = (payload.get("name") or "").strip()
-        if not name:
-            return jsonify({"success": False, "message": "List name is required"}), 400
-
-        result = stock_list_manager.delete(name)
-        return jsonify(result), 200 if result.get("success") else 404
-
-    except Exception as e:
-        logger.exception("Failed to delete stock list: %s", e)
-        return jsonify({"success": False, "message": "Error deleting stock list"}), 500
-
-
-@app.route("/stock-list/list", methods=["GET"])
-def stock_list_list():
-    """Return all saved stock list names and metadata."""
-    try:
-        result = stock_list_manager.list_all()
-        return jsonify(result), 200 if result.get("success") else 500
-    except Exception as e:
-        logger.exception("Failed to list stock lists: %s", e)
-        return jsonify({"success": False, "message": "Error listing stock lists"}), 500
-
-
-# -------------------------------------------------------------------------
-# END OF SCHEDULER ENDPOINTS
 # -------------------------------------------------------------------------
 
 

@@ -19,7 +19,6 @@ from wtforms import (
     SelectField,
     BooleanField,
     RadioField,
-    TextAreaField,
 )
 from wtforms.validators import DataRequired
 
@@ -70,11 +69,9 @@ class Parameters(FlaskForm):
     OBV = IntegerField("OBV")
     ATR = IntegerField("ATR")
 
-    ScannerName = StringField("Scanner Name")
     PrevClose = IntegerField("Previous Close")
     LowOfDay = IntegerField("Low of Day")
     HighOfDay = IntegerField("High of Day")
-    HighestHigh = IntegerField("Break High (N days)")
 
     # ------------------------------------------------------------------
     # Percentage / threshold values for indicators
@@ -96,8 +93,6 @@ class Parameters(FlaskForm):
     PercentageLowOfDay1 = DecimalField("Percentage Low Of Day1")
     PercentageHighOfDay = DecimalField("Percentage High Of Day")
     PercentageHighOfDay1 = DecimalField("Percentage High Of Day1")
-    PercentageHighestHigh = DecimalField("Percentage Highest High")
-    PercentageHighestHigh1 = DecimalField("Percentage Highest High1")
 
     # ------------------------------------------------------------------
     # Comparison operators for indicators
@@ -223,19 +218,6 @@ class Parameters(FlaskForm):
         ],
     )
 
-    ComparisonHighestHigh = SelectField(
-        "Programming Language",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("near", "within X% of high"),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
-    )
-
     ComparisonLowOfDay = SelectField(
         "Programming Language",
         choices=[
@@ -319,6 +301,53 @@ class Parameters(FlaskForm):
         ],
     )
 
+    ComparisonCrossAbove200SMA = SelectField(
+        "Cross Above 200 SMA",
+        choices=[
+            ("Not used", "disabled"),
+            ("Used", "enabled"),
+            ("withinPercent", "Within %"),
+        ],
+    )
+    PercentageCross200SMA = DecimalField("% from 200 SMA")
+
+    ComparisonCross50SMA = SelectField(
+        "Cross 50 SMA",
+        choices=[
+            ("Not used", "disabled"),
+            ("crossAbove", "Cross Above"),
+            ("crossBelow", "Cross Below"),
+            ("crossEither", "Cross Either"),
+            ("withinPercent", "Within %"),
+        ],
+    )
+    PercentageCross50SMA = DecimalField("% from 50 SMA")
+
+    # ------------------------------------------------------------------
+    # Break High (recent X-day high)
+    # ------------------------------------------------------------------
+
+    BreakHigh = IntegerField("Break High Days")
+    PercentageBreakHigh = DecimalField("Percentage Break High")
+
+    ComparisonBreakHigh = SelectField(
+        "Break High",
+        choices=[
+            ("greater", ">"),
+            ("greaterEqual", ">="),
+            ("lower", "<"),
+            ("lowerEqual", "<="),
+            ("between", "between"),
+            ("Not used", "disabled"),
+        ],
+    )
+
+    BreakHighBool = RadioField(
+        "",
+        choices=[("percentage", "%"), ("value", "val")],
+        default="percentage",
+    )
+
     ComparisonPivotPoint = SelectField(
         "Programming Language",
         choices=[
@@ -382,10 +411,6 @@ class Parameters(FlaskForm):
     LowOfDay1_tf = SelectField("Low Of Day1 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     HighOfDay_tf = SelectField("High Of Day Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     HighOfDay1_tf = SelectField("High Of Day1 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
-    HighestHigh_tf = SelectField("Highest High Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
-    HighestHigh1_tf = SelectField("Highest High1 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
-    Pullback_tf = SelectField("Pullback Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
-    Pullback1_tf = SelectField("Pullback1 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
 
     averageVolume_tf = SelectField("Average Volume Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     averageVolume1_tf = SelectField("Average Volume1 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
@@ -424,19 +449,7 @@ class Parameters(FlaskForm):
 
     PercentagePrice = DecimalField("Percentage Price")
     PercentagePrice1 = DecimalField("Percentage Price")
-    ComparisonPullback = SelectField(
-        "Programming Language",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
-    )
-    PercentagePullback = DecimalField("Percentage Pullback")
-    PercentagePullback1 = DecimalField("Percentage Pullback1")
+
     # ------------------------------------------------------------------
     # Average volume configuration
     # ------------------------------------------------------------------
@@ -514,52 +527,7 @@ class Parameters(FlaskForm):
         choices=[("percentage", "%"), ("value", "val")],
         default="value",
     )
-    SMACrossoverPeriod = SelectField(
-        "SMA Period",
-        choices=[
-            ("50", "50"),
-            ("200", "200"),
-        ],
-        default="50",
-    )
 
-    ComparisonSMACrossover = SelectField(
-        "SMA Crossover",
-        choices=[
-            ("crossAbove", "Cross Above"),
-            ("crossBelow", "Cross Below"),
-            ("Not used", "disabled"),
-        ],
-        default="Not used",
-    )
-
-    SMACrossoverBool = RadioField(
-        "",
-        choices=[("percentage", "%"), ("value", "val")],
-        default="value",
-    )
-
-    ComparisonSMA200Crossover = SelectField(
-        "SMA 200 Crossover",
-        choices=[
-            ("crossAbove", "Cross Above"),
-            ("crossBelow", "Cross Below"),
-            ("Not used", "disabled"),
-        ],
-        default="Not used",
-    )
-
-    ComparisonSMA200 = SelectField(
-        "Programming Language",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
-    )
     SlowEMABool = RadioField(
         "",
         choices=[("percentage", "%"), ("value", "val")],
@@ -584,19 +552,7 @@ class Parameters(FlaskForm):
         default="value",
     )
 
-    HighestHighBool = RadioField(
-        "",
-        choices=[("percentage", "%"), ("value", "val")],
-        default="value",
-    )
-
     LowOfDayBool = RadioField(
-        "",
-        choices=[("percentage", "%"), ("value", "val")],
-        default="value",
-    )
-
-    PullbackBool = RadioField(
         "",
         choices=[("percentage", "%"), ("value", "val")],
         default="value",
@@ -646,22 +602,20 @@ class Parameters(FlaskForm):
     )
 
     # ------------------------------------------------------------------
-    # News filter configuration
+    # News headlines
     # ------------------------------------------------------------------
 
-    NewsExcludeSources = TextAreaField("Exclude News Sources")
-
-    NewsLookbackHours = IntegerField("News Within (hours)")
-
-    NewsEnabled = SelectField(
-        "News Filter",
+    ComparisonNews = SelectField(
+        "News",
         choices=[
-            ("disabled", "disabled"),
-            ("enabled", "Show News"),
-            ("required", "Require News"),
+            ("Not used", "disabled"),
+            ("Used", "enabled"),
         ],
-        default="disabled",
     )
+
+    NewsMaxHeadlines = IntegerField("Max Headlines")
+    NewsWithinHours = IntegerField("News Within Hours")
+    NewsExcludePublishers = StringField("Exclude Publishers")
 
     # ------------------------------------------------------------------
     # ETF processing mode

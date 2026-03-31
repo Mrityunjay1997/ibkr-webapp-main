@@ -4,14 +4,11 @@ import math
 import random
 import logging
 import threading
-import os
-import datetime
-import urllib.request
-import urllib.parse
 import numpy as np
 import pandas as pd
 from config import Config
 from typing import Any, Dict
+
 from ibapi.order import *
 from ibapi.common import *
 from ibapi.common import OrderId
@@ -31,266 +28,15 @@ from indicators import (
     # pivot_points,
     last_value
 )
-from news_filter import filter_news
 
-from resilience import (
-    ExponentialBackoffRetry,
-    PartialFailureHandler,
-    PercentChangeNormalizer,
-    HistoricalDataRetryFetcher,
-    create_retry_context,
-)
-
-# ============================================================================
-# STRUCTURED LOGGING & DEBUGGING
-# ============================================================================
-
-class StructuredLogger:
-    """
-    Centralized structured logging with support for different event types.
-    Allows JSON-style logging for better parsing and debugging.
-    """
-    
-    DEBUG_MODE = False  # Set True to enable verbose debug logging
-    
-    def __init__(self, name="ibkr_app"):
-        self.logger = logging.getLogger(name)
-        self.debug_logs = []  # Optional: retain debug logs in memory
-        self.error_logs = []  # Track errors for analysis
-        self.scanner_logs = []  # Track scanner runs
-        self.fetch_logs = []  # Track data fetches
-    
-    def _should_log(self, level):
-        """Check if message should be logged based on debug mode."""
-        if level == "DEBUG" and not self.DEBUG_MODE:
-            return False
-        return True
-    
-    def _append_log(self, log_type, entry):
-        """Store log in memory for later analysis."""
-        if log_type == "debug":
-            self.debug_logs.append(entry)
-            if len(self.debug_logs) > 1000:  # Keep last 1000
-                self.debug_logs = self.debug_logs[-1000:]
-        elif log_type == "error":
-            self.error_logs.append(entry)
-            if len(self.error_logs) > 500:  # Keep last 500
-                self.error_logs = self.error_logs[-500:]
-        elif log_type == "scanner":
-            self.scanner_logs.append(entry)
-            if len(self.scanner_logs) > 500:  # Keep last 500
-                self.scanner_logs = self.scanner_logs[-500:]
-        elif log_type == "fetch":
-            self.fetch_logs.append(entry)
-            if len(self.fetch_logs) > 500:  # Keep last 500
-                self.fetch_logs = self.fetch_logs[-500:]
-    
-    def scanner_start(self, scan_id, scan_type, num_symbols, config_summary=""):
-        """Log scanner start event."""
-        message = (
-            f"[SCANNER START] id={scan_id} | type={scan_type} | symbols={num_symbols} | "
-            f"config={config_summary} | timestamp={time.time()}"
-        )
-        self.logger.info(message)
-        self._append_log("scanner", {
-            "event": "start",
-            "scan_id": scan_id,
-            "type": scan_type,
-            "symbols": num_symbols,
-            "timestamp": time.time(),
-        })
-    
-    def scanner_complete(self, scan_id, duration_sec, results_count, errors_count=0):
-        """Log scanner completion event."""
-        message = (
-            f"[SCANNER COMPLETE] id={scan_id} | duration={duration_sec:.2f}s | "
-            f"results={results_count} | errors={errors_count}"
-        )
-        self.logger.info(message)
-        self._append_log("scanner", {
-            "event": "complete",
-            "scan_id": scan_id,
-            "duration_sec": duration_sec,
-            "results_count": results_count,
-            "errors_count": errors_count,
-            "timestamp": time.time(),
-        })
-    
-    def scanner_error(self, scan_id, error_msg, error_type=""):
-        """Log scanner error event."""
-        message = (
-            f"[SCANNER ERROR] id={scan_id} | type={error_type} | "
-            f"msg={error_msg}"
-        )
-        self.logger.error(message)
-        self._append_log("error", {
-            "event": "scanner_error",
-            "scan_id": scan_id,
-            "error_type": error_type,
-            "error_msg": error_msg,
-            "timestamp": time.time(),
-        })
-    
-    def data_fetch_start(self, fetch_id, symbol, timeframe, lookback):
-        """Log data fetch start event."""
-        if not self._should_log("DEBUG"):
-            return
-        message = (
-            f"[FETCH START] id={fetch_id} | symbol={symbol} | timeframe={timeframe} | "
-            f"lookback={lookback}"
-        )
-        self.logger.debug(message)
-        self._append_log("fetch", {
-            "event": "start",
-            "fetch_id": fetch_id,
-            "symbol": symbol,
-            "timeframe": timeframe,
-            "lookback": lookback,
-            "timestamp": time.time(),
-        })
-    
-    def data_fetch_complete(self, fetch_id, symbol, timeframe, bar_count, duration_sec, source="api"):
-        """Log data fetch completion event."""
-        message = (
-            f"[FETCH COMPLETE] id={fetch_id} | symbol={symbol} | timeframe={timeframe} | "
-            f"bars={bar_count} | duration={duration_sec:.2f}s | source={source}"
-        )
-        if source == "cache":
-            self.logger.debug(message)
-        else:
-            self.logger.info(message)
-        self._append_log("fetch", {
-            "event": "complete",
-            "fetch_id": fetch_id,
-            "symbol": symbol,
-            "timeframe": timeframe,
-            "bar_count": bar_count,
-            "duration_sec": duration_sec,
-            "source": source,
-            "timestamp": time.time(),
-        })
-    
-    def data_fetch_error(self, fetch_id, symbol, timeframe, error_msg):
-        """Log data fetch error event."""
-        message = (
-            f"[FETCH ERROR] id={fetch_id} | symbol={symbol} | timeframe={timeframe} | "
-            f"error={error_msg}"
-        )
-        self.logger.error(message)
-        self._append_log("error", {
-            "event": "fetch_error",
-            "fetch_id": fetch_id,
-            "symbol": symbol,
-            "timeframe": timeframe,
-            "error_msg": error_msg,
-            "timestamp": time.time(),
-        })
-    
-    def error(self, error_msg, error_type="general", context=""):
-        """Log generic error event."""
-        message = (
-            f"[ERROR] type={error_type} | msg={error_msg} | "
-            f"context={context}"
-        )
-        self.logger.error(message)
-        self._append_log("error", {
-            "event": "error",
-            "error_type": error_type,
-            "error_msg": error_msg,
-            "context": context,
-            "timestamp": time.time(),
-        })
-    
-    def debug(self, message, category=""):
-        """Log debug message."""
-        if not self._should_log("DEBUG"):
-            return
-        full_msg = f"[DEBUG] {category} | {message}" if category else f"[DEBUG] {message}"
-        self.logger.debug(full_msg)
-        self._append_log("debug", {
-            "message": message,
-            "category": category,
-            "timestamp": time.time(),
-        })
-    
-    def info(self, message, category=""):
-        """Log info message."""
-        full_msg = f"[INFO] {category} | {message}" if category else f"[INFO] {message}"
-        self.logger.info(full_msg)
-    
-    def warning(self, message, category=""):
-        """Log warning message."""
-        full_msg = f"[WARNING] {category} | {message}" if category else f"[WARNING] {message}"
-        self.logger.warning(full_msg)
-    
-    def enable_debug(self):
-        """Enable debug logging."""
-        self.DEBUG_MODE = True
-        self.logger.setLevel(logging.DEBUG)
-        self.logger.info("[DEBUG MODE] Enabled")
-    
-    def disable_debug(self):
-        """Disable debug logging."""
-        self.DEBUG_MODE = False
-        self.logger.setLevel(logging.INFO)
-        self.logger.info("[DEBUG MODE] Disabled")
-    
-    def get_scanner_logs(self, limit=None):
-        """Retrieve scanner logs."""
-        logs = self.scanner_logs
-        if limit:
-            logs = logs[-limit:]
-        return logs
-    
-    def get_error_logs(self, limit=None):
-        """Retrieve error logs."""
-        logs = self.error_logs
-        if limit:
-            logs = logs[-limit:]
-        return logs
-    
-    def get_fetch_logs(self, limit=None):
-        """Retrieve fetch logs."""
-        logs = self.fetch_logs
-        if limit:
-            logs = logs[-limit:]
-        return logs
-    
-    def get_debug_logs(self, limit=None):
-        """Retrieve debug logs."""
-        logs = self.debug_logs
-        if limit:
-            logs = logs[-limit:]
-        return logs
-    
-    def get_log_summary(self):
-        """Get summary statistics of all logs."""
-        return {
-            "scanner_events": len(self.scanner_logs),
-            "error_events": len(self.error_logs),
-            "fetch_events": len(self.fetch_logs),
-            "debug_events": len(self.debug_logs),
-            "debug_mode": self.DEBUG_MODE,
-        }
-    
-    def clear_logs(self):
-        """Clear all in-memory logs."""
-        self.debug_logs = []
-        self.error_logs = []
-        self.scanner_logs = []
-        self.fetch_logs = []
-        self.logger.info("[LOGS CLEARED] All in-memory logs cleared")
-
-
-# Initialize standard logging configuration
+# -----------------------------------------------------------------------------
+# Logging - lightweight
+# -----------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
 )
-
-# Create centralized structured logger instance
-structured_logger = StructuredLogger("ibkr_app")
-logger = structured_logger.logger  # Keep for backward compatibility
+logger = logging.getLogger("ibkr_app")
 
 
 def _safe_compare(value, op, threshold):
@@ -299,7 +45,7 @@ def _safe_compare(value, op, threshold):
     If value is None -> return False.
     """
 
-    if value is None or threshold is None:
+    if value is None:
         return False
 
     if op == ">":
@@ -312,109 +58,6 @@ def _safe_compare(value, op, threshold):
         return value <= threshold
 
     raise ValueError(f"Unsupported operator: {op}")
-
-
-def _parse_float(value):
-    """Convert value to float safely; return None otherwise."""
-    try:
-        if value is None:
-            return None
-        return float(value)
-    except (ValueError, TypeError):
-        return None
-
-
-def evaluate(value, condition, target, target2=None):
-    """Unified condition evaluator supporting >, <, >=, <=, between."""
-    if condition in (None, "Not used", ""):
-        return None
-
-    normalized = condition
-    if condition == "greater":
-        normalized = ">"
-    elif condition == "greaterEqual":
-        normalized = ">="
-    elif condition == "lower":
-        normalized = "<"
-    elif condition == "lowerEqual":
-        normalized = "<="
-    elif condition == "between":
-        normalized = "between"
-
-    if normalized == "between":
-        if target is None or target2 is None:
-            return False
-        lo = _parse_float(target)
-        hi = _parse_float(target2)
-        if lo is None or hi is None:
-            return False
-
-        if value is None:
-            return False
-
-        try:
-            # Use strict inequality for 'between' (old logic in the application)
-            return float(value) > lo and float(value) < hi
-        except (ValueError, TypeError):
-            return False
-
-    # non-between comparison
-    rhs = _parse_float(target)
-    if rhs is None:
-        return False
-
-    if value is None:
-        return False
-
-    try:
-        lhs = float(value)
-    except (ValueError, TypeError):
-        return False
-
-    return _safe_compare(lhs, normalized, rhs)
-
-
-def evaluate_percentage(value, condition, base, percentage, percentage2=None):
-    """Compare via percentage on a base value.
-
-    For non-between: compare value to base * (1+percentage/100).
-    For between: compare value to [base*(1+percentage/100), base*(1+percentage2/100)].
-    """
-    base_float = _parse_float(base)
-    pct1 = _parse_float(percentage)
-    pct2 = _parse_float(percentage2)
-
-    if base_float is None or pct1 is None:
-        return False
-
-    try:
-        current = float(value)
-    except (ValueError, TypeError):
-        return False
-
-    if condition == "between":
-        if pct2 is None:
-            return False
-        lower = base_float * (1.0 + pct1 / 100.0)
-        upper = base_float * (1.0 + pct2 / 100.0)
-        return lower <= current <= upper
-
-    target = base_float * (1.0 + pct1 / 100.0)
-
-    return evaluate(current, condition, target)
-
-
-def absolute_cond(value, condition, target, target2=None):
-    """Absolute value and between comparison."""
-    return evaluate(value, condition, target, target2)
-
-
-def percent_cond(value, condition, base, pct, pct2=None):
-    """Percent-based comparison against base.
-
-    The caller should pass percentage amount (e.g. 5 for +5%).
-    """
-    return evaluate_percentage(value, condition, base, pct, pct2)
 
 
 def average_volume(data: pd.DataFrame, lookback: int) -> float:
@@ -552,37 +195,13 @@ class IBapi(EWrapper, EClient):
         self._market_expected = 0
 
         # ---------------------------
-        # Resilience & Retry Context
+        # News related containers
         # ---------------------------
-        self._resilience = create_retry_context(self, self.config)
-        self._failure_tracker = self._resilience['failure_tracker']
-        self._data_fetcher = self._resilience['data_fetcher']
-        self._pct_normalizer = self._resilience['pct_normalizer']
-
-        # ---------------------------
-        # PERFORMANCE: Per-Timeframe Historical Data Cache
-        # Key: (symbol, timeframe) -> {'data': [...bars...], 'timestamp': time.time()}
-        # Reduces redundant API calls when same timeframe requested multiple times
-        # ---------------------------
-        self._historical_cache = {}  # (symbol, timeframe) -> {'data': list, 'timestamp': float}
-        self._historical_cache_ttl = 300  # 5 minutes - cache valid period per timeframe
-        self._cache_lock = threading.Lock()
-        
-        # Track in-flight requests to prevent duplicate API calls
-        self._inflight_requests = {}  # (symbol, timeframe) -> reqId
-        self._inflight_lock = threading.Lock()
-        
-        # Map reqId -> (symbol, timeframe) for caching on historicalDataEnd
-        self._reqid_to_symbol_tf = {}  # reqId -> (symbol, timeframe)
-        
-        # Optimization metrics
-        self._optimization_metrics = {
-            'cache_hits': 0,
-            'cache_misses': 0,
-            'api_calls_avoided': 0,
-            'batch_requests_sent': 0,
-            'inflight_collisions_prevented': 0,
-        }
+        # reqId -> list of headline dicts
+        self._news_data = {}
+        # reqId -> bool (historicalNewsEnd received)
+        self._news_done = {}
+        self._news_lock = threading.Lock()
 
     def _to_dict(self, obj):
         if obj is None:
@@ -605,7 +224,7 @@ class IBapi(EWrapper, EClient):
 
     def _load_contract_cache_from_disk(self):
 
-        if not getattr(self.config, "enable_contract_cache", False):
+        if not self.config.enable_contract_cache:
             logger.info("Contract cache disabled by config")
             return
 
@@ -653,7 +272,7 @@ class IBapi(EWrapper, EClient):
 
     def _save_contract_cache_to_disk(self, updated_symbols=None):
 
-        if not getattr(self.config, "enable_contract_cache", False):
+        if not self.config.enable_contract_cache:
             return
 
         updated_symbols = set(updated_symbols or [])
@@ -704,223 +323,6 @@ class IBapi(EWrapper, EClient):
                 json.dump(out, f, indent=2)
         except Exception:
             pass
-
-    # ============================================================
-    # PERFORMANCE OPTIMIZATION: Historical Data Caching
-    # ============================================================
-    
-    def get_cached_historical_data(self, symbol, timeframe):
-        """
-        Retrieve cached historical data if valid (not expired).
-        
-        Args:
-            symbol: str, stock symbol
-            timeframe: str, e.g. '1 min', '5 min', '1 day'
-        
-        Returns:
-            list of bars or None if not cached/expired
-        """
-        cache_key = (symbol, timeframe)
-        
-        with self._cache_lock:
-            if cache_key not in self._historical_cache:
-                self._optimization_metrics['cache_misses'] += 1
-                return None
-            
-            cache_entry = self._historical_cache[cache_key]
-            age = time.time() - cache_entry['timestamp']
-            
-            if age > self._historical_cache_ttl:
-                # Cache expired
-                del self._historical_cache[cache_key]
-                self._optimization_metrics['cache_misses'] += 1
-                return None
-            
-            # Valid cache hit
-            self._optimization_metrics['cache_hits'] += 1
-            self._optimization_metrics['api_calls_avoided'] += 1
-            logger.info(
-                "[CACHE HIT] %s | timeframe=%s | age=%.1fs | bars=%d",
-                symbol,
-                timeframe,
-                age,
-                len(cache_entry['data'])
-            )
-            return cache_entry['data']
-    
-    def store_cached_historical_data(self, symbol, timeframe, bars):
-        """
-        Store historical bars in cache with current timestamp.
-        
-        Args:
-            symbol: str, stock symbol
-            timeframe: str, e.g. '1 min'
-            bars: list of bar data
-        """
-        cache_key = (symbol, timeframe)
-        
-        with self._cache_lock:
-            self._historical_cache[cache_key] = {
-                'data': bars,
-                'timestamp': time.time()
-            }
-            logger.debug(
-                "[CACHE STORE] %s | timeframe=%s | bars=%d",
-                symbol,
-                timeframe,
-                len(bars) if bars else 0
-            )
-    
-    def is_request_inflight(self, symbol, timeframe):
-        """
-        Check if a request for this symbol/timeframe is already in-flight.
-        Prevents duplicate API calls.
-        
-        Returns:
-            reqId if in-flight, None otherwise
-        """
-        request_key = (symbol, timeframe)
-        
-        with self._inflight_lock:
-            return self._inflight_requests.get(request_key)
-    
-    def mark_request_inflight(self, symbol, timeframe, reqId):
-        """Mark a request as in-flight."""
-        request_key = (symbol, timeframe)
-        
-        with self._inflight_lock:
-            if request_key in self._inflight_requests:
-                self._optimization_metrics['inflight_collisions_prevented'] += 1
-                logger.debug(
-                    "[INFLIGHT COLLISION] %s | timeframe=%s | preventing duplicate reqId=%s",
-                    symbol,
-                    timeframe,
-                    reqId
-                )
-                return False
-            
-            self._inflight_requests[request_key] = reqId
-            return True
-    
-    def unmark_request_inflight(self, symbol, timeframe):
-        """Mark request as no longer in-flight."""
-        request_key = (symbol, timeframe)
-        
-        with self._inflight_lock:
-            self._inflight_requests.pop(request_key, None)
-    
-    def get_optimization_metrics(self):
-        """Return current optimization metrics."""
-        return self._optimization_metrics.copy()
-    
-    def reset_optimization_metrics(self):
-        """Reset optimization metrics counters."""
-        for key in self._optimization_metrics:
-            self._optimization_metrics[key] = 0
-        logger.info("[METRICS RESET] Optimization metrics cleared")
-    
-    def cleanup_expired_cache(self):
-        """
-        Cleanup expired cache entries (TTL-based).
-        Returns count of entries removed.
-        """
-        now = time.time()
-        expired_count = 0
-        
-        with self._cache_lock:
-            keys_to_remove = []
-            for cache_key, cache_entry in self._historical_cache.items():
-                age = now - cache_entry['timestamp']
-                if age > self._historical_cache_ttl:
-                    keys_to_remove.append(cache_key)
-            
-            for key in keys_to_remove:
-                del self._historical_cache[key]
-                expired_count += 1
-        
-        if expired_count > 0:
-            logger.info("[CACHE CLEANUP] Removed %d expired cache entries", expired_count)
-        
-        return expired_count
-    
-    def get_cache_status(self):
-        """
-        Get current cache status for monitoring.
-        
-        Returns:
-            dict: {
-                'cached_entries': int,
-                'cache_size_approx_kb': float,
-                'oldest_entry_age_sec': float,
-                'newest_entry_age_sec': float,
-            }
-        """
-        now = time.time()
-        status = {
-            'cached_entries': 0,
-            'cache_size_approx_kb': 0.0,
-            'oldest_entry_age_sec': None,
-            'newest_entry_age_sec': None,
-        }
-        
-        with self._cache_lock:
-            status['cached_entries'] = len(self._historical_cache)
-            
-            ages = []
-            for cache_entry in self._historical_cache.values():
-                age = now - cache_entry['timestamp']
-                ages.append(age)
-                
-                # Approximate size: (bars * ~50 bytes per bar)
-                bars_count = len(cache_entry['data'])
-                status['cache_size_approx_kb'] += (bars_count * 50) / 1024
-            
-            if ages:
-                status['oldest_entry_age_sec'] = max(ages)
-                status['newest_entry_age_sec'] = min(ages)
-        
-        return status
-    
-    def fetch_all_timeframe_data_batched(self, contract, indicator_config, theid, batch_delay_ms=100):
-        """
-        Request historical data for all required timeframes with controlled batching.
-        
-        Batching reduces burst load on IB API by introducing small delays between requests.
-        
-        Args:
-            contract: IB Contract object
-            indicator_config: dict with indicator configurations
-            theid: int, base request ID
-            batch_delay_ms: int, milliseconds to wait between batch requests (default 100ms)
-        
-        Returns:
-            dict: {
-                'timeframe': reqId,
-                ...
-            }
-        """
-        timeframe_lookbacks = self.calculate_lookback_for_indicators(indicator_config)
-        timeframe_to_reqid = {}
-        
-        self._optimization_metrics['batch_requests_sent'] += 1
-        
-        logger.info(
-            "[BATCH REQUEST] %s | timeframes=%d | batch_delay=%dms",
-            getattr(contract, 'symbol', '<unknown>'),
-            len(timeframe_lookbacks),
-            batch_delay_ms
-        )
-        
-        for index, (timeframe, lookback_window) in enumerate(timeframe_lookbacks.items()):
-            reqId = self.fetch_data_for_timeframe(contract, timeframe, lookback_window, theid, index)
-            timeframe_to_reqid[timeframe] = reqId
-            
-            # Insert delay between batch requests (except for cached/reused requests)
-            if index < len(timeframe_lookbacks) - 1:
-                delay_sec = batch_delay_ms / 1000.0
-                time.sleep(delay_sec)
-        
-        return timeframe_to_reqid
 
     @staticmethod
     def _select_best_contract(contracts, requested_symbol=None):
@@ -1024,7 +426,6 @@ class IBapi(EWrapper, EClient):
     def historicalDataEnd(self, req_id: int, start: str, end: str):
         """
         Callback fired when all historical bars for reqId were sent.
-        Stores data in cache for future reuse.
         """
 
         super().historicalDataEnd(req_id, start, end)
@@ -1033,27 +434,30 @@ class IBapi(EWrapper, EClient):
 
         # mark this request as completed
         self.hisdtId[req_id] = True
-        
-        # ============================================================
-        # CACHE: Store historical data for future reuse
-        # ============================================================
-        if req_id in self._reqid_to_symbol_tf:
-            symbol, timeframe = self._reqid_to_symbol_tf[req_id]
-            bars_data = self.HistoricalDt.get(req_id, [])
-            
-            if bars_data:
-                self.store_cached_historical_data(symbol, timeframe, bars_data)
-                logger.debug(
-                    "[CACHE STORED] reqId=%s | %s | timeframe=%s | bars=%d",
-                    req_id,
-                    symbol,
-                    timeframe,
-                    len(bars_data)
-                )
-            
-            # Clean up the mapping
-            del self._reqid_to_symbol_tf[req_id]
-            self.unmark_request_inflight(symbol, timeframe)
+
+    # ------------------------------------------------------------------
+    # News callbacks
+    # ------------------------------------------------------------------
+
+    def historicalNews(self, request_id, time_str, provider_code, article_id, headline):
+        """
+        Callback for each historical news headline received from IBKR.
+        """
+        with self._news_lock:
+            if request_id not in self._news_data:
+                self._news_data[request_id] = []
+            self._news_data[request_id].append({
+                "time": time_str,
+                "provider": provider_code,
+                "articleId": article_id,
+                "headline": headline,
+            })
+
+    def historicalNewsEnd(self, request_id, has_more):
+        """
+        Callback fired when all historical news for request_id were sent.
+        """
+        self._news_done[request_id] = True
 
     def tickPrice(self, req_id, tick_type, price, attrib):
         """
@@ -1061,7 +465,6 @@ class IBapi(EWrapper, EClient):
 
         - Supports tickType 56 (LAST_PERCENT) as a primary source.
         - Fallback: capture LAST (4) and CLOSE (9) and compute pct when both present.
-        - NEW: All % change values go through resilience normalizer for fallback support
         The current implementation stores the last price
         using self.symbolData as a key.
         """
@@ -1084,18 +487,6 @@ class IBapi(EWrapper, EClient):
                         # store percent directly
                         self._market_data[req_id]["percent"] = float(price) if price is not None else None
 
-                        # NEW: Normalize % change with fallback chain if needed
-                        if hasattr(self, '_pct_normalizer'):
-                            normalized_pct = self._pct_normalizer.normalize_market_data(
-                                self._market_data[req_id],
-                                last_price=self._market_data[req_id].get("last"),
-                                close_price=self._market_data[req_id].get("close"),
-                                df=None
-                            )
-                            if normalized_pct is not None:
-                                self._market_data[req_id]["percent"] = normalized_pct
-                                logger.debug(f"[NORMALIZATION] req_id {req_id}: LAST_PERCENT normalized to {normalized_pct}")
-
                         # mark progress
                         if isinstance(self._market_expected, int) and self._market_expected > 0:
                             self._market_expected -= 1
@@ -1103,9 +494,8 @@ class IBapi(EWrapper, EClient):
                         if self._market_expected <= 0:
                             self._market_event.set()
                 return
-        except Exception as e:
+        except Exception:
             # don't raise from callback
-            logger.warning(f"[NORMALIZATION ERROR] LAST_PERCENT normalization failed: {e}")
             pass
 
         # ------------------ fallback: LAST (4) and CLOSE (9) to compute percent ------------------
@@ -1128,25 +518,12 @@ class IBapi(EWrapper, EClient):
                 if last is not None and close not in (None, 0):
                     entry["percent"] = ((last - close) / close) * 100.0
 
-                    # NEW: Normalize % change with fallback chain if needed
-                    if hasattr(self, '_pct_normalizer'):
-                        normalized_pct = self._pct_normalizer.normalize_market_data(
-                            entry,
-                            last_price=last,
-                            close_price=close,
-                            df=None
-                        )
-                        if normalized_pct is not None:
-                            entry["percent"] = normalized_pct
-                            logger.debug(f"[NORMALIZATION] req_id {req_id}: LAST/CLOSE normalized to {normalized_pct}")
-
                     if isinstance(self._market_expected, int) and self._market_expected > 0:
                         self._market_expected -= 1
                     if self._market_expected <= 0:
                         self._market_event.set()
-        except Exception as e:
+        except Exception:
             # swallow any callback exceptions
-            logger.warning(f"[NORMALIZATION ERROR] LAST/CLOSE normalization failed: {e}")
             pass
 
     def error(self, req_id, error_code, error_string):
@@ -1195,6 +572,15 @@ class IBapi(EWrapper, EClient):
                 "Internal Error",
                 f"Error: {error_code}. {error_string}",
             ]
+
+        # Unblock the historical-data waiting loop in getDataResult().
+        # When IB rejects a request (pacing violation, no data, etc.) the
+        # historicalDataEnd callback never fires, so hisdtId stays False and
+        # the thread sleeps for the full timeout (30 s).  Signal completion
+        # here so the thread can proceed immediately with whatever bars
+        # (if any) were already received.
+        if req_id in self.hisdtId and not self.hisdtId[req_id]:
+            self.hisdtId[req_id] = True
 
     def contractDetails(self, req_id, contract_details):
         """
@@ -1333,572 +719,6 @@ class IBapi(EWrapper, EClient):
         contract.currency = currency
 
         return contract
-
-    # =========================================================================
-    # NEW: Per-Indicator Execution Architecture
-    # =========================================================================
-    # Enables independent timeframe and historical data fetch for each indicator
-    # =========================================================================
-
-    def build_indicator_config(self, form):
-        """
-        Extract indicator configuration from form.
-        
-        Returns:
-            dict: {
-                'indicator_name': {
-                    'enabled': bool,
-                    'timeframe': str,              # '1 min', '5 min', '1 day', etc.
-                    'window': int,                  # lookback window/period
-                    'comparison': str,              # 'Not used', '>', '<', 'between', etc.
-                    'threshold1': float,            # primary threshold
-                    'threshold2': float or None,    # secondary threshold for 'between'
-                    'alt_window': int or None,      # alternative window for 'between' comparisons
-                },
-                ...
-            }
-        
-        Example:
-            {
-                'FastSMA': {
-                    'enabled': True,
-                    'timeframe': '5m',
-                    'window': 21,
-                    'comparison': '>',
-                    'threshold1': 100.0,
-                    'threshold2': None,
-                    'alt_window': None,
-                },
-                'SlowEMA': {
-                    'enabled': True,
-                    'timeframe': '1d',
-                    'window': 50,
-                    'comparison': 'between',
-                    'threshold1': 90.0,
-                    'threshold2': 110.0,
-                    'alt_window': 60,
-                },
-            }
-        """
-        config = {}
-        
-        # Indicator definitions: (form_key, form_window_key, form_tf_key, form_comparison_key, form_threshold_key, form_threshold2_key, alt_window_key)
-        indicator_specs = [
-            ("FastSMA", "FastSMA", "FastSMA_tf", "ComparisonFastSMA", "FastSMA_threshold", "FastSMA_threshold2", "FastSMA1"),
-            ("FastSMA1", "FastSMA1", "FastSMA1_tf", "ComparisonFastSMA", "FastSMA_threshold", "FastSMA_threshold2", "FastSMA1"),
-            ("MediumSMA", "MediumSMA", "MediumSMA_tf", "ComparisonMediumSMA", "MediumSMA_threshold", "MediumSMA_threshold2", "MediumSMA1"),
-            ("MediumSMA1", "MediumSMA1", "MediumSMA1_tf", "ComparisonMediumSMA", "MediumSMA_threshold", "MediumSMA_threshold2", "MediumSMA1"),
-            ("SlowSMA", "SlowSMA", "SlowSMA_tf", "ComparisonSlowSMA", "SlowSMA_threshold", "SlowSMA_threshold2", "SlowSMA1"),
-            ("SlowSMA1", "SlowSMA1", "SlowSMA1_tf", "ComparisonSlowSMA", "SlowSMA_threshold", "SlowSMA_threshold2", "SlowSMA1"),
-            ("VWAP", "VWAP", "VWAP_tf", "ComparisonVWAP", "VWAP_threshold", "VWAP_threshold2", "VWAP1"),
-            ("VWAP1", "VWAP1", "VWAP1_tf", "ComparisonVWAP", "VWAP_threshold", "VWAP_threshold2", "VWAP1"),
-            ("RSI", "RSI", "RSI_tf", "ComparisonRSI", "RSI_threshold", "RSI_threshold2", "RSI1"),
-            ("RSI1", "RSI1", "RSI1_tf", "ComparisonRSI", "RSI_threshold", "RSI_threshold2", "RSI1"),
-            ("FastEMA", "FastEMA", "FastEMA_tf", "ComparisonFastEMA", "FastEMA_threshold", "FastEMA_threshold2", "FastEMA1"),
-            ("FastEMA1", "FastEMA1", "FastEMA1_tf", "ComparisonFastEMA", "FastEMA_threshold", "FastEMA_threshold2", "FastEMA1"),
-            ("SlowEMA", "SlowEMA", "SlowEMA_tf", "ComparisonSlowEMA", "SlowEMA_threshold", "SlowEMA_threshold2", "SlowEMA1"),
-            ("SlowEMA1", "SlowEMA1", "SlowEMA1_tf", "ComparisonSlowEMA", "SlowEMA_threshold", "SlowEMA_threshold2", "SlowEMA1"),
-            ("OBV", "OBV", "OBV_tf", "ComparisonOBV", "OBV_threshold", "OBV_threshold2", "OBV1"),
-            ("OBV1", "OBV1", "OBV1_tf", "ComparisonOBV", "OBV_threshold", "OBV_threshold2", "OBV1"),
-            ("ATR", "ATR", "ATR_tf", "ComparisonATR", "ATR_threshold", "ATR_threshold2", "ATR1"),
-            ("ATR1", "ATR1", "ATR1_tf", "ComparisonATR", "ATR_threshold", "ATR_threshold2", "ATR1"),
-            ("PrevClose", "PrevClose", "PrevClose_tf", "ComparisonPrevClose", "PrevClose_threshold", "PrevClose_threshold2", "PrevClose1"),
-            ("LowOfDay", "LowOfDay", "LowOfDay_tf", "ComparisonLowOfDay", "LowOfDay_threshold", "LowOfDay_threshold2", "LowOfDay1"),
-            ("HighOfDay", "HighOfDay", "HighOfDay_tf", "ComparisonHighOfDay", "HighOfDay_threshold", "HighOfDay_threshold2", "HighOfDay1"),
-            ("HighestHigh", "HighestHigh", "HighestHigh_tf", "ComparisonHighestHigh", "HighestHigh_threshold", "HighestHigh_threshold2", "HighestHigh1"),
-            ("Pullback", "Pullback", "Pullback_tf", "ComparisonPullback", "Pullback_threshold", "Pullback_threshold2", "Pullback1"),
-        ]
-        
-        for ind_name, window_key, tf_key, cmp_key, thresh_key, thresh2_key, alt_key in indicator_specs:
-            comparison = form.get(cmp_key, "Not used")
-            
-            if comparison == "Not used":
-                continue
-            
-            # Extract window
-            try:
-                window = int(form.get(window_key, "20"))
-            except (ValueError, TypeError):
-                window = 20
-            
-            # Extract timeframe
-            timeframe = form.get(tf_key, "1 day")
-            
-            # Extract thresholds
-            try:
-                threshold1 = float(form.get(thresh_key, "0"))
-            except (ValueError, TypeError):
-                threshold1 = 0.0
-            
-            try:
-                threshold2 = float(form.get(thresh2_key)) if form.get(thresh2_key) else None
-            except (ValueError, TypeError):
-                threshold2 = None
-            
-            # Extract alternative window (for 'between' comparisons)
-            alt_window = None
-            if comparison == "between":
-                try:
-                    alt_window = int(form.get(alt_key, window))
-                except (ValueError, TypeError):
-                    alt_window = window
-            
-            config[ind_name] = {
-                'enabled': True,
-                'timeframe': timeframe,
-                'window': window,
-                'comparison': comparison,
-                'threshold1': threshold1,
-                'threshold2': threshold2,
-                'alt_window': alt_window,
-            }
-        
-        logger.info("[INDICATOR CONFIG] Built config for %d indicators", len(config))
-        return config
-
-    def group_indicators_by_timeframe(self, indicator_config):
-        """
-        Group indicators by their required timeframe to minimize API calls.
-        
-        Returns:
-            dict: {
-                'timeframe': ['indicator1', 'indicator2', ...],
-                ...
-            }
-        
-        Example:
-            {
-                '5m': ['FastSMA', 'FastSMA1'],
-                '1d': ['SlowSMA', 'SlowEMA', 'RSI'],
-            }
-        """
-        grouped = {}
-        
-        for ind_name, ind_cfg in indicator_config.items():
-            tf = ind_cfg['timeframe']
-            if tf not in grouped:
-                grouped[tf] = []
-            grouped[tf].append(ind_name)
-        
-        logger.info("[TIMEFRAME GROUPING] %d unique timeframes: %s", len(grouped), list(grouped.keys()))
-        return grouped
-
-    def calculate_lookback_for_indicators(self, indicator_config):
-        """
-        Calculate maximum lookback window needed across all indicators for each timeframe.
-        
-        Returns:
-            dict: {
-                'timeframe': max_window_for_this_tf,
-                ...
-            }
-        """
-        timeframe_lookbacks = {}
-        
-        for ind_name, ind_cfg in indicator_config.items():
-            tf = ind_cfg['timeframe']
-            window = ind_cfg['window']
-            alt_window = ind_cfg.get('alt_window') or ind_cfg['window']
-            
-            max_window = max(window, alt_window)
-            
-            if tf not in timeframe_lookbacks:
-                timeframe_lookbacks[tf] = max_window
-            else:
-                timeframe_lookbacks[tf] = max(timeframe_lookbacks[tf], max_window)
-        
-        logger.info("[LOOKBACK CALCULATION] Per-timeframe lookbacks: %s", timeframe_lookbacks)
-        return timeframe_lookbacks
-
-    def fetch_data_for_timeframe(self, contract, timeframe, lookback_window, theid, timeframe_index):
-        """
-        Request historical data for ONE specific timeframe with caching optimization.
-        
-        Optimization Features:
-        - Check cache first (per-timeframe, TTL-controlled)
-        - Prevent duplicate in-flight requests for same symbol/timeframe
-        - Store results in cache for future reuse
-        
-        Args:
-            contract: IB Contract object
-            timeframe: str, one of '1 min', '5 min', '1 hour', '1 day'
-            lookback_window: int, number of bars to request
-            theid: int, base request ID
-            timeframe_index: int, 0-based index for this timeframe (to derive unique reqId)
-        
-        Returns:
-            int: The reqId used for this request
-        """
-        symbol = getattr(contract, 'symbol', '<unknown>')
-        
-        # ============================================================
-        # OPTIMIZATION 1: Check cache first
-        # ============================================================
-        cached_data = self.get_cached_historical_data(symbol, timeframe)
-        if cached_data is not None:
-            # Use cache instead of API call!
-            reqId = theid * 1000 + timeframe_index
-            self.HistoricalDt[reqId] = cached_data
-            self.hisdtId[reqId] = True  # mark as complete
-            logger.info(
-                "[CACHE SERVED] %s | timeframe=%s | reqId=%s | bars=%d (cache hit)",
-                symbol,
-                timeframe,
-                reqId,
-                len(cached_data)
-            )
-            return reqId
-        
-        # ============================================================
-        # OPTIMIZATION 2: Check for in-flight requests (prevent duplicates)
-        # ============================================================
-        existing_reqId = self.is_request_inflight(symbol, timeframe)
-        if existing_reqId is not None:
-            # Request already in-flight, reuse its reqId
-            self._optimization_metrics['inflight_collisions_prevented'] += 1
-            logger.info(
-                "[REUSE INFLIGHT] %s | timeframe=%s | existing_reqId=%s (avoiding duplicate API call)",
-                symbol,
-                timeframe,
-                existing_reqId
-            )
-            return existing_reqId
-        
-        # ============================================================
-        # Standard API call (not cached, not in-flight)
-        # ============================================================
-        
-        TIMEFRAME_TO_IB = {
-            "1 min": ("1 min", 60),
-            "2 min": ("2 mins", 120),
-            "5 min": ("5 mins", 300),
-            "15 min": ("15 mins", 900),
-            "1 hour": ("1 hour", 3600),
-            "1 day": ("1 day", 86400),
-            "1 year": ("1 day", 31536000),
-        }
-        
-        ib_bar_size, bar_seconds = TIMEFRAME_TO_IB.get(timeframe, ("1 day", 86400))
-        
-        # Calculate timeperiod needed to cover lookback_window bars
-        if bar_seconds < 3600:
-            # intraday minute bars
-            minutes_per_trading_day = 390
-            bars_per_day = (minutes_per_trading_day * 60) / bar_seconds
-            if bars_per_day < 1:
-                bars_per_day = 1
-            days_needed = int(math.ceil(float(lookback_window) / bars_per_day))
-            if days_needed < 1:
-                days_needed = 1
-            timeperiod = f"{days_needed} D"
-        elif ib_bar_size == "1 hour":
-            bars_per_day = 6.5
-            days_needed = int(math.ceil(float(lookback_window) / bars_per_day))
-            if days_needed < 1:
-                days_needed = 1
-            timeperiod = f"{days_needed} D"
-        else:
-            # daily bars
-            if lookback_window < 365:
-                timeperiod = f"{lookback_window} D"
-            else:
-                years = int(math.ceil(float(lookback_window) / 252.0))
-                if years < 1:
-                    years = 1
-                timeperiod = f"{years} Y"
-        
-        # Create unique request ID for this timeframe (theid_0, theid_1, etc.)
-        reqId = theid * 1000 + timeframe_index
-        
-        # Mark as in-flight before making API call
-        if not self.mark_request_inflight(symbol, timeframe, reqId):
-            # Collision detected - another request already marked as inflight
-            # Reuse that request instead
-            return self.is_request_inflight(symbol, timeframe)
-        
-        # Initialize storage
-        self.HistoricalDt[reqId] = []
-        self.hisdtId[reqId] = False
-        
-        # Store reqId -> (symbol, timeframe) mapping for later cache storage
-        self._reqid_to_symbol_tf[reqId] = (symbol, timeframe)
-        
-        logger.info(
-            "[FETCH TIMEFRAME] %s | timeframe=%s | bar_size=%s | timeperiod=%s | lookback=%s | reqId=%s",
-            symbol,
-            timeframe,
-            ib_bar_size,
-            timeperiod,
-            lookback_window,
-            reqId,
-        )
-        
-        try:
-            self.reqHistoricalData(
-                reqId,
-                contract,
-                "",
-                timeperiod,
-                ib_bar_size,
-                "TRADES",
-                0,
-                1,
-                False,
-                [],
-            )
-        except Exception as e:
-            logger.exception("Failed to request historical data for %s at %s", symbol, timeframe)
-            self.unmark_request_inflight(symbol, timeframe)
-            raise
-        
-        return reqId
-
-    def fetch_all_timeframe_data(self, contract, indicator_config, theid):
-        """
-        Request historical data for all required timeframes.
-        
-        Optimizations:
-        - Uses per-timeframe cache to avoid redundant API calls
-        - Prevents duplicate in-flight requests
-        - Applies batch delay for smoother API load
-        
-        Returns:
-            dict: {
-                'timeframe': reqId,
-                ...
-            }
-        """
-        # Use batched variant with default 100ms delay between requests
-        # This reduces burst load on IBKR API and improves overall stability
-        return self.fetch_all_timeframe_data_batched(contract, indicator_config, theid, batch_delay_ms=100)
-
-    def wait_for_all_timeframe_data(self, timeframe_to_reqid, timeout_per_tf=10.0):
-        """
-        Wait for historical data to arrive for all requested timeframes.
-        
-        Args:
-            timeframe_to_reqid: dict mapping timeframe -> reqId
-            timeout_per_tf: timeout in seconds per timeframe
-        
-        Returns:
-            dict: {
-                'timeframe': data_list,
-                ...
-            }
-        """
-        timeframe_data = {}
-        
-        for timeframe, reqId in timeframe_to_reqid.items():
-            waited = 0.0
-            while not self.hisdtId.get(reqId, False):
-                time.sleep(0.1)
-                waited += 0.1
-                if waited >= timeout_per_tf:
-                    logger.warning("[WAIT TIMEOUT] Timeframe %s (reqId %s) exceeded timeout", timeframe, reqId)
-                    break
-            
-            data = self.HistoricalDt.get(reqId, []) or []
-            timeframe_data[timeframe] = data
-            
-            logger.info("[TIMEFRAME DATA READY] %s: %d bars", timeframe, len(data))
-        
-        return timeframe_data
-
-    def compute_single_indicator(self, indicator_name, indicator_cfg, timeframe_data_df, symbol, form):
-        """
-        Compute a single indicator from its dedicated timeframe data.
-        
-        Args:
-            indicator_name: str, e.g. 'FastSMA', 'SlowEMA'
-            indicator_cfg: dict with 'window', 'alt_window', etc.
-            timeframe_data_df: pd.DataFrame with cols [date, open, high, low, close, volume]
-            symbol: str, for logging
-            form: dict, original form for extra config
-        
-        Returns:
-            dict: {
-                indicator_name: value (float or None),
-                indicator_name + '1': value (float or None) if 'between' comparison,
-            }
-        """
-        results = {}
-        
-        if timeframe_data_df.empty:
-            logger.warning("[COMPUTE FAILED] %s %s: empty dataframe", symbol, indicator_name)
-            results[indicator_name] = None
-            if indicator_cfg['comparison'] == 'between':
-                results[indicator_name + '1'] = None
-            return results
-        
-        try:
-            # Compute primary value
-            if indicator_name.startswith('FastSMA') or indicator_name.startswith('MediumSMA') or indicator_name.startswith('SlowSMA'):
-                window = indicator_cfg['window']
-                sma = SMAIndicator(close=timeframe_data_df["close"], window=window)
-                results[indicator_name] = last_value(sma.sma_indicator())
-                
-                if indicator_cfg['comparison'] == 'between':
-                    alt_window = indicator_cfg.get('alt_window', window)
-                    sma_alt = SMAIndicator(close=timeframe_data_df["close"], window=alt_window)
-                    results[indicator_name + '1'] = last_value(sma_alt.sma_indicator())
-            
-            elif indicator_name.startswith('FastEMA') or indicator_name.startswith('SlowEMA'):
-                window = indicator_cfg['window']
-                ema = EMAIndicator(close=timeframe_data_df["close"], window=window)
-                try:
-                    ema_series = ema.ema_indicator()
-                except Exception:
-                    ema_series = ema.ema()
-                results[indicator_name] = last_value(ema_series)
-                
-                if indicator_cfg['comparison'] == 'between':
-                    alt_window = indicator_cfg.get('alt_window', window)
-                    ema_alt = EMAIndicator(close=timeframe_data_df["close"], window=alt_window)
-                    try:
-                        ema_alt_series = ema_alt.ema_indicator()
-                    except Exception:
-                        ema_alt_series = ema_alt.ema()
-                    results[indicator_name + '1'] = last_value(ema_alt_series)
-            
-            elif indicator_name.startswith('VWAP'):
-                window = indicator_cfg['window']
-                vwap = VolumeWeightedAveragePrice(
-                    high=timeframe_data_df["high"],
-                    low=timeframe_data_df["low"],
-                    close=timeframe_data_df["close"],
-                    volume=timeframe_data_df["volume"],
-                    window=window,
-                )
-                results[indicator_name] = last_value(vwap.volume_weighted_average_price())
-                
-                if indicator_cfg['comparison'] == 'between':
-                    alt_window = indicator_cfg.get('alt_window', window)
-                    vwap_alt = VolumeWeightedAveragePrice(
-                        high=timeframe_data_df["high"],
-                        low=timeframe_data_df["low"],
-                        close=timeframe_data_df["close"],
-                        volume=timeframe_data_df["volume"],
-                        window=alt_window,
-                    )
-                    results[indicator_name + '1'] = last_value(vwap_alt.volume_weighted_average_price())
-            
-            elif indicator_name.startswith('RSI'):
-                window = indicator_cfg['window']
-                rsi = RSIIndicator(timeframe_data_df["close"], window=window)
-                results[indicator_name] = last_value(rsi.rsi())
-                
-                if indicator_cfg['comparison'] == 'between':
-                    alt_window = indicator_cfg.get('alt_window', window)
-                    rsi_alt = RSIIndicator(timeframe_data_df["close"], window=alt_window)
-                    results[indicator_name + '1'] = last_value(rsi_alt.rsi())
-            
-            elif indicator_name.startswith('OBV'):
-                obv = OBVIndicator(close=timeframe_data_df["close"], volume=timeframe_data_df["volume"])
-                try:
-                    obv_series = obv.on_balance_volume()
-                except Exception:
-                    try:
-                        obv_series = obv.obv()
-                    except Exception:
-                        obv_series = obv.onBalanceVolume()
-                results[indicator_name] = last_value(obv_series)
-                
-                if indicator_cfg['comparison'] == 'between':
-                    obv_alt = OBVIndicator(close=timeframe_data_df["close"], volume=timeframe_data_df["volume"])
-                    try:
-                        obv_alt_series = obv_alt.on_balance_volume()
-                    except Exception:
-                        try:
-                            obv_alt_series = obv_alt.obv()
-                        except Exception:
-                            obv_alt_series = obv_alt.onBalanceVolume()
-                    results[indicator_name + '1'] = last_value(obv_alt_series)
-            
-            elif indicator_name.startswith('ATR'):
-                window = indicator_cfg['window']
-                atr = ATRIndicator(
-                    high=timeframe_data_df["high"],
-                    low=timeframe_data_df["low"],
-                    close=timeframe_data_df["close"],
-                    window=window,
-                )
-                try:
-                    atr_series = atr.average_true_range()
-                except Exception:
-                    try:
-                        atr_series = atr.atr()
-                    except Exception:
-                        atr_series = atr.averageTrueRange()
-                results[indicator_name] = last_value(atr_series)
-                
-                if indicator_cfg['comparison'] == 'between':
-                    alt_window = indicator_cfg.get('alt_window', window)
-                    atr_alt = ATRIndicator(
-                        high=timeframe_data_df["high"],
-                        low=timeframe_data_df["low"],
-                        close=timeframe_data_df["close"],
-                        window=alt_window,
-                    )
-                    try:
-                        atr_alt_series = atr_alt.average_true_range()
-                    except Exception:
-                        try:
-                            atr_alt_series = atr_alt.atr()
-                        except Exception:
-                            atr_alt_series = atr_alt.averageTrueRange()
-                    results[indicator_name + '1'] = last_value(atr_alt_series)
-
-            elif indicator_name == 'PrevClose':
-                if len(timeframe_data_df) >= 2:
-                    results['prevClose'] = float(timeframe_data_df['close'].iloc[-2])
-                else:
-                    results['prevClose'] = None
-
-            elif indicator_name == 'LowOfDay':
-                try:
-                    results['lowOfDay'] = float(timeframe_data_df['low'].min())
-                except Exception:
-                    results['lowOfDay'] = None
-
-            elif indicator_name == 'HighOfDay':
-                try:
-                    results['highOfDay'] = float(timeframe_data_df['high'].max())
-                except Exception:
-                    results['highOfDay'] = None
-
-            elif indicator_name == 'HighestHigh':
-                try:
-                    window = indicator_cfg.get('window', 1)
-                    high_series = timeframe_data_df['high']
-                    if not high_series.empty:
-                        lookup = min(len(high_series), int(window)) if window and window > 0 else len(high_series)
-                        results['highestHigh'] = float(high_series.iloc[-lookup:].max())
-                    else:
-                        results['highestHigh'] = None
-                except Exception:
-                    results['highestHigh'] = None
-
-            elif indicator_name == 'Pullback':
-                current_close = float(timeframe_data_df['close'].iloc[-1]) if not timeframe_data_df.empty else None
-                high = float(timeframe_data_df['high'].iloc[-1]) if not timeframe_data_df.empty else None
-                prev_close = float(timeframe_data_df['close'].iloc[-2]) if len(timeframe_data_df) >= 2 else None
-
-                if prev_close is not None and high is not None and high != prev_close and current_close is not None:
-                    results['pullback'] = (high - current_close) / (high - prev_close)
-                else:
-                    results['pullback'] = None
-
-            else:
-                logger.warning("[COMPUTE] Unknown indicator: %s", indicator_name)
-                results[indicator_name] = None
-        
-        except Exception as e:
-            logger.exception("[COMPUTE FAILED] %s %s: %s", symbol, indicator_name, e)
-            results[indicator_name] = None
-            if indicator_cfg['comparison'] == 'between':
-                results[indicator_name + '1'] = None
-        
-        return results
 
     def getData(self, contract, form, theid):
         """
@@ -2128,347 +948,638 @@ class IBapi(EWrapper, EClient):
             # defensive: if contract has no symbol, skip assignment
             pass
 
-    def getIndicators(self, data, cusip, contract, form, net_position, symbol, market_data=None):
+    @staticmethod
+    def getIndicators(data, cusip, contract, form, net_position, symbol):
         """
-        NEW ARCHITECTURE: Per-indicator execution with independent timeframes.
-        
-        Each indicator runs independently with its own timeframe and historical data fetch.
-        This refactored version:
-        - Extracts indicator config from form
-        - Groups indicators by timeframe to minimize API calls
-        - Fetches data for each timeframe
-        - Computes each indicator using its dedicated timeframe data
-        - Returns dict of indicators compatible with existing signal logic
-        
-        Args:
-            data: list of bars (legacy fallback, now unused - fetched per-timeframe)
-            cusip: str
-            contract: IB Contract object
-            form: dict with indicator configuration
-            net_position: int
-            symbol: str
-            
-        Returns:
-            dict of indicators and computed values
+        Build and compute all configured indicators for one symbol.
+
+        Requirements fixed:
+        - separates full historical data (result_full) from the current session bars (result_session)
+          so session-only indicators (HighOfDay/LowOfDay/RelativeVolume/Pivot) use the correct data.
+        - pivot points are computed from the previous trading day's H/L/C.
+        - averageVolume uses daily aggregation when intraday bars are present.
+        - relativeVolume is calculated as (today cumulative volume) / (avg daily volume over lookback days)
+          which is the common market definition and matches TWS-like behaviour.
+        - defensive: attempts to parse date column into pd.Timestamp; falls back to string heuristics.
+
+        Returns dict of indicators (same keys as before).
         """
-        logger.info(
-            "[GETINDICATORS] NEW ARCHITECTURE | %s | %d primary bars (fallback)",
-            getattr(contract, "symbol", symbol),
-            len(data) if data else 0,
-        )
-        
-        # Initialize result dict with basic metadata
-        indicators = {
-            "symbol": getattr(contract, "symbol", symbol),
-            "cusip": cusip,
-            "close": None,
-            "volume": None,
-            "netPosition": int(net_position) if net_position is not None else 0,
-        }
-        
-        if not data:
-            logger.warning("[GETINDICATORS] No primary data provided for %s", symbol)
-            return indicators
-        
-        # =====================================================================
-        # STEP 1: Extract per-indicator configuration from form
-        # =====================================================================
-        indicator_config = self.build_indicator_config(form)
-        
-        if not indicator_config:
-            logger.info("[GETINDICATORS] No indicators configured for %s", symbol)
-            # Set at least close/volume from primary data and derived OHLC values
+        # --- build dataframe and normalize the datetime index ---
+        result_full = pd.DataFrame(data, columns=["date", "open", "high", "low", "close", "volume"])
+
+        # try to coerce 'date' into pandas datetime (handles ints, strings)
+        # many IB historical bars come as 'YYYYMMDD' or epoch-like ints; try both
+        def _to_datetime(x):
             try:
-                result_df = pd.DataFrame(data, columns=["date", "open", "high", "low", "close", "volume"])
-                if not result_df.empty:
-                    indicators["close"] = float(result_df["close"].iloc[-1])
-                    indicators["volume"] = float(result_df["volume"].iloc[-1])
-                    indicators["high"] = float(result_df["high"].iloc[-1])
-                    indicators["low"] = float(result_df["low"].iloc[-1])
-                    indicators["highOfDay"] = float(result_df["high"].max())
-                    indicators["lowOfDay"] = float(result_df["low"].min())
-                    indicators["prevClose"] = float(result_df["close"].iloc[-2]) if len(result_df) >= 2 else None
-                    prev_close = indicators.get("prevClose")
-                    cur_close = indicators.get("close")
-                    high_val = indicators.get("high")
-                    if prev_close is not None and high_val is not None and high_val != prev_close and cur_close is not None:
-                        indicators["pullback"] = (high_val - cur_close) / (high_val - prev_close)
-                    else:
-                        indicators["pullback"] = None
-                else:
-                    indicators["close"] = None
-                    indicators["volume"] = None
+                return pd.to_datetime(x, unit="s")
             except Exception:
                 pass
-            return indicators
-        
-        # =====================================================================
-        # STEP 2: Group indicators by timeframe
-        # =====================================================================
-        tf_grouping = self.group_indicators_by_timeframe(indicator_config)
-        logger.info("[GETINDICATORS] Grouped %d indicators into %d timeframes", 
-                   len(indicator_config), len(tf_grouping))
-        
-        # =====================================================================
-        # STEP 3: Fetch data for each timeframe (NEW: per-timeframe requests)
-        # =====================================================================
-        # Note: This is the key architectural change - each timeframe gets fresh data
-        # instead of all indicators using a single minimum timeframe
-        
-        # For now, map the incoming `data` to the finest timeframe
-        # (preserves legacy behavior as fallback)
-        finest_tf = min(tf_grouping.keys(), 
-                       key=lambda tf: self._tf_to_seconds(tf))
-        
-        timeframe_data = {finest_tf: data}
-        
-        logger.info("[GETINDICATORS] Using legacy data for fine-grained timeframes: %s", finest_tf)
-        
-        # =====================================================================
-        # STEP 4: Convert raw data to timeframe-indexed DataFrames
-        # =====================================================================
-        timeframe_dfs = {}
-        
-        for tf, bars in timeframe_data.items():
-            if not bars:
-                logger.warning("[GETINDICATORS] No bars for timeframe %s", tf)
-                timeframe_dfs[tf] = pd.DataFrame(
-                    columns=["date", "open", "high", "low", "close", "volume"]
-                )
-                continue
-            
             try:
-                df = pd.DataFrame(bars, columns=["date", "open", "high", "low", "close", "volume"])
-                
-                # Normalize datetime index
-                def _to_datetime(x):
-                    try:
-                        return pd.to_datetime(x, unit="s")
-                    except Exception:
-                        pass
-                    try:
-                        return pd.to_datetime(str(x), format="%Y%m%d", errors="coerce")
-                    except Exception:
-                        return pd.to_datetime(x, errors="coerce")
-                
-                df["ts"] = df["date"].apply(_to_datetime)
-                if df["ts"].isna().all():
-                    df["ts"] = pd.to_datetime(df["date"], errors="coerce")
-                if df["ts"].isna().any():
-                    df["ts"] = df["ts"].fillna(method="ffill").fillna(method="bfill")
-                
-                df = df.set_index("ts", drop=False).sort_index()
-                timeframe_dfs[tf] = df
-                
-                logger.info("[GETINDICATORS] Prepared %d bars for timeframe %s", len(df), tf)
-            except Exception as e:
-                logger.exception("[GETINDICATORS] Failed to prepare dataframe for timeframe %s: %s", tf, e)
-                timeframe_dfs[tf] = pd.DataFrame(
-                    columns=["date", "open", "high", "low", "close", "volume"]
-                )
-        
-        # =====================================================================
-        # STEP 5: Execute each indicator independently
-        # =====================================================================
-        for ind_name, ind_cfg in indicator_config.items():
-            tf = ind_cfg['timeframe']
-            ind_df = timeframe_dfs.get(tf)
-            
-            if ind_df is None or ind_df.empty:
-                logger.warning("[GETINDICATORS] No data for %s at timeframe %s", ind_name, tf)
-                indicators[ind_name] = None
-                if ind_cfg['comparison'] == 'between':
-                    indicators[ind_name + '1'] = None
-                continue
-            
-            # Compute single indicator from its dedicated timeframe
-            ind_results = self.compute_single_indicator(ind_name, ind_cfg, ind_df, symbol, form)
-            indicators.update(ind_results)
-        
-        # =====================================================================
-        # STEP 6: Set baseline metadata (use finest timeframe for OHLCV)
-        # =====================================================================
-        finest_df = timeframe_dfs.get(finest_tf)
-        if finest_df is not None and not finest_df.empty:
-            try:
-                last_close = float(finest_df["close"].iloc[-1])
-                last_high = float(finest_df["high"].iloc[-1])
-                last_low = float(finest_df["low"].iloc[-1])
-
-                indicators["close"] = last_close
-                indicators["volume"] = float(finest_df["volume"].iloc[-1])
-                indicators["high"] = last_high
-                indicators["low"] = last_low
-                indicators["highOfDay"] = float(finest_df["high"].max())
-                indicators["lowOfDay"] = float(finest_df["low"].min())
-                indicators["prevClose"] = float(finest_df["close"].iloc[-2]) if len(finest_df) >= 2 else None
-
-                prev_close = indicators.get("prevClose")
-                if prev_close is not None and last_high is not None and last_high != prev_close and last_close is not None:
-                    indicators["pullback"] = (last_high - last_close) / (last_high - prev_close)
-                else:
-                    indicators["pullback"] = None
+                # If it's integer like 20260217 or string '20260217'
+                return pd.to_datetime(str(x), format="%Y%m%d", errors="coerce")
             except Exception:
-                pass
-        
-        # NEW: Add normalized % change using fallback chain (market_data, last/close, OHLC)
-        try:
-            if hasattr(self, '_pct_normalizer'):
-                market_data_payload = dict(market_data or {})
-                normalized = self._pct_normalizer.normalize_market_data(
-                    market_data_payload,
-                    last_price=market_data_payload.get('last'),
-                    close_price=market_data_payload.get('close'),
-                    df=finest_df,
-                )
-                indicators['percent'] = normalized.get('percent')
-                if indicators['percent'] is not None:
-                    indicators['percent_source'] = normalized.get('percent_source', 'market_data')
-                    logger.info(
-                        "[GETINDICATORS] Added normalized percent: %.2f%% for %s (source=%s)",
-                        indicators['percent'], symbol, indicators.get('percent_source')
-                    )
-        except Exception as e:
-            logger.warning("[GETINDICATORS] Percent normalization failed for %s: %s", symbol, e)
+                return pd.to_datetime(x, errors="coerce")
 
-        # NEW: Add fixed period SMAs for crossover checks (50 & 200)
-        try:
-            if finest_df is not None and not finest_df.empty:
-                sma_50_val = last_value(SMAIndicator(close=finest_df['close'], window=50).sma_indicator())
-                sma_200_val = last_value(SMAIndicator(close=finest_df['close'], window=200).sma_indicator())
-                indicators['sma50'] = float(sma_50_val) if sma_50_val is not None else None
-                indicators['sma200'] = float(sma_200_val) if sma_200_val is not None else None
-        except Exception:
-            indicators.setdefault('sma50', None)
-            indicators.setdefault('sma200', None)
+        result_full["ts"] = result_full["date"].apply(_to_datetime)
+        # if parsing failed entirely, try a looser parse
+        if result_full["ts"].isna().all():
+            result_full["ts"] = pd.to_datetime(result_full["date"], errors="coerce")
 
-        logger.info(
-            "[GETINDICATORS COMPLETE] %s computed %d indicator values",
-            symbol,
-            sum(1 for k, v in indicators.items() if v is not None and k not in ("symbol", "cusip", "netPosition")),
-        )
+        # If still NaT, keep original 'date' as string index to preserve previous logic
+        if result_full["ts"].isna().any():
+            # best-effort: fill NaT with forward fill of last valid
+            result_full["ts"] = result_full["ts"].fillna(method="ffill").fillna(method="bfill")
 
-        return indicators
+        # set a proper datetime index
+        result_full = result_full.set_index("ts", drop=False).sort_index()
 
-    def fetch_news_for_symbol(self, symbol, limit=25, lookback_days=14):
-        """Fetch symbol news and sort most recent first.
+        # determine unique trading dates in the dataset (as date objects)
+        unique_dates = result_full.index.normalize().unique()
+        unique_dates = sorted([d for d in unique_dates if pd.notna(d)])
 
-        Uses provider configured in Config.news_api_provider (optional). If not
-        configured, returns an empty list and logs a warning.
+        # latest trading date (session we consider 'today' in this run)
+        if len(unique_dates) == 0:
+            # no usable timestamps: fallback to original behaviour using raw array
+            result = result_full.set_index("date")
+            indicators = {"volume": last_value(result.volume), "symbol": getattr(contract, "symbol", symbol),
+                          "cusip": cusip, "close": last_value(result.close) if not result.close.empty else None,
+                          "netPosition": int(net_position) if net_position is not None else 0}
+            return indicators
 
-        The returned list structure is:
-            [{"symbol": ..., "title": ..., "url": ..., "publishedAt": ..., "source": ...}, ...]
-        """
-        if not symbol:
-            return []
+        latest_date = unique_dates[-1]
+        # construct session dataframe: all rows whose normalized date == latest_date
+        mask_session = result_full.index.normalize() == latest_date
+        result_session = result_full.loc[mask_session].copy()
 
-        provider = self.config.news_api_provider.strip().lower() if getattr(self, 'config', None) else ''
-        api_key = self.config.news_api_key.strip() if getattr(self, 'config', None) else ''
+        # full history excluding incomplete current session if the user wants previous-close logic
+        result_history = result_full.copy()
 
-        if not provider or not api_key:
-            logger.warning("[NEWS] No news provider/key configured; returning empty news for %s", symbol)
-            return []
+        # --- helper: daily aggregated volumes (for averageVolume / relativeVolume) ---
+        # if data has multiple bars per date -> intraday, else daily bars
+        grouped = result_history.groupby(result_history.index.normalize())
+        daily_volume = grouped["volume"].sum()
 
-        end_date = datetime.datetime.utcnow().date()
-        start_date = end_date - datetime.timedelta(days=lookback_days)
-
-        try:
-            if provider in ('finnhub', 'finn'):
-                uri = (
-                    f"https://finnhub.io/api/v1/company-news?symbol={symbol}&from={start_date}&to={end_date}&token={api_key}"
-                )
-            elif provider in ('newsapi', 'newsapi.org'):
-                uri = (
-                    f"https://newsapi.org/v2/everything?q={urllib.parse.quote(symbol)}"
-                    f"&from={start_date}&to={end_date}&pageSize={min(limit,100)}&sortBy=publishedAt&apiKey={api_key}"
-                )
+        def _avg_daily_volume(_lookback):
+            # use last `_lookback` days available (exclude current incomplete session if it is partial)
+            days = daily_volume.copy()
+            # if latest_date is today and session may be partial, exclude it for 'average daily volume'
+            if len(days) > 1:
+                days_to_use = days.iloc[-(min(len(days) - 1, _lookback)): -0] if len(days) > 1 else days
+                # but above slicing can be empty; fallback:
+                if days_to_use.empty:
+                    days_to_use = days.iloc[-_lookback:]
             else:
-                logger.warning("[NEWS] Unsupported news provider '%s'", provider)
-                return []
+                days_to_use = days.iloc[-_lookback:]
+            if days_to_use.empty:
+                return float(np.nan)
+            return float(days_to_use.mean())
 
-            with urllib.request.urlopen(uri, timeout=20) as resp:
-                raw = resp.read().decode('utf-8', errors='ignore')
-                payload = json.loads(raw)
+        # cumulative today volume up to the last available bar in session
+        today_cum_volume = float(result_session["volume"].sum()) if not result_session.empty else float(np.nan)
 
-            articles = []
-            if provider in ('finnhub', 'finn'):
-                for art in payload or []:
-                    articles.append({
-                        'symbol': symbol,
-                        'title': art.get('headline'),
-                        'url': art.get('url'),
-                        'summary': art.get('summary'),
-                        'publishedAt': art.get('datetime'),
-                        'source': art.get('source'),
-                    })
-            elif provider in ('newsapi', 'newsapi.org'):
-                for art in payload.get('articles', [])[:limit]:
-                    articles.append({
-                        'symbol': symbol,
-                        'title': art.get('title'),
-                        'url': art.get('url'),
-                        'summary': art.get('description'),
-                        'publishedAt': art.get('publishedAt'),
-                        'source': art.get('source', {}).get('name'),
-                    })
+        # last available bar volume (including incomplete bar if present in result_session)
+        last_bar_volume = float(result_session["volume"].iloc[-1]) if not result_session.empty else float(np.nan)
 
-            def parse_date(x):
-                if x is None:
-                    return datetime.datetime.min
-                if isinstance(x, (int, float)):
-                    return datetime.datetime.utcfromtimestamp(x)
+        # --- build indicators dict (start with some safe defaults) ---
+        indicators: Dict[str, Any] = {"symbol": getattr(contract, "symbol", symbol), "cusip": cusip,
+                                      "netPosition": int(net_position) if net_position is not None else 0}
+
+        # store last close reference (if form asks for previous bar or last closed bar)
+        try:
+            if form.get("CloseBool") == "Close":
+                # reference the last available bar in the index
+                indicators["close"] = float(result_full["close"].iloc[-1])
+            else:
+                # previous close (exclude current last incomplete bar)
+                if len(result_full) >= 2:
+                    indicators["close"] = float(result_full["close"].iloc[-2])
+                else:
+                    indicators["close"] = float(result_full["close"].iloc[-1])
+        except Exception:
+            indicators["close"] = None
+
+        # --- Average volume ---
+        if form.get("ComparisonAverageVolume") != "Not used":
+            try:
+                lookback = int(form.get("AverageVolume", 14))
+            except Exception:
+                lookback = 14
+
+            # If intraday bars (more than 1 bar per day) -> compute average daily volume
+            if result_full.shape[0] > 1 and len(unique_dates) > 1 and result_full.shape[0] / max(1,
+                                                                                                 len(unique_dates)) > 1.5:
+                avg_vol = _avg_daily_volume(lookback)
+            else:
+                # data looks like daily bars: average of last `lookback` bars' volume
+                avg_vol = float(result_full["volume"].iloc[-lookback:].mean()) if result_full.shape[0] >= 1 else float(
+                    np.nan)
+
+            indicators["averageVolume"] = avg_vol
+
+            if form.get("ComparisonAverageVolume") == "between":
                 try:
-                    return datetime.datetime.fromisoformat(str(x).replace('Z', '+00:00'))
+                    lookback1 = int(form.get("AverageVolume1", lookback))
+                except Exception:
+                    lookback1 = lookback
+                if result_full.shape[0] > 1 and len(unique_dates) > 1 and result_full.shape[0] / max(1,
+                                                                                                     len(unique_dates)) > 1.5:
+                    avg_vol1 = _avg_daily_volume(lookback1)
+                else:
+                    avg_vol1 = float(result_full["volume"].iloc[-lookback1:].mean()) if result_full.shape[
+                                                                                            0] >= 1 else float(np.nan)
+                indicators["averageVolume1"] = avg_vol1
+
+        # --- Relative volume ---
+        if form.get("ComparisonRelativeVolume") != "Not used":
+            try:
+                rv_lookback = int(form.get("RelativeVolume", 5))
+            except Exception:
+                rv_lookback = 5
+
+            # Definition: relativeVolume = today's cumulative volume / average daily volume (last N days)
+            avg_daily = _avg_daily_volume(rv_lookback)
+            if avg_daily and not np.isnan(avg_daily) and avg_daily > 0:
+                rel_vol = today_cum_volume / avg_daily if not np.isnan(today_cum_volume) else float(np.nan)
+            else:
+                # fallback: last bar vs average bar volume
+                avg_bar = float(result_full["volume"].iloc[-rv_lookback:].mean()) if result_full.shape[
+                                                                                         0] >= 1 else float(np.nan)
+                rel_vol = last_bar_volume / avg_bar if avg_bar and avg_bar > 0 else float(np.nan)
+
+            indicators["relativeVolume"] = rel_vol
+
+            if form.get("ComparisonRelativeVolume") == "between":
+                try:
+                    rv_lookback1 = int(form.get("RelativeVolume1", rv_lookback))
+                except Exception:
+                    rv_lookback1 = rv_lookback
+                avg_daily1 = _avg_daily_volume(rv_lookback1)
+                if avg_daily1 and not np.isnan(avg_daily1) and avg_daily1 > 0:
+                    # we compare today's cum volume to avg_daily1
+                    rel_vol1 = today_cum_volume / avg_daily1 if not np.isnan(today_cum_volume) else float(np.nan)
+                else:
+                    avg_bar1 = float(result_full["volume"].iloc[-rv_lookback1:].mean()) if result_full.shape[
+                                                                                               0] >= 1 else float(
+                        np.nan)
+                    rel_vol1 = last_bar_volume / avg_bar1 if avg_bar1 and avg_bar1 > 0 else float(np.nan)
+                indicators["relativeVolume1"] = rel_vol1
+
+        # --- Price level (last close) ---
+        if form.get("ComparisonPrice") != "Not used":
+            # prefer last closed bar (if session incomplete and user requested previous close logic this was handled above)
+            indicators["priceLevel"] = indicators.get("close")
+
+        # --- VWAP ---
+        if form.get("ComparisonVWAP") != "Not used":
+            try:
+                w = int(form.get("VWAP", 20))
+            except Exception:
+                w = 20
+            try:
+                vwap = VolumeWeightedAveragePrice(
+                    high=result_full["high"],
+                    low=result_full["low"],
+                    close=result_full["close"],
+                    volume=result_full["volume"],
+                    window=w,
+                )
+                indicators["vwap"] = last_value(vwap.volume_weighted_average_price())
+            except Exception:
+                indicators["vwap"] = None
+
+            if form.get("ComparisonVWAP") == "between":
+                try:
+                    w1 = int(form.get("VWAP1", w))
+                except Exception:
+                    w1 = w
+                try:
+                    vwap1 = VolumeWeightedAveragePrice(
+                        high=result_full["high"],
+                        low=result_full["low"],
+                        close=result_full["close"],
+                        volume=result_full["volume"],
+                        window=w1,
+                    )
+                    indicators["vwap1"] = last_value(vwap1.volume_weighted_average_price())
+                except Exception:
+                    indicators["vwap1"] = None
+
+        # --- Fast SMA ---
+        if form.get("ComparisonFastSMA") != "Not used":
+            try:
+                w = int(form.get("FastSMA", 10))
+            except Exception:
+                w = 10
+            try:
+                sma_fast = SMAIndicator(close=result_full["close"], window=w)
+                indicators["smaFast"] = last_value(sma_fast.sma_indicator())
+            except Exception:
+                indicators["smaFast"] = None
+
+            if form.get("ComparisonFastSMA") == "between":
+                try:
+                    w1 = int(form.get("FastSMA1", w))
+                except Exception:
+                    w1 = w
+                try:
+                    sma_fast1 = SMAIndicator(close=result_full["close"], window=w1)
+                    indicators["smaFast1"] = last_value(sma_fast1.sma_indicator())
+                except Exception:
+                    indicators["smaFast1"] = None
+
+        # --- Medium SMA ---
+        if form.get("ComparisonMediumSMA") != "Not used":
+            try:
+                w = int(form.get("MediumSMA", 10))
+            except Exception:
+                w = 10
+            try:
+                sma_medium = SMAIndicator(close=result_full["close"], window=w)
+                indicators["smaMedium"] = last_value(sma_medium.sma_indicator())
+            except Exception:
+                indicators["smaMedium"] = None
+
+            if form.get("ComparisonMediumSMA") == "between":
+                try:
+                    w1 = int(form.get("MediumSMA1", w))
+                except Exception:
+                    w1 = w
+                try:
+                    sma_medium1 = SMAIndicator(close=result_full["close"], window=w1)
+                    indicators["smaMedium1"] = last_value(sma_medium1.sma_indicator())
+                except Exception:
+                    indicators["smaMedium1"] = None
+
+        # --- Slow SMA ---
+        if form.get("ComparisonSlowSMA") != "Not used":
+            try:
+                w = int(form.get("SlowSMA", 50))
+            except Exception:
+                w = 50
+            try:
+                sma_slow = SMAIndicator(close=result_full["close"], window=w)
+                indicators["smaSlow"] = last_value(sma_slow.sma_indicator())
+            except Exception:
+                indicators["smaSlow"] = None
+
+            if form.get("ComparisonSlowSMA") == "between":
+                try:
+                    w1 = int(form.get("SlowSMA1", w))
+                except Exception:
+                    w1 = w
+                try:
+                    sma_slow1 = SMAIndicator(close=result_full["close"], window=w1)
+                    indicators["smaSlow1"] = last_value(sma_slow1.sma_indicator())
+                except Exception:
+                    indicators["smaSlow1"] = None
+
+        # --- RSI ---
+        if form.get("ComparisonRSI") != "Not used":
+            try:
+                w = int(form.get("RSI", 14))
+            except Exception:
+                w = 14
+            try:
+                rsi = RSIIndicator(result_full["close"], window=w)
+                indicators["rsi"] = last_value(rsi.rsi())
+            except Exception:
+                indicators["rsi"] = None
+
+            if form.get("ComparisonRSI") == "between":
+                try:
+                    w1 = int(form.get("RSI1", w))
+                except Exception:
+                    w1 = w
+                try:
+                    rsi1 = RSIIndicator(result_full["close"], window=w1)
+                    indicators["rsi1"] = last_value(rsi1.rsi())
+                except Exception:
+                    indicators["rsi1"] = None
+
+        # --- Fast EMA ---
+        if form.get("ComparisonFastEMA", "Not used") != "Not used":
+            try:
+                w = int(form.get("FastEMA", 21))
+            except Exception:
+                w = 21
+            try:
+                emaFast = EMAIndicator(close=result_full["close"], window=w)
+                try:
+                    emaFast_series = emaFast.ema_indicator()
+                except Exception:
+                    emaFast_series = emaFast.ema()
+                indicators["emaFast"] = last_value(emaFast_series)
+            except Exception:
+                indicators["emaFast"] = None
+
+            if form.get("ComparisonFastEMA") == "between":
+                try:
+                    w1 = int(form.get("FastEMA1", w))
+                except Exception:
+                    w1 = w
+                try:
+                    emaFast1 = EMAIndicator(close=result_full["close"], window=w1)
+                    try:
+                        emaFast1_series = emaFast1.ema_indicator()
+                    except Exception:
+                        emaFast1_series = emaFast1.ema()
+                    indicators["emaFast1"] = last_value(emaFast1_series)
+                except Exception:
+                    indicators["emaFast1"] = None
+
+        # --- Slow EMA ---
+        if form.get("ComparisonSlowEMA", "Not used") != "Not used":
+            try:
+                w = int(form.get("SlowEMA", 21))
+            except Exception:
+                w = 21
+            try:
+                emaSlow = EMAIndicator(close=result_full["close"], window=w)
+                try:
+                    emaSlow_series = emaSlow.ema_indicator()
+                except Exception:
+                    emaSlow_series = emaSlow.ema()
+                indicators["emaSlow"] = last_value(emaSlow_series)
+            except Exception:
+                indicators["emaSlow"] = None
+
+            if form.get("ComparisonSlowEMA") == "between":
+                try:
+                    w1 = int(form.get("SlowEMA1", w))
+                except Exception:
+                    w1 = w
+                try:
+                    emaSlow1 = EMAIndicator(close=result_full["close"], window=w1)
+                    try:
+                        emaSlow1_series = emaSlow1.ema_indicator()
+                    except Exception:
+                        emaSlow1_series = emaSlow1.ema()
+                    indicators["emaSlow1"] = last_value(emaSlow1_series)
+                except Exception:
+                    indicators["emaSlow1"] = None
+
+        # --- OBV ---
+        if form.get("ComparisonOBV", "Not used") != "Not used":
+            try:
+                obv = OBVIndicator(close=result_full["close"], volume=result_full["volume"])
+                try:
+                    obv_series = obv.on_balance_volume()
                 except Exception:
                     try:
-                        return datetime.datetime.strptime(str(x), '%Y-%m-%dT%H:%M:%S%z')
+                        obv_series = obv.obv()
                     except Exception:
-                        return datetime.datetime.min
+                        obv_series = obv.onBalanceVolume()
+                indicators["obv"] = last_value(obv_series)
+            except Exception:
+                indicators["obv"] = None
 
-            articles_sorted = sorted(
-                articles,
-                key=lambda item: parse_date(item.get('publishedAt')),
-                reverse=True,
-            )
+            if form.get("ComparisonOBV") == "between":
+                try:
+                    obv1 = OBVIndicator(close=result_full["close"], volume=result_full["volume"])
+                    try:
+                        obv1_series = obv1.on_balance_volume()
+                    except Exception:
+                        try:
+                            obv1_series = obv1.obv()
+                        except Exception:
+                            obv1_series = obv1.onBalanceVolume()
+                    indicators["obv1"] = last_value(obv1_series)
+                except Exception:
+                    indicators["obv1"] = None
 
-            return articles_sorted[:limit]
+        # --- ATR ---
+        if form.get("ComparisonATR", "Not used") != "Not used":
+            try:
+                w = int(form.get("ATR", 14))
+            except Exception:
+                w = 14
+            try:
+                atr = ATRIndicator(high=result_full["high"], low=result_full["low"], close=result_full["close"],
+                                   window=w)
+                try:
+                    atr_series = atr.average_true_range()
+                except Exception:
+                    try:
+                        atr_series = atr.atr()
+                    except Exception:
+                        atr_series = atr.averageTrueRange()
+                indicators["atr"] = last_value(atr_series)
+            except Exception:
+                indicators["atr"] = None
 
-        except Exception as e:
-            logger.warning('[NEWS] Failed fetching news for %s: %s', symbol, e)
-            return []
+            if form.get("ComparisonATR") == "between":
+                try:
+                    w1 = int(form.get("ATR1", w))
+                except Exception:
+                    w1 = w
+                try:
+                    atr1 = ATRIndicator(high=result_full["high"], low=result_full["low"], close=result_full["close"],
+                                        window=w1)
+                    try:
+                        atr1_series = atr1.average_true_range()
+                    except Exception:
+                        try:
+                            atr1_series = atr1.atr()
+                        except Exception:
+                            atr1_series = atr1.averageTrueRange()
+                    indicators["atr1"] = last_value(atr1_series)
+                except Exception:
+                    indicators["atr1"] = None
 
-    @staticmethod
-    def _tf_to_seconds(timeframe_str):
-        """Convert timeframe string to seconds for comparison."""
-        tf_map = {
-            "1 min": 60,
-            "2 min": 120,
-            "5 min": 300,
-            "15 min": 900,
-            "1 hour": 3600,
-            "1 day": 86400,
-            "1 year": 31536000,
-        }
-        return tf_map.get(timeframe_str, 86400)
+        # --- Previous Close (explicit) ---
+        if form.get("ComparisonPrevClose", "Not used") != "Not used":
+            try:
+                # previous session close = last bar close from previous date (not the current session)
+                if len(unique_dates) >= 2:
+                    prev_date = unique_dates[-2]
+                    prev_mask = result_full.index.normalize() == prev_date
+                    prev_close = float(result_full.loc[prev_mask]["close"].iloc[-1])
+                else:
+                    prev_close = float(result_full["close"].iloc[-2]) if len(result_full) >= 2 else float(
+                        result_full["close"].iloc[-1])
+                indicators["prevClose"] = prev_close
+                if form.get("ComparisonPrevClose") == "between":
+                    indicators["prevClose1"] = prev_close
+            except Exception:
+                indicators["prevClose"] = None
 
-    @staticmethod
-    def _parse_datetime(x):
-        """Parse various datetime formats robustly."""
+        # --- LowOfDay / HighOfDay (session-only) ---
+        if form.get("ComparisonLowOfDay", "Not used") != "Not used":
+            try:
+                if not result_session.empty:
+                    low_of_day = float(result_session["low"].min())
+                else:
+                    # fallback to last available low
+                    low_of_day = float(result_full["low"].iloc[-1])
+                indicators["lowOfDay"] = low_of_day
+                if form.get("ComparisonLowOfDay") == "between":
+                    indicators["lowOfDay1"] = low_of_day
+            except Exception:
+                indicators["lowOfDay"] = None
+
+        if form.get("ComparisonHighOfDay", "Not used") != "Not used":
+            try:
+                if not result_session.empty:
+                    high_of_day = float(result_session["high"].max())
+                else:
+                    high_of_day = float(result_full["high"].iloc[-1])
+                indicators["highOfDay"] = high_of_day
+                if form.get("ComparisonHighOfDay") == "between":
+                    indicators["highOfDay1"] = high_of_day
+            except Exception:
+                indicators["highOfDay"] = None
+
+        # --- Pivot points: compute from previous trading day H/L/C (classical pivots) ---
+        # Classic pivot formulas:
+        # P  = (H + L + C) / 3
+        # R1 = (2 * P) - L
+        # S1 = (2 * P) - H
+        # R2 = P + (H - L)
+        # S2 = P - (H - L)
+        if form.get("ComparisonPivotPoint") != "Not used":
+            try:
+                if len(unique_dates) >= 2:
+                    prev_date = unique_dates[-2]
+                    prev_mask = result_full.index.normalize() == prev_date
+                    prev_df = result_full.loc[prev_mask]
+                    prev_h = float(prev_df["high"].max())
+                    prev_l = float(prev_df["low"].min())
+                    prev_c = float(prev_df["close"].iloc[-1])
+                else:
+                    # fallback to last full bar as previous day
+                    prev_h = float(result_full["high"].iloc[-2]) if len(result_full) >= 2 else float(
+                        result_full["high"].iloc[-1])
+                    prev_l = float(result_full["low"].iloc[-2]) if len(result_full) >= 2 else float(
+                        result_full["low"].iloc[-1])
+                    prev_c = float(result_full["close"].iloc[-2]) if len(result_full) >= 2 else float(
+                        result_full["close"].iloc[-1])
+
+                P = (prev_h + prev_l + prev_c) / 3.0
+                R1 = (2 * P) - prev_l
+                S1 = (2 * P) - prev_h
+                R2 = P + (prev_h - prev_l)
+                S2 = P - (prev_h - prev_l)
+
+                pivots = {
+                    "Pivot": P,
+                    "R1": R1,
+                    "S1": S1,
+                    "R2": R2,
+                    "S2": S2,
+                }
+
+                # user selects which pivot to use via form["PivotPoint"]; map common names
+                pp_name = form.get("PivotPoint", "Pivot")
+                # try to return requested pivot value, otherwise return the main pivot
+                val = pivots.get(pp_name, P)
+                indicators["Pivot"] = {pp_name: val}
+
+                if form.get("ComparisonPivotPoint") == "between":
+                    pp_name1 = form.get("PivotPoint1", pp_name)
+                    val1 = pivots.get(pp_name1, P)
+                    indicators["Pivot1"] = {pp_name1: val1}
+            except Exception:
+                indicators["Pivot"] = {}
+                indicators["Pivot1"] = {}
+
+        # --- Cross 50 SMA (daily) ---
+        if form.get("ComparisonCross50SMA", "Not used") != "Not used":
+            try:
+                sma_50 = SMAIndicator(close=result_full["close"], window=50)
+                sma_50_series = sma_50.sma_indicator()
+                if len(sma_50_series) >= 2 and len(result_full["close"]) >= 2:
+                    prev_close = float(result_full["close"].iloc[-2])
+                    curr_close = float(result_full["close"].iloc[-1])
+                    prev_sma50 = float(sma_50_series.iloc[-2])
+                    curr_sma50 = float(sma_50_series.iloc[-1])
+                    crossed_above = (prev_close < prev_sma50) and (curr_close > curr_sma50)
+                    crossed_below = (prev_close > prev_sma50) and (curr_close < curr_sma50)
+                    indicators["cross50SMA_above"] = crossed_above
+                    indicators["cross50SMA_below"] = crossed_below
+                    indicators["cross50SMA_either"] = crossed_above or crossed_below
+                    # within % of 50 SMA: how far current close is from 50 SMA
+                    indicators["cross50SMA_value"] = curr_sma50
+                    if curr_sma50 != 0:
+                        indicators["cross50SMA_pctFromSMA"] = ((curr_close - curr_sma50) / curr_sma50) * 100.0
+                    else:
+                        indicators["cross50SMA_pctFromSMA"] = None
+                else:
+                    indicators["cross50SMA_above"] = False
+                    indicators["cross50SMA_below"] = False
+                    indicators["cross50SMA_either"] = False
+                    indicators["cross50SMA_value"] = None
+                    indicators["cross50SMA_pctFromSMA"] = None
+            except Exception:
+                indicators["cross50SMA_above"] = False
+                indicators["cross50SMA_below"] = False
+                indicators["cross50SMA_either"] = False
+                indicators["cross50SMA_value"] = None
+                indicators["cross50SMA_pctFromSMA"] = None
+
+        # --- Cross Above 200 SMA (daily) ---
+        if form.get("ComparisonCrossAbove200SMA", "Not used") != "Not used":
+            try:
+                sma_200 = SMAIndicator(close=result_full["close"], window=200)
+                sma_200_series = sma_200.sma_indicator()
+                if len(sma_200_series) >= 2 and len(result_full["close"]) >= 2:
+                    prev_close = float(result_full["close"].iloc[-2])
+                    curr_close = float(result_full["close"].iloc[-1])
+                    prev_sma = float(sma_200_series.iloc[-2])
+                    curr_sma = float(sma_200_series.iloc[-1])
+                    indicators["crossAbove200SMA"] = (prev_close < prev_sma) and (curr_close > curr_sma)
+                    # within % of 200 SMA
+                    indicators["cross200SMA_value"] = curr_sma
+                    if curr_sma != 0:
+                        indicators["cross200SMA_pctFromSMA"] = ((curr_close - curr_sma) / curr_sma) * 100.0
+                    else:
+                        indicators["cross200SMA_pctFromSMA"] = None
+                else:
+                    indicators["crossAbove200SMA"] = False
+                    indicators["cross200SMA_value"] = None
+                    indicators["cross200SMA_pctFromSMA"] = None
+            except Exception:
+                indicators["crossAbove200SMA"] = False
+                indicators["cross200SMA_value"] = None
+                indicators["cross200SMA_pctFromSMA"] = None
+
+        # --- Break High (recent X-day high) ---
+        if form.get("ComparisonBreakHigh", "Not used") != "Not used":
+            try:
+                lookback_days = int(form.get("BreakHigh", 5))
+            except Exception:
+                lookback_days = 5
+            try:
+                # use daily highs: group by date, take max high per day
+                daily_highs = result_full.groupby(result_full.index.normalize())["high"].max()
+                # exclude today (last date) to get the *previous* X days' high
+                if len(daily_highs) > 1:
+                    past_highs = daily_highs.iloc[-(lookback_days + 1):-1]
+                else:
+                    past_highs = daily_highs.iloc[-lookback_days:]
+                if not past_highs.empty:
+                    indicators["breakHigh"] = float(past_highs.max())
+                else:
+                    indicators["breakHigh"] = None
+            except Exception:
+                indicators["breakHigh"] = None
+
+            if form.get("ComparisonBreakHigh") == "between":
+                indicators["breakHigh1"] = indicators.get("breakHigh")
+
+        # --- final housekeeping ---
+        # ensure volume metadata
         try:
-            return pd.to_datetime(x, unit="s")
+            indicators["volume"] = float(result_session["volume"].iloc[-1]) if not result_session.empty else float(
+                result_full["volume"].iloc[-1])
         except Exception:
-            pass
-        try:
-            return pd.to_datetime(str(x), format="%Y%m%d", errors="coerce")
-        except Exception:
-            return pd.to_datetime(x, errors="coerce")
+            indicators["volume"] = None
+
+        return indicators
 
     def buySellSignalCheck(self, data, form):
         condition = True
         counting_ = 0
-        
-        # Dictionary to track individual condition statuses for visual feedback
-        conditions_status = {}
+        variable_results = {}  # track pass/fail per variable
 
         # -------------------------
         # AVERAGE VOLUME
@@ -2541,24 +1652,35 @@ class IBapi(EWrapper, EClient):
                 )
 
         if zero_condition is not None:
-            conditions_status['AverageVolume'] = zero_condition
             condition = condition and zero_condition
             counting_ += 1
+            variable_results["averageVolume"] = bool(zero_condition)
 
         # -------------------------
         # PRICE LEVEL
         # -------------------------
-        price_condition = absolute_cond(
-            data.get("close"),
-            form.get("ComparisonPrice", "Not used"),
-            form.get("PercentagePrice"),
-            form.get("PercentagePrice1"),
-        )
+        price_condition = None
+
+        if form["ComparisonPrice"] not in ("Not used", "between"):
+            if form["ComparisonPrice"] == "greater":
+                price_condition = _safe_compare(data.get("close"), ">", float(form["PercentagePrice"]))
+            elif form["ComparisonPrice"] == "greaterEqual":
+                price_condition = _safe_compare(data.get("close"), ">=", float(form["PercentagePrice"]))
+            elif form["ComparisonPrice"] == "lower":
+                price_condition = _safe_compare(data.get("close"), "<", float(form["PercentagePrice"]))
+            elif form["ComparisonPrice"] == "lowerEqual":
+                price_condition = _safe_compare(data.get("close"), "<=", float(form["PercentagePrice"]))
+
+        elif form["ComparisonPrice"] == "between":
+            price_condition = (
+                    _safe_compare(data.get("close"), ">", float(form["PercentagePrice"]))
+                    and _safe_compare(data.get("close"), "<", float(form["PercentagePrice1"]))
+            )
 
         if price_condition is not None:
-            conditions_status['Price'] = price_condition
             condition = condition and price_condition
             counting_ += 1
+            variable_results["close"] = bool(price_condition)
 
         # -------------------------
         # VWAP
@@ -2625,9 +1747,9 @@ class IBapi(EWrapper, EClient):
             )
 
         if vwap_condition is not None:
-            conditions_status['VWAP'] = vwap_condition
             condition = condition and vwap_condition
             counting_ += 1
+            variable_results["vwap"] = bool(vwap_condition)
 
         # -------------------------
         # FAST SMA
@@ -2702,9 +1824,9 @@ class IBapi(EWrapper, EClient):
             )
 
         if fast_sma_condition is not None:
-            conditions_status['FastSMA'] = fast_sma_condition
             condition = condition and fast_sma_condition
             counting_ += 1
+            variable_results["smaFast"] = bool(fast_sma_condition)
 
         # -------------------------
         # MEDIUM SMA
@@ -2779,9 +1901,9 @@ class IBapi(EWrapper, EClient):
             )
 
         if medium_sma_condition is not None:
-            conditions_status['MediumSMA'] = medium_sma_condition
             condition = condition and medium_sma_condition
             counting_ += 1
+            variable_results["smaMedium"] = bool(medium_sma_condition)
 
         # -------------------------
         # SLOW SMA
@@ -2856,9 +1978,9 @@ class IBapi(EWrapper, EClient):
             )
 
         if slow_sma_condition is not None:
-            conditions_status['SlowSMA'] = slow_sma_condition
             condition = condition and slow_sma_condition
             counting_ += 1
+            variable_results["smaSlow"] = bool(slow_sma_condition)
 
         # -------------------------
         # RSI
@@ -2882,9 +2004,9 @@ class IBapi(EWrapper, EClient):
             )
 
         if rsi_condition is not None:
-            conditions_status['RSI'] = rsi_condition
             condition = condition and rsi_condition
             counting_ += 1
+            variable_results["rsi"] = bool(rsi_condition)
 
         # -------------------------
         # FAST EMA
@@ -2907,9 +2029,9 @@ class IBapi(EWrapper, EClient):
             )
 
         if emaFast_condition is not None:
-            conditions_status['FastEMA'] = emaFast_condition
             condition = condition and emaFast_condition
             counting_ += 1
+            variable_results["emaFast"] = bool(emaFast_condition)
 
         # -------------------------
         # SLOW EMA
@@ -2932,9 +2054,9 @@ class IBapi(EWrapper, EClient):
             )
 
         if emaSlow_condition is not None:
-            conditions_status['SlowEMA'] = emaSlow_condition
             condition = condition and emaSlow_condition
             counting_ += 1
+            variable_results["emaSlow"] = bool(emaSlow_condition)
 
         # -------------------------
         # OBV
@@ -2957,9 +2079,9 @@ class IBapi(EWrapper, EClient):
             )
 
         if obv_condition is not None:
-            conditions_status['OBV'] = obv_condition
             condition = condition and obv_condition
             counting_ += 1
+            variable_results["obv"] = bool(obv_condition)
 
         # -------------------------
         # ATR
@@ -2982,256 +2104,262 @@ class IBapi(EWrapper, EClient):
             )
 
         if atr_condition is not None:
-            conditions_status['ATR'] = atr_condition
             condition = condition and atr_condition
             counting_ += 1
+            variable_results["atr"] = bool(atr_condition)
 
         # -------------------------
         # PREVIOUS CLOSE
         # -------------------------
         prev_condition = None
 
-        if form.get("PrevCloseBool") == "percentage":
-            prev_condition = percent_cond(
-                data.get("close"),
-                form.get("ComparisonPrevClose", "Not used"),
-                data.get("prevClose"),
-                form.get("PercentagePrevClose"),
-                form.get("PercentagePrevClose1"),
-            )
+        if (form.get("ComparisonPrevClose", "Not used") not in ("Not used", "between") and
+                form["PrevCloseBool"] == "percentage"):
+            v = data.get("prevClose")
+            if v is None:
+                prev_condition = False
+            else:
+                base = v * (1.0 + float(form["PercentagePrevClose"]) / 100.0)
+                if form["ComparisonPrevClose"] == "greater":
+                    prev_condition = _safe_compare(data.get("close"), ">", base)
+                elif form["ComparisonPrevClose"] == "greaterEqual":
+                    prev_condition = _safe_compare(data.get("close"), ">=", base)
+                elif form["ComparisonPrevClose"] == "lower":
+                    prev_condition = _safe_compare(data.get("close"), "<", base)
+                elif form["ComparisonPrevClose"] == "lowerEqual":
+                    prev_condition = _safe_compare(data.get("close"), "<=", base)
 
-        elif form.get("PrevCloseBool") == "value":
-            prev_condition = absolute_cond(
-                data.get("prevClose"),
-                form.get("ComparisonPrevClose", "Not used"),
-                form.get("PercentagePrevClose"),
-                form.get("PercentagePrevClose1"),
+        elif form.get("ComparisonPrevClose", "") == "between" and form["PrevCloseBool"] == "percentage":
+            v = data.get("prevClose")
+            v1 = data.get("prevClose1")
+            if v is None or v1 is None:
+                prev_condition = False
+            else:
+                base = v * (1.0 + float(form["PercentagePrevClose"]) / 100.0)
+                base1 = v1 * (1.0 + float(form["PercentagePrevClose1"]) / 100.0)
+                prev_condition = (
+                        _safe_compare(data.get("close"), ">=", base)
+                        and _safe_compare(data.get("close"), "<=", base1)
+                )
+
+        elif (form.get("ComparisonPrevClose", "Not used") not in ("Not used", "between") and
+              form["PrevCloseBool"] == "value"):
+            if form["ComparisonPrevClose"] == "greater":
+                prev_condition = _safe_compare(data.get("prevClose"), ">", float(form["PercentagePrevClose"]))
+            elif form["ComparisonPrevClose"] == "greaterEqual":
+                prev_condition = _safe_compare(data.get("prevClose"), ">=", float(form["PercentagePrevClose"]))
+            elif form["ComparisonPrevClose"] == "lower":
+                prev_condition = _safe_compare(data.get("prevClose"), "<", float(form["PercentagePrevClose"]))
+            elif form["ComparisonPrevClose"] == "lowerEqual":
+                prev_condition = _safe_compare(data.get("prevClose"), "<=", float(form["PercentagePrevClose"]))
+        elif form.get("ComparisonPrevClose", "") == "between" and form["PrevCloseBool"] == "value":
+            prev_condition = (
+                    _safe_compare(data.get("prevClose"), ">=", float(form["PercentagePrevClose"]))
+                    and _safe_compare(data.get("prevClose1"), "<=", float(form["PercentagePrevClose1"]))
             )
 
         if prev_condition is not None:
-            conditions_status['PrevClose'] = prev_condition
             condition = condition and prev_condition
             counting_ += 1
+            variable_results["prevClose"] = bool(prev_condition)
 
         # -------------------------
         # LOW OF DAY
         # -------------------------
         low_condition = None
 
-        if form.get("LowOfDayBool") == "percentage":
-            low_condition = percent_cond(
-                data.get("close"),
-                form.get("ComparisonLowOfDay", "Not used"),
-                data.get("lowOfDay"),
-                form.get("PercentageLowOfDay"),
-                form.get("PercentageLowOfDay1"),
-            )
+        if (form.get("ComparisonLowOfDay", "Not used") not in ("Not used", "between") and
+                form["LowOfDayBool"] == "percentage"):
+            v = data.get("lowOfDay")
+            if v is None:
+                low_condition = False
+            else:
+                base = v * (1.0 + float(form["PercentageLowOfDay"]) / 100.0)
+                if form["ComparisonLowOfDay"] == "greater":
+                    low_condition = _safe_compare(data.get("close"), ">", base)
+                elif form["ComparisonLowOfDay"] == "greaterEqual":
+                    low_condition = _safe_compare(data.get("close"), ">=", base)
+                elif form["ComparisonLowOfDay"] == "lower":
+                    low_condition = _safe_compare(data.get("close"), "<", base)
+                elif form["ComparisonLowOfDay"] == "lowerEqual":
+                    low_condition = _safe_compare(data.get("close"), "<=", base)
 
-        elif form.get("LowOfDayBool") == "value":
-            low_condition = absolute_cond(
-                data.get("lowOfDay"),
-                form.get("ComparisonLowOfDay", "Not used"),
-                form.get("PercentageLowOfDay"),
-                form.get("PercentageLowOfDay1"),
+        elif form.get("ComparisonLowOfDay", "") == "between" and form["LowOfDayBool"] == "percentage":
+            v = data.get("lowOfDay")
+            v1 = data.get("lowOfDay1")
+            if v is None or v1 is None:
+                low_condition = False
+            else:
+                base = v * (1.0 + float(form["PercentageLowOfDay"]) / 100.0)
+                base1 = v1 * (1.0 + float(form["PercentageLowOfDay1"]) / 100.0)
+                low_condition = (
+                        _safe_compare(data.get("close"), ">=", base)
+                        and _safe_compare(data.get("close"), "<=", base1)
+                )
+
+        elif (form.get("ComparisonLowOfDay", "Not used") not in ("Not used", "between") and
+              form["LowOfDayBool"] == "value"):
+            if form["ComparisonLowOfDay"] == "greater":
+                low_condition = _safe_compare(data.get("lowOfDay"), ">", float(form["PercentageLowOfDay"]))
+            elif form["ComparisonLowOfDay"] == "greaterEqual":
+                low_condition = _safe_compare(data.get("lowOfDay"), ">=", float(form["PercentageLowOfDay"]))
+            elif form["ComparisonLowOfDay"] == "lower":
+                low_condition = _safe_compare(data.get("lowOfDay"), "<", float(form["PercentageLowOfDay"]))
+            elif form["ComparisonLowOfDay"] == "lowerEqual":
+                low_condition = _safe_compare(data.get("lowOfDay"), "<=", float(form["PercentageLowOfDay"]))
+        elif form.get("ComparisonLowOfDay", "") == "between" and form["LowOfDayBool"] == "value":
+            low_condition = (
+                    _safe_compare(data.get("lowOfDay"), ">=", float(form["PercentageLowOfDay"]))
+                    and _safe_compare(data.get("lowOfDay1"), "<=", float(form["PercentageLowOfDay1"]))
             )
 
         if low_condition is not None:
-            conditions_status['LowOfDay'] = low_condition
             condition = condition and low_condition
             counting_ += 1
+            variable_results["lowOfDay"] = bool(low_condition)
 
         # -------------------------
         # HIGH OF DAY
         # -------------------------
         high_condition = None
 
-        if form.get("HighOfDayBool") == "percentage":
-            high_condition = percent_cond(
-                data.get("close"),
-                form.get("ComparisonHighOfDay", "Not used"),
-                data.get("highOfDay"),
-                form.get("PercentageHighOfDay"),
-                form.get("PercentageHighOfDay1"),
-            )
+        if (form.get("ComparisonHighOfDay", "Not used") not in ("Not used", "between") and
+                form["HighOfDayBool"] == "percentage"):
+            v = data.get("highOfDay")
+            if v is None:
+                high_condition = False
+            else:
+                base = v * (1.0 + float(form["PercentageHighOfDay"]) / 100.0)
+                if form["ComparisonHighOfDay"] == "greater":
+                    high_condition = _safe_compare(data.get("close"), ">", base)
+                elif form["ComparisonHighOfDay"] == "greaterEqual":
+                    high_condition = _safe_compare(data.get("close"), ">=", base)
+                elif form["ComparisonHighOfDay"] == "lower":
+                    high_condition = _safe_compare(data.get("close"), "<", base)
+                elif form["ComparisonHighOfDay"] == "lowerEqual":
+                    high_condition = _safe_compare(data.get("close"), "<=", base)
 
-        elif form.get("HighOfDayBool") == "value":
-            high_condition = absolute_cond(
-                data.get("highOfDay"),
-                form.get("ComparisonHighOfDay", "Not used"),
-                form.get("PercentageHighOfDay"),
-                form.get("PercentageHighOfDay1"),
+        elif form.get("ComparisonHighOfDay", "") == "between" and form["HighOfDayBool"] == "percentage":
+            v = data.get("highOfDay")
+            v1 = data.get("highOfDay1")
+            if v is None or v1 is None:
+                high_condition = False
+            else:
+                base = v * (1.0 + float(form["PercentageHighOfDay"]) / 100.0)
+                base1 = v1 * (1.0 + float(form["PercentageHighOfDay1"]) / 100.0)
+                high_condition = (
+                        _safe_compare(data.get("close"), ">=", base)
+                        and _safe_compare(data.get("close"), "<=", base1)
+                )
+
+        elif (form.get("ComparisonHighOfDay", "Not used") not in ("Not used", "between") and
+              form["HighOfDayBool"] == "value"):
+            if form["ComparisonHighOfDay"] == "greater":
+                high_condition = _safe_compare(data.get("highOfDay"), ">", float(form["PercentageHighOfDay"]))
+            elif form["ComparisonHighOfDay"] == "greaterEqual":
+                high_condition = _safe_compare(data.get("highOfDay"), ">=", float(form["PercentageHighOfDay"]))
+            elif form["ComparisonHighOfDay"] == "lower":
+                high_condition = _safe_compare(data.get("highOfDay"), "<", float(form["PercentageHighOfDay"]))
+            elif form["ComparisonHighOfDay"] == "lowerEqual":
+                high_condition = _safe_compare(data.get("highOfDay"), "<=", float(form["PercentageHighOfDay"]))
+        elif form.get("ComparisonHighOfDay", "") == "between" and form["HighOfDayBool"] == "value":
+            high_condition = (
+                    _safe_compare(data.get("highOfDay"), ">=", float(form["PercentageHighOfDay"]))
+                    and _safe_compare(data.get("highOfDay1"), "<=", float(form["PercentageHighOfDay1"]))
             )
 
         if high_condition is not None:
-            conditions_status['HighOfDay'] = high_condition
             condition = condition and high_condition
             counting_ += 1
-
-        # -------------------------
-        # BREAK HIGH (N days) — break or near-break of recent high
-        # -------------------------
-        highest_high_condition = None
-        highest_high = data.get("highestHigh")
-
-        if form.get("HighestHighBool") == "value":
-            comp = form.get("ComparisonHighestHigh", "Not used")
-            if comp != "Not used":
-                highest_high_condition = evaluate(
-                    data.get("close"),
-                    comp,
-                    highest_high,
-                    None,
-                )
-
-        elif form.get("HighestHighBool") == "percentage":
-            comp = form.get("ComparisonHighestHigh", "Not used")
-            if comp == "near":
-                try:
-                    pct = float(form.get("PercentageHighestHigh", 0))
-                    if highest_high is None or data.get("close") is None:
-                        highest_high_condition = False
-                    else:
-                        low_limit = float(highest_high) * (1.0 - pct / 100.0)
-                        highest_high_condition = (
-                            float(data.get("close")) >= low_limit
-                        )
-                except (TypeError, ValueError):
-                    highest_high_condition = False
-            elif comp != "Not used":
-                highest_high_condition = percent_cond(
-                    data.get("close"),
-                    comp,
-                    highest_high,
-                    form.get("PercentageHighestHigh"),
-                    form.get("PercentageHighestHigh1"),
-                )
-
-        if highest_high_condition is not None:
-            conditions_status['HighestHigh'] = highest_high_condition
-            condition = condition and highest_high_condition
-            counting_ += 1
-
-        # -------------------------
-        # SMA CROSSOVER (Previous close vs SMA, Current price vs SMA)
-        # -------------------------
-        sma_crossover_condition = None
-        smaperiod = form.get("SMACrossoverPeriod", "50")
-        comp = form.get("ComparisonSMACrossover", "Not used")
-        sma_key = "sma50" if smaperiod == "50" else "sma200"
-        sma_value = data.get(sma_key)
-        prev_close = data.get("prevClose")
-        current_close = data.get("close")
-
-        if comp != "Not used":
-            if sma_value is None or prev_close is None or current_close is None:
-                sma_crossover_condition = False
-            else:
-                if comp == "crossAbove":
-                    sma_crossover_condition = (prev_close < sma_value and current_close > sma_value)
-                elif comp == "crossBelow":
-                    sma_crossover_condition = (prev_close > sma_value and current_close < sma_value)
-                else:
-                    sma_crossover_condition = False
-
-        if sma_crossover_condition is not None:
-            conditions_status['SMACrossover'] = sma_crossover_condition
-            condition = condition and sma_crossover_condition
-            counting_ += 1
-
-        # -------------------------
-        # SMA 200 CROSSOVER (Previous close vs SMA200, Current price vs SMA200)
-        # -------------------------
-        sma200_crossover_condition = None
-        comp200 = form.get("ComparisonSMA200Crossover", "Not used")
-        sma200_value = data.get("sma200")
-        prev_close_200 = data.get("prevClose")
-        current_close_200 = data.get("close")
-
-        if comp200 != "Not used":
-            if sma200_value is None or prev_close_200 is None or current_close_200 is None:
-                sma200_crossover_condition = False
-            else:
-                if comp200 == "crossAbove":
-                    sma200_crossover_condition = (prev_close_200 < sma200_value and current_close_200 > sma200_value)
-                elif comp200 == "crossBelow":
-                    sma200_crossover_condition = (prev_close_200 > sma200_value and current_close_200 < sma200_value)
-                else:
-                    sma200_crossover_condition = False
-
-        if sma200_crossover_condition is not None:
-            conditions_status['SMA200Crossover'] = sma200_crossover_condition
-            condition = condition and sma200_crossover_condition
-            counting_ += 1
-
-        # -------------------------
-        # PULLBACK
-        # -------------------------
-        pullback_condition = None
-
-        if form.get("PullbackBool") == "percentage":
-            pb_value = data.get("pullback")
-            try:
-                target = float(form.get("PercentagePullback", 0)) / 100.0
-                target1 = float(form.get("PercentagePullback1")) / 100.0 if form.get("PercentagePullback1") else None
-            except (TypeError, ValueError):
-                pb_value = None
-                target = None
-                target1 = None
-
-            if pb_value is not None:
-                pullback_condition = evaluate(pb_value, form.get("ComparisonPullback", "Not used"), target, target1)
-
-        elif form.get("PullbackBool") == "value":
-            pullback_condition = absolute_cond(
-                data.get("pullback"),
-                form.get("ComparisonPullback", "Not used"),
-                form.get("PercentagePullback"),
-                form.get("PercentagePullback1"),
-            )
-
-        if pullback_condition is not None:
-            conditions_status['Pullback'] = pullback_condition
-            condition = condition and pullback_condition
-            counting_ += 1
+            variable_results["highOfDay"] = bool(high_condition)
 
         # -------------------------
         # PIVOT POINT
         # -------------------------
         pivot_condition = None
 
-        pivot = None
-        pivot1 = None
-        if isinstance(data.get("Pivot"), dict) and data.get("Pivot"):
-            pivot = next(iter(data["Pivot"].values()), None)
-        if isinstance(data.get("Pivot1"), dict) and data.get("Pivot1"):
-            pivot1 = next(iter(data["Pivot1"].values()), None)
+        if (
+                form["ComparisonPivotPoint"] not in ("Not used", "between")
+                and form["pivotPointBool"] == "percentage"
+        ):
+            pp_name = list(data["Pivot"].keys())[0]
+            pivot = data["Pivot"][pp_name]
 
-        if form.get("pivotPointBool") == "percentage":
-            close_value = data.get("close")
-            pivot_condition = percent_cond(
-                close_value,
-                form.get("ComparisonPivotPoint", "Not used"),
-                pivot,
-                form.get("PercentagePivotPoint"),
-                form.get("PercentagePivotPoint1"),
-            )
+            if pivot is None:
+                pivot_condition = False
+            else:
+                base = pivot * (
+                        1.0 + float(form["PercentagePivotPoint"]) / 100.0
+                )
 
-        elif form.get("pivotPointBool") == "value":
-            pivot_condition = absolute_cond(
-                pivot,
-                form.get("ComparisonPivotPoint", "Not used"),
-                form.get("PercentagePivotPoint"),
-                form.get("PercentagePivotPoint1"),
+                if form["ComparisonPivotPoint"] == "greater":
+                    pivot_condition = _safe_compare(data.get("close"), ">", base)
+                elif form["ComparisonPivotPoint"] == "greaterEqual":
+                    pivot_condition = _safe_compare(data.get("close"), ">=", base)
+                elif form["ComparisonPivotPoint"] == "lower":
+                    pivot_condition = _safe_compare(data.get("close"), "<", base)
+                elif form["ComparisonPivotPoint"] == "lowerEqual":
+                    pivot_condition = _safe_compare(data.get("close"), "<=", base)
+
+        elif (
+                form["ComparisonPivotPoint"] == "between"
+                and form["pivotPointBool"] == "percentage"
+        ):
+            pp_name = list(data["Pivot"].keys())[0]
+            pp_name1 = list(data["Pivot1"].keys())[0]
+            pivot = data["Pivot"][pp_name]
+            pivot1 = data["Pivot1"][pp_name1]
+
+            close_val = data.get("close")
+
+            if close_val is None or pivot is None or pivot1 is None:
+                pivot_condition = False
+            else:
+                base_close = close_val * (1.0 + float(form["PercentagePivotPoint"]) / 100.0)
+                base_pivot1 = pivot1 * (1.0 + float(form["PercentagePivotPoint1"]) / 100.0)
+
+                pivot_condition = (
+                        _safe_compare(base_close, ">=", pivot)
+                        and _safe_compare(base_close, "<=", base_pivot1)
+                )
+
+        elif (
+                form["ComparisonPivotPoint"] not in ("Not used", "between")
+                and form["pivotPointBool"] == "value"
+        ):
+            pp_name = list(data["Pivot"].keys())[0]
+            pivot = data["Pivot"][pp_name]
+
+            if pivot is None:
+                pivot_condition = False
+            else:
+                if form["ComparisonPivotPoint"] == "greater":
+                    pivot_condition = _safe_compare(pivot, ">", float(form["PercentagePivotPoint"]))
+                elif form["ComparisonPivotPoint"] == "greaterEqual":
+                    pivot_condition = _safe_compare(pivot, ">=", float(form["PercentagePivotPoint"]))
+                elif form["ComparisonPivotPoint"] == "lower":
+                    pivot_condition = _safe_compare(float(form["PercentagePivotPoint"]), "<", pivot)
+                elif form["ComparisonPivotPoint"] == "lowerEqual":
+                    pivot_condition = _safe_compare(float(form["PercentagePivotPoint"]), "<=", pivot)
+
+        elif (
+                form["ComparisonPivotPoint"] == "between"
+                and form["pivotPointBool"] == "value"
+        ):
+            pp_name = list(data["Pivot"].keys())[0]
+            pp_name1 = list(data["Pivot1"].keys())[0]
+            pivot = data["Pivot"][pp_name]
+            pivot1 = data["Pivot1"][pp_name1]
+
+            pivot_condition = (
+                    _safe_compare(pivot, ">=", float(form["PercentagePivotPoint"]))
+                    and _safe_compare(float(form["PercentagePivotPoint1"]), ">=", pivot1)
             )
 
         if pivot_condition is not None:
-            conditions_status['PivotPoint'] = pivot_condition
             condition = condition and pivot_condition
             counting_ += 1
-
-        # -------------------------
-        # RELATIVE VOLUME
-        # -------------------------
+            variable_results["Pivot"] = bool(pivot_condition)
 
         # -------------------------
         # RELATIVE VOLUME
@@ -3263,9 +2391,157 @@ class IBapi(EWrapper, EClient):
             )
 
         if relative_volume_condition is not None:
-            conditions_status['RelativeVolume'] = relative_volume_condition
             condition = condition and relative_volume_condition
             counting_ += 1
+            variable_results["relativeVolume"] = bool(relative_volume_condition)
+
+        # -------------------------
+        # CROSS 50 SMA
+        # -------------------------
+        cross_50_condition = None
+
+        cross50_mode = form.get("ComparisonCross50SMA", "Not used")
+        if cross50_mode == "crossAbove":
+            cross_50_condition = data.get("cross50SMA_above", False)
+        elif cross50_mode == "crossBelow":
+            cross_50_condition = data.get("cross50SMA_below", False)
+        elif cross50_mode == "crossEither":
+            cross_50_condition = data.get("cross50SMA_either", False)
+        elif cross50_mode == "withinPercent":
+            pct_from = data.get("cross50SMA_pctFromSMA")
+            try:
+                threshold = float(form.get("PercentageCross50SMA", 5))
+            except Exception:
+                threshold = 5.0
+            if pct_from is not None:
+                cross_50_condition = abs(pct_from) <= threshold
+            else:
+                cross_50_condition = False
+
+        if cross_50_condition is not None:
+            condition = condition and cross_50_condition
+            counting_ += 1
+            variable_results["cross50SMA"] = bool(cross_50_condition)
+
+        # -------------------------
+        # CROSS ABOVE 200 SMA
+        # -------------------------
+        cross_above_200_condition = None
+
+        cross200_mode = form.get("ComparisonCrossAbove200SMA", "Not used")
+        if cross200_mode == "Used":
+            cross_above_200_condition = data.get("crossAbove200SMA", False)
+        elif cross200_mode == "withinPercent":
+            pct_from = data.get("cross200SMA_pctFromSMA")
+            try:
+                threshold = float(form.get("PercentageCross200SMA", 5))
+            except Exception:
+                threshold = 5.0
+            if pct_from is not None:
+                cross_above_200_condition = abs(pct_from) <= threshold
+            else:
+                cross_above_200_condition = False
+
+        if cross_above_200_condition is not None:
+            condition = condition and cross_above_200_condition
+            counting_ += 1
+            variable_results["crossAbove200SMA"] = bool(cross_above_200_condition)
+
+        # -------------------------
+        # BREAK HIGH
+        # -------------------------
+        break_high_condition = None
+
+        if (form.get("ComparisonBreakHigh", "Not used") not in ("Not used", "between") and
+                form.get("BreakHighBool", "percentage") == "percentage"):
+            v = data.get("breakHigh")
+            if v is None:
+                break_high_condition = False
+            else:
+                base = v * (1.0 + float(form.get("PercentageBreakHigh", 0)) / 100.0)
+                if form["ComparisonBreakHigh"] == "greater":
+                    break_high_condition = _safe_compare(data.get("close"), ">", base)
+                elif form["ComparisonBreakHigh"] == "greaterEqual":
+                    break_high_condition = _safe_compare(data.get("close"), ">=", base)
+                elif form["ComparisonBreakHigh"] == "lower":
+                    break_high_condition = _safe_compare(data.get("close"), "<", base)
+                elif form["ComparisonBreakHigh"] == "lowerEqual":
+                    break_high_condition = _safe_compare(data.get("close"), "<=", base)
+
+        elif (form.get("ComparisonBreakHigh", "") == "between" and
+              form.get("BreakHighBool", "percentage") == "percentage"):
+            v = data.get("breakHigh")
+            v1 = data.get("breakHigh1")
+            if v is None or v1 is None:
+                break_high_condition = False
+            else:
+                base = v * (1.0 + float(form.get("PercentageBreakHigh", 0)) / 100.0)
+                base1 = v1 * (1.0 + float(form.get("PercentageBreakHigh1", 0)) / 100.0)
+                break_high_condition = (
+                        _safe_compare(data.get("close"), ">=", base)
+                        and _safe_compare(data.get("close"), "<=", base1)
+                )
+
+        elif (form.get("ComparisonBreakHigh", "Not used") not in ("Not used", "between") and
+              form.get("BreakHighBool", "percentage") == "value"):
+            if form["ComparisonBreakHigh"] == "greater":
+                break_high_condition = _safe_compare(data.get("breakHigh"), ">", float(form.get("PercentageBreakHigh", 0)))
+            elif form["ComparisonBreakHigh"] == "greaterEqual":
+                break_high_condition = _safe_compare(data.get("breakHigh"), ">=", float(form.get("PercentageBreakHigh", 0)))
+            elif form["ComparisonBreakHigh"] == "lower":
+                break_high_condition = _safe_compare(data.get("breakHigh"), "<", float(form.get("PercentageBreakHigh", 0)))
+            elif form["ComparisonBreakHigh"] == "lowerEqual":
+                break_high_condition = _safe_compare(data.get("breakHigh"), "<=", float(form.get("PercentageBreakHigh", 0)))
+
+        elif (form.get("ComparisonBreakHigh", "") == "between" and
+              form.get("BreakHighBool", "percentage") == "value"):
+            break_high_condition = (
+                    _safe_compare(data.get("breakHigh"), ">=", float(form.get("PercentageBreakHigh", 0)))
+                    and _safe_compare(data.get("breakHigh1"), "<=", float(form.get("PercentageBreakHigh1", 0)))
+            )
+
+        if break_high_condition is not None:
+            condition = condition and break_high_condition
+            counting_ += 1
+            variable_results["breakHigh"] = bool(break_high_condition)
+
+        # -------------------------
+        # NEWS (within X hours)
+        # -------------------------
+        news_condition = None
+
+        if form.get("ComparisonNews", "Not used") != "Not used":
+            news_within_hours = 0
+            try:
+                news_within_hours = int(form.get("NewsWithinHours", 0))
+            except Exception:
+                pass
+
+            if news_within_hours > 0:
+                # Check if any headline falls within the time window
+                from datetime import datetime, timezone, timedelta
+                cutoff = datetime.now(timezone.utc) - timedelta(hours=news_within_hours)
+                headlines = data.get("newsHeadlines", [])
+                has_recent = False
+                for h in headlines:
+                    parsed = h.get("parsedTime", "")
+                    if parsed:
+                        try:
+                            dt = datetime.fromisoformat(parsed)
+                            if dt >= cutoff:
+                                has_recent = True
+                                break
+                        except Exception:
+                            pass
+                news_condition = has_recent
+            else:
+                # No time filter — just check if any headlines exist
+                news_condition = len(data.get("newsHeadlines", [])) > 0
+
+        if news_condition is not None:
+            condition = condition and news_condition
+            counting_ += 1
+            variable_results["news"] = bool(news_condition)
 
         # -------------------------
         # FINAL
@@ -3274,80 +2550,13 @@ class IBapi(EWrapper, EClient):
             condition = False
 
         data["signal"] = "yes" if condition else "no"
-        data["conditions_status"] = conditions_status  # Include individual condition statuses for UI highlighting
-        
-        # Calculate signal quality metrics for audio alerts
-        total_conditions_met = sum(1 for v in conditions_status.values() if v)
-        total_conditions_checked = len(conditions_status)
-        data["conditions_met"] = total_conditions_met
-        data["conditions_checked"] = total_conditions_checked
-        
-        # Determine alert type based on condition match
-        if condition:  # Signal is good
-            if total_conditions_met == total_conditions_checked:
-                data["alert_type"] = "single_beep"  # All conditions met
-            elif total_conditions_met == total_conditions_checked - 1:
-                data["alert_type"] = "double_beep"  # All except one
-            else:
-                data["alert_type"] = "beep"  # Some conditions met
-        else:
-            data["alert_type"] = "none"
-
-        # tag scanner name on every row when provided
-        scanner_name = None
-        if isinstance(form, dict):
-            scanner_name = form.get("ScannerName") or form.get("scanner_name")
-        if scanner_name is not None and scanner_name != "":
-            data["scanner_name"] = str(scanner_name)
-
-        # -------------------------
-        # NEWS HEADLINES
-        # -------------------------
-        news_mode = form.get("NewsEnabled", "disabled") if isinstance(form, dict) else "disabled"
-        data["news_headlines"] = []
-        data["latest_news_ts"] = ""
-
-        if news_mode in ("enabled", "required"):
-            symbol = data.get("symbol") or ""
-            lookback_hrs = None
-            try:
-                lookback_hrs = int(form.get("NewsLookbackHours") or 0)
-            except (TypeError, ValueError):
-                lookback_hrs = 0
-
-            lookback_days = max((lookback_hrs // 24) + 1, 7) if lookback_hrs > 0 else 14
-
-            raw_articles = self.fetch_news_for_symbol(symbol, limit=50, lookback_days=lookback_days)
-
-            excluded_raw = form.get("NewsExcludeSources", "") or ""
-            excluded_list = [s.strip() for s in excluded_raw.split(",") if s.strip()] if excluded_raw else None
-
-            filtered = filter_news(
-                raw_articles,
-                max_headlines=25,
-                excluded_sources=excluded_list,
-                hours_back=lookback_hrs if lookback_hrs > 0 else None,
-                remove_dups=True,
-            )
-
-            data["news_headlines"] = filtered
-            if filtered:
-                data["latest_news_ts"] = filtered[0].get("publishedAt", "") or ""
-
-            # If "required" mode and no news within window, force signal to "no"
-            if news_mode == "required" and len(filtered) == 0:
-                data["signal"] = "no"
-                conditions_status["NewsWithinWindow"] = False
-                data["conditions_status"] = conditions_status
-            elif news_mode == "required":
-                conditions_status["NewsWithinWindow"] = True
-                data["conditions_status"] = conditions_status
+        data["variableResults"] = variable_results
+        data["passCount"] = sum(1 for v in variable_results.values() if v)
+        data["totalCount"] = counting_
 
         if self.config.scale_volume_metrics:
             # create copy for Flask so internal logic stays untouched
             flask_data = data.copy()
-            if scanner_name is not None and scanner_name != "":
-                flask_data["scanner_name"] = str(scanner_name)
 
             # scale volume metrics x100 for UI
             if flask_data.get("volume") is not None:
@@ -3370,6 +2579,125 @@ class IBapi(EWrapper, EClient):
             self.sendToFlaskIB[data["cusip"]] = data
 
         return data
+
+    def fetchNews(self, con_id, form, news_req_id):
+        """
+        Fetch historical news headlines for a contract from IBKR.
+
+        Uses reqHistoricalNews which requires conId.
+        Returns list of headline dicts, filtered by exclude list and deduped.
+        """
+        from datetime import datetime, timezone, timedelta
+
+        max_headlines = 5
+        try:
+            max_headlines = int(form.get("NewsMaxHeadlines", 5))
+        except Exception:
+            pass
+        if max_headlines < 1:
+            max_headlines = 5
+
+        # Parse excluded publishers from comma-separated string
+        exclude_raw = form.get("NewsExcludePublishers", "")
+        excluded_publishers = set()
+        if exclude_raw:
+            excluded_publishers = {
+                p.strip().lower() for p in str(exclude_raw).split(",") if p.strip()
+            }
+
+        # Prepare the news request
+        self._news_data[news_req_id] = []
+        self._news_done[news_req_id] = False
+
+        # IBKR reqHistoricalNews:
+        #   reqId, conId, providerCodes, startDateTime, endDateTime, totalResults, historicalNewsOptions
+        # providerCodes: "BZ+FLY+DJ+MT+GS" (or empty for all)
+        # Date format: "YYYYMMDD-HH:MM:SS" or "" for open-ended
+        end_dt = ""  # now
+        start_dt = ""  # open-ended (let maxResults limit it)
+
+        try:
+            self.reqHistoricalNews(
+                news_req_id,
+                con_id,
+                "",  # all providers
+                start_dt,
+                end_dt,
+                max_headlines + 20,  # over-request to allow for filtering
+                [],
+            )
+        except Exception as e:
+            logger.warning("reqHistoricalNews failed for conId %s: %s", con_id, e)
+            return []
+
+        # Wait for news (bounded)
+        waited = 0.0
+        timeout = 10.0  # seconds
+        while not self._news_done.get(news_req_id, False):
+            time.sleep(0.1)
+            waited += 0.1
+            if waited >= timeout:
+                break
+
+        raw_headlines = self._news_data.get(news_req_id, [])
+
+        # Filter excluded publishers
+        filtered = []
+        for h in raw_headlines:
+            provider = (h.get("provider") or "").strip().lower()
+            if provider in excluded_publishers:
+                continue
+            filtered.append(h)
+
+        # Deduplicate by headline text (keep first occurrence)
+        seen_headlines = set()
+        deduped = []
+        for h in filtered:
+            hl_text = (h.get("headline") or "").strip()
+            if hl_text in seen_headlines:
+                continue
+            seen_headlines.add(hl_text)
+            deduped.append(h)
+
+        # Limit to max requested
+        deduped = deduped[:max_headlines]
+
+        # Parse times and build clean output
+        result = []
+        for h in deduped:
+            time_str = h.get("time", "")
+            article_id = h.get("articleId", "")
+            provider = h.get("provider", "")
+            headline = h.get("headline", "")
+
+            # IBKR time format: "2024-03-25 14:30:00.0" or epoch
+            parsed_time = None
+            try:
+                # Try standard IBKR format
+                if " " in time_str:
+                    parsed_time = datetime.strptime(
+                        time_str.split(".")[0], "%Y-%m-%d %H:%M:%S"
+                    ).replace(tzinfo=timezone.utc)
+                elif time_str.isdigit():
+                    parsed_time = datetime.fromtimestamp(
+                        int(time_str) / 1000, tz=timezone.utc
+                    )
+            except Exception:
+                pass
+
+            result.append({
+                "time": time_str,
+                "parsedTime": parsed_time.isoformat() if parsed_time else time_str,
+                "provider": provider,
+                "articleId": article_id,
+                "headline": headline,
+            })
+
+        # Cleanup
+        self._news_data.pop(news_req_id, None)
+        self._news_done.pop(news_req_id, None)
+
+        return result
 
     def getDataResult(self, i, m, net_position, form, theid, contract_id=None):
         """
@@ -3399,54 +2727,43 @@ class IBapi(EWrapper, EClient):
         resolved_cusip = None
         if contract is None:
 
-            def _lookup_contract():
-                """Single contract lookup attempt with timeout polling."""
+            selected = None
+
+            for attempt in range(self.config.contract_lookup_max_attempts):
+
+                # reset state for this attempt
                 self.data[theid] = []
                 self.requestInformation[theid] = False
 
-                if contract_id is not None:
-                    try:
-                        self.findContractDetails(theid, i, "CUSIP", m, contract_id=contract_id)
-                    except TypeError:
-                        self.findContractDetails(theid, i, "CUSIP", m)
-                else:
-                    self.findContractDetails(theid, i, "CUSIP", m)
+                # request details from IB
+                self.findContractDetails(theid, i, "CUSIP", m, contract_id=contract_id)
 
                 waited = 0.0
-                while self.requestInformation.get(theid) is False and waited < self.config.contract_lookup_timeout_sec:
+                while self.requestInformation.get(theid) is False:
                     time.sleep(self.config.contract_lookup_poll_sec)
                     waited += self.config.contract_lookup_poll_sec
 
+                    if waited >= self.config.contract_lookup_timeout_sec:
+                        break
+
                 contracts_list = self.data.get(theid, []) or []
-                selected_contract = self._select_best_contract(contracts_list, requested_symbol=m)
 
-                if selected_contract is None:
-                    raise Exception(
-                        f"Contract lookup attempt {self._resilience['retry_executor'].attempt_count + 1} failed for {m} (CUSIP={i})"
-                    )
-
-                return selected_contract
-
-            try:
-                selected = self._resilience['retry_executor'].execute(_lookup_contract)
-                resolved_cusip = selected.get("cusip")
-            except Exception as e:
-                error_msg = (
-                    f"Contract lookup failed for {m} (CUSIP={i}) after "
-                    f"{self.config.contract_lookup_max_attempts} attempts: {e}"
+                selected = self._select_best_contract(
+                    contracts_list,
+                    requested_symbol=m
                 )
-                self.warningTicker[theid] = [m, i, error_msg]
-                self._failure_tracker.mark_failed(m, error_msg, i)
-                
-                # ============================================================
-                # [STRUCTURED LOG] Contract Lookup Error
-                # ============================================================
-                structured_logger.error(
-                    error_msg=error_msg,
-                    error_type="contract_lookup_failed",
-                    context=f"symbol={m}|cusip={i}"
-                )
-                
+
+                if selected is not None:
+                    resolved_cusip = selected.get("cusip")
+                    break
+
+            if selected is None:
+                self.warningTicker[theid] = [
+                    m,
+                    i,
+                    "Contract lookup failed (CUSIP) after "
+                    f"{self.config.contract_lookup_max_attempts} attempts due to IBKR TWS API error",
+                ]
                 try:
                     self.numberOfTicker -= 1
                 except Exception:
@@ -3493,6 +2810,9 @@ class IBapi(EWrapper, EClient):
                 m = getattr(contract, "symbol", m) or m
             except Exception:
                 pass
+            # Use the cusip passed into getDataResult as fallback when cache hit
+            # skips contract resolution (which is where resolved_cusip is normally set)
+            resolved_cusip = i
 
         # small delay for safety (preserve original timing behavior)
         time.sleep(0.1)
@@ -3500,37 +2820,11 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         # Request historical data
         # -------------------------
-        fetch_id = f"fetch_{theid}_{int(time.time()*1000)}"
-        fetch_start_time = time.time()
-        
-        # ============================================================
-        # [STRUCTURED LOG] Data Fetch Start
-        # ============================================================
-        structured_logger.data_fetch_start(
-            fetch_id=fetch_id,
-            symbol=m,
-            timeframe=getattr(self, 'addFrequency', 'unknown'),
-            lookback=getattr(self, 'maxlength', 252) or 252
-        )
-        
         try:
             self.getData(contract, form, theid)
-        except Exception as e:
-            # If requesting historical data fails, track failure and exit
-            error_msg = f"Failed to request historical data: {e}"
-            self.warningTicker[theid] = [m, i, error_msg]
-            self._failure_tracker.mark_failed(m, error_msg, i)
-            
-            # ============================================================
-            # [STRUCTURED LOG] Data Fetch Error
-            # ============================================================
-            structured_logger.data_fetch_error(
-                fetch_id=fetch_id,
-                symbol=m,
-                timeframe=getattr(self, 'addFrequency', 'unknown'),
-                error_msg=str(e)
-            )
-            
+        except Exception:
+            # If requesting historical data fails, warn and exit gracefully
+            self.warningTicker[theid] = [m, i, "Failed to request historical data"]
             try:
                 self.numberOfTicker -= 1
             except Exception:
@@ -3541,57 +2835,34 @@ class IBapi(EWrapper, EClient):
             return
 
         # -------------------------
-        # Wait for historical data with retry logic
+        # Wait for historical data to finish (bounded)
         # -------------------------
         self.initial += 1
-        
-        # Use resilience-enabled fetcher for timeout/retry
-        history = self._data_fetcher.fetch_with_retry(
-            theid,
-            contract,
-            timeout_sec=self.config.history_lookup_timeout_sec,
-            retry_count=2  # Allow 1 retry on timeout
-        )
-        
-        fetch_duration = time.time() - fetch_start_time
-        
-        # ============================================================
-        # [STRUCTURED LOG] Data Fetch Complete
-        # ============================================================
-        structured_logger.data_fetch_complete(
-            fetch_id=fetch_id,
-            symbol=m,
-            timeframe=getattr(self, 'addFrequency', 'unknown'),
-            bar_count=len(history) if history else 0,
-            duration_sec=fetch_duration,
-            source="api"
-        )
-        
-        # Validate row count - track partial failures
-        min_rows = self.maxlength or 20
-        is_valid, validation_error = self._data_fetcher.validate_rowcount(
-            history, min_rows, m, i
-        )
-        
-        if not is_valid:
-            # Log but CONTINUE processing with partial data (resilience over strictness)
-            logger.warning(f"[PARTIAL DATA] {m} ({i}): {validation_error}")
-            self._failure_tracker.mark_failed(m, validation_error, i)
+        waited = 0.0
 
-            # Skip this symbol if no bars were received
-            if len(history) == 0:
-                self.warningTicker[theid] = [m, i, validation_error]
-                try:
-                    self.numberOfTicker -= 1
-                except Exception:
-                    pass
-                self.data.pop(theid, None)
-                self.HistoricalDt.pop(theid, None)
-                return
+        while not self.hisdtId.get(theid, False):
+            time.sleep(self.config.history_lookup_poll_sec)
+            waited += self.config.history_lookup_poll_sec
+            if waited >= self.config.history_lookup_timeout_sec:
+                # timeout: warn and continue to attempt processing with whatever we have
+                self.warningTicker[theid] = [
+                    m,
+                    i,
+                    "Historical data download timeout",
+                ]
+                break
 
+        # Ensure historical data exists
+        history = self.HistoricalDt.get(theid, []) or []
+
+        # Process any symbol that returned at least 1 bar of data.
+        # Individual indicators handle insufficient lookback gracefully
+        # (return None), and buySellSignalCheck treats None as False via
+        # _safe_compare.  The old rigid gate (len >= maxlength) rejected
+        # many valid symbols whose IB history was simply shorter than the
+        # longest configured lookback window.
+        if len(history) >= 1:
             try:
-                # Get market data with normalized % change if available
-                market_data = self._market_data.get(theid) if hasattr(self, '_market_data') else None
                 indic = self.getIndicators(
                     history,
                     i,
@@ -3599,31 +2870,58 @@ class IBapi(EWrapper, EClient):
                     form,
                     net_position.get(i, 0),
                     m,
-                    market_data=market_data,
                 )
                 indic["cusip"] = resolved_cusip
+
+                # -------------------------
+                # Fetch news headlines if enabled
+                # -------------------------
+                if form.get("ComparisonNews", "Not used") != "Not used":
+                    con_id = getattr(contract, "conId", None)
+                    if con_id:
+                        try:
+                            with self.Locking:
+                                self.idInc += 1
+                                news_req_id = self.idInc
+                            news_headlines = self.fetchNews(con_id, form, news_req_id)
+                            indic["newsHeadlines"] = news_headlines
+
+                            # Compute latest news timestamp for sorting & signal check
+                            if news_headlines:
+                                indic["latestNewsTime"] = news_headlines[0].get("parsedTime", "")
+                                indic["newsCount"] = len(news_headlines)
+                            else:
+                                indic["latestNewsTime"] = ""
+                                indic["newsCount"] = 0
+                        except Exception as e:
+                            logger.warning("News fetch error for %s: %s", m, e)
+                            indic["newsHeadlines"] = []
+                            indic["latestNewsTime"] = ""
+                            indic["newsCount"] = 0
+                    else:
+                        indic["newsHeadlines"] = []
+                        indic["latestNewsTime"] = ""
+                        indic["newsCount"] = 0
+
                 _ = self.buySellSignalCheck(indic, form)
             except Exception as e:
                 # Protect the thread: capture indicator/signal exceptions and log to warningTicker
                 self.warningTicker[theid] = [m, i, f"Indicator/signal error: {e}"]
         else:
-            self._failure_tracker.mark_succeeded(m)
-            # Data is valid – run indicators and signal check
-            try:
-                market_data = self._market_data.get(theid) if hasattr(self, '_market_data') else None
-                indic = self.getIndicators(
-                    history,
-                    i,
-                    contract,
-                    form,
-                    net_position.get(i, 0),
-                    m,
-                    market_data=market_data,
-                )
-                indic["cusip"] = resolved_cusip
-                _ = self.buySellSignalCheck(indic, form)
-            except Exception as e:
-                self.warningTicker[theid] = [m, i, f"Indicator/signal error: {e}"]
+            # zero rows -> register a warning
+            if theid not in self.warningTicker:
+                if self.hisdtId.get(theid, False):
+                    self.warningTicker[theid] = [
+                        self.data.get(theid, [{}])[0].get("symbol", m) if self.data.get(theid) else m,
+                        i,
+                        "No historical data returned by IBKR for this security",
+                    ]
+                else:
+                    self.warningTicker[theid] = [
+                        self.data.get(theid, [{}])[0].get("symbol", m) if self.data.get(theid) else m,
+                        i,
+                        "Historical data download timeout - no bars received",
+                    ]
 
         # -------------------------
         # cleanup & bookkeeping
@@ -3642,174 +2940,12 @@ class IBapi(EWrapper, EClient):
         self.data.pop(theid, None)
         self.HistoricalDt.pop(theid, None)
 
-    # -------------------------------------------------------------------------
-    # NEW: Fresh data & cache management methods
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def is_market_hours(use_utc=False):
-        """
-        Check if current time is during US market hours (9:30 AM - 4:00 PM ET).
-        During market hours, disable contract caching for fresh data.
-        
-        Args:
-            use_utc: If True, use UTC time; else use local time
-        
-        Returns:
-            bool: True if currently in market hours, False otherwise
-        """
-        import datetime
-        
-        if use_utc:
-            now = datetime.datetime.utcnow()
-            # UTC offset for ET: -5 (EST) or -4 (EDT)
-            # For simplicity, use offset rule: Mar-Nov is EDT (-4), else EST (-5)
-            month = now.month
-            offset = -4 if 3 <= month <= 10 else -5
-            market_time = now + datetime.timedelta(hours=offset)
-        else:
-            market_time = datetime.datetime.now()
-        
-        weekday = market_time.weekday()  # 0=Monday, 4=Friday, 5=Saturday, 6=Sunday
-        hour = market_time.hour
-        minute = market_time.minute
-        
-        # Market is closed on weekends
-        if weekday >= 5:
-            return False
-        
-        # Market hours: 9:30 AM to 4:00 PM (16:00)
-        # Convert to minutes for easier comparison
-        current_minutes = hour * 60 + minute
-        market_open = 9 * 60 + 30  # 9:30 AM
-        market_close = 16 * 60  # 4:00 PM
-        
-        return market_open <= current_minutes < market_close
-
-    def clear_contract_cache(self, force=False):
-        """
-        Clear the contract cache to force fresh lookups.
-        
-        If force=True, clear immediately.
-        If force=False, only clear during market hours.
-        
-        Args:
-            force: If True, clear regardless of market hours
-        """
-        should_clear = force or self.is_market_hours()
-        
-        if should_clear:
-            old_size = len(self.contract_cache)
-            self.contract_cache.clear()
-            logger.info(
-                "[FRESH DATA] Contract cache cleared (was %d entries, market_hours=%s, force=%s)",
-                old_size,
-                self.is_market_hours(),
-                force
-            )
-            return True
-        else:
-            logger.debug(
-                "[CACHE] Contract cache NOT cleared (outside market hours)"
-            )
-            return False
-
-    def reset_scan_state(self):
-        """
-        Reset all scan-related state for a fresh iteration.
-        Called at the beginning of each background scan cycle.
-        
-        This ensures:
-        - No reuse of previous response objects
-        - Fresh data containers
-        - Clean request/response tracking
-        """
-        import time as time_module
-        scan_id = time_module.time()
-        scan_timestamp = time_module.strftime("%Y-%m-%d %H:%M:%S", time_module.localtime(scan_id))
-        
-        logger.info(
-            "[SCAN CYCLE START] ts=%s | Resetting all request/response state for fresh data fetch",
-            scan_timestamp
-        )
-        
-        # Clear all request/response containers to prevent stale data reuse
-        try:
-            # Clear historical data containers
-            self.HistoricalDt.clear()
-            self.hisdtId.clear()
-            
-            # Clear request tracking
-            self.requestInformation.clear()
-            self.data.clear()
-            
-            # Clear results from previous iteration
-            self.sendToFlaskIB.clear()
-            self.warningTicker.clear()
-            
-            # Clear market data
-            with self._market_lock:
-                self._market_data.clear()
-                self._market_expected = 0
-            
-            # Clear error tracking
-            self.errorSymbol.clear()
-            self.priceMarketData.clear()
-            
-            # Reset per-ticker counters (but preserve global state)
-            self.initial = 0
-            self.numberOfTicker = 0
-            self.customSymbol = 0
-            
-            logger.info(
-                "[SCAN CYCLE START] ts=%s | State reset complete. Ready for fresh API calls.",
-                scan_timestamp
-            )
-            
-            return scan_timestamp
-        except Exception as e:
-            logger.error(
-                "[SCAN CYCLE START] Failed to reset scan state: %s",
-                e,
-                exc_info=True
-            )
-            return scan_timestamp
-
     def getFinalResult(self, data, form):
         """
         Entry point for running the screening logic for all symbols.
 
         Spawns worker threads which call getDataResult().
         """
-        
-        # ---- CRITICAL: Ensure fresh data on each call ----
-        scan_timestamp = self.reset_scan_state()
-        
-        # ---- IMPORTANT: Disable contract cache during market hours ----
-        # During market hours, clear cache to force fresh CUSIP/contract lookups
-        self.clear_contract_cache(force=False)
-        
-        num_symbols = len(data.get("ticker", []))
-        scan_id = f"{scan_timestamp}-{id(threading.current_thread())}"
-        
-        # ============================================================
-        # [STRUCTURED LOG] Scanner Start
-        # ============================================================
-        indicators_enabled = [k for k in form.keys() if form[k] and k.startswith(("FastSMA", "SlowSMA", "RSI", "VWAP"))]
-        structured_logger.scanner_start(
-            scan_id=scan_id,
-            scan_type="multi_timeframe",
-            num_symbols=num_symbols,
-            config_summary=f"indicators={len(indicators_enabled)}"
-        )
-        
-        scan_start_time = time.time()
-        
-        logger.info(
-            "[%s] getFinalResult called | %d symbols, form keys: %s",
-            scan_timestamp,
-            num_symbols,
-            list(form.keys()) if form else "none"
-        )
 
         self.cusip = data["cusip"][0:50]
 
@@ -3829,7 +2965,7 @@ class IBapi(EWrapper, EClient):
 
         for cusip, conId, m in zip(self.cusip, self.conIds, mainTickers):
 
-            time.sleep(6 / 50)
+            time.sleep(11 / 50)
 
             self.numberOfTicker += 1
             self.numberSequence += 1
@@ -3858,24 +2994,6 @@ class IBapi(EWrapper, EClient):
 
         for t in threads:
             t.join()
-
-        # ============================================================
-        # [STRUCTURED LOG] Scanner Complete
-        # ============================================================
-        scan_duration = time.time() - scan_start_time
-        results_count = len([v for v in self.data.values() if v])
-        errors_count = len(self.warningTicker)
-        
-        structured_logger.scanner_complete(
-            scan_id=scan_id,
-            duration_sec=scan_duration,
-            results_count=results_count,
-            errors_count=errors_count
-        )
-
-        # Log partial failure summary for this scan cycle
-        if hasattr(self, '_failure_tracker'):
-            self._failure_tracker.log_summary()
 
     @staticmethod
     def bracketOrder(
@@ -4221,3 +3339,41 @@ class IBapi(EWrapper, EClient):
         # )
 
         return results
+
+    def _reset_scanner_state(self):
+        """Clear scanner-related state for a fresh request_price_movers() call."""
+        with self._scanner_lock:
+            self._scanner_results_raw = []
+            self._scanner_results = []
+            self._scanner_event.clear()
+        with self._market_lock:
+            self._market_data = {}
+            self._market_event.clear()
+            self._market_expected = 0
+
+    def _reset_screening_state(self):
+        """Clear ALL screening-related state for a fresh getFinalResult() call."""
+        self.sendToFlaskIB = {}
+        self.warningTicker = {}
+        self.errorSymbol = {}
+        self.otherErrorCounter = 0
+        self.numberOfTicker = 0
+        self.initial = 0
+
+        # Clear accumulated per-request dicts that leak across iterations
+        self.data = {}
+        self.hisdtId = {}
+        self.requestInformation = {}
+        self.HistoricalDt = {}
+        self.windowLength = {}
+        self.priceMarketData = {}
+
+        # Reset maxlength so it is recomputed from the form each run
+        self.maxlength = None
+
+        # Clear contract cache so each iteration resolves contracts fresh
+        # (prevents stale exchange routing and the resolved_cusip=None bug)
+        self.contract_cache = {}
+
+        # Reset custom symbol counter to avoid unbounded growth
+        self.customSymbol = 0
