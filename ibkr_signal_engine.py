@@ -60,6 +60,36 @@ def _safe_compare(value, op, threshold):
     raise ValueError(f"Unsupported operator: {op}")
 
 
+def _within_percent_check(indicator_value, close_value, mode, threshold):
+    """Check if close is within threshold% of indicator_value.
+
+    mode must be one of:
+      'withinPercentAbove'  – close is between indicator and indicator*(1+threshold/100)
+      'withinPercentBelow'  – close is between indicator*(1-threshold/100) and indicator
+      'withinPercentEither' – close is within threshold% in either direction
+    Returns True/False, or False if either value is None.
+    """
+    if indicator_value is None or close_value is None:
+        return False
+    try:
+        pct_from = ((close_value - indicator_value) / abs(indicator_value)) * 100.0
+    except ZeroDivisionError:
+        return False
+    if mode == "withinPercentAbove":
+        return 0 <= pct_from <= threshold
+    elif mode == "withinPercentBelow":
+        return -threshold <= pct_from <= 0
+    else:  # withinPercentEither
+        return abs(pct_from) <= threshold
+
+
+# Modes that are NOT simple > >= < <= comparisons
+_NON_SIMPLE_MODES = frozenset(
+    ("Not used", "between",
+     "withinPercentAbove", "withinPercentBelow", "withinPercentEither")
+)
+
+
 def average_volume(data: pd.DataFrame, lookback: int) -> float:
     """
     Calculate the average volume over the last `lookback` rows.
@@ -572,6 +602,14 @@ class IBapi(EWrapper, EClient):
                 "Internal Error",
                 f"Error: {error_code}. {error_string}",
             ]
+
+        # Unblock the contract-details waiting loop in getDataResult().
+        # When IB rejects a contract lookup (e.g. error 200 "No security
+        # definition") the contractDetailsEnd callback never fires, so
+        # requestInformation stays False and the thread idles for the full
+        # timeout.  Signal completion here so it can proceed immediately.
+        if req_id in self.requestInformation and not self.requestInformation[req_id]:
+            self.requestInformation[req_id] = True
 
         # Unblock the historical-data waiting loop in getDataResult().
         # When IB rejects a request (pacing violation, no data, etc.) the
@@ -1485,7 +1523,11 @@ class IBapi(EWrapper, EClient):
         # --- Cross 50 SMA (daily) ---
         if form.get("ComparisonCross50SMA", "Not used") != "Not used":
             try:
-                sma_50 = SMAIndicator(close=result_full["close"], window=50)
+                sma_window_50 = int(form.get("Cross50SMA", 50))
+            except Exception:
+                sma_window_50 = 50
+            try:
+                sma_50 = SMAIndicator(close=result_full["close"], window=sma_window_50)
                 sma_50_series = sma_50.sma_indicator()
                 if len(sma_50_series) >= 2 and len(result_full["close"]) >= 2:
                     prev_close = float(result_full["close"].iloc[-2])
@@ -1497,7 +1539,6 @@ class IBapi(EWrapper, EClient):
                     indicators["cross50SMA_above"] = crossed_above
                     indicators["cross50SMA_below"] = crossed_below
                     indicators["cross50SMA_either"] = crossed_above or crossed_below
-                    # within % of 50 SMA: how far current close is from 50 SMA
                     indicators["cross50SMA_value"] = curr_sma50
                     if curr_sma50 != 0:
                         indicators["cross50SMA_pctFromSMA"] = ((curr_close - curr_sma50) / curr_sma50) * 100.0
@@ -1516,29 +1557,40 @@ class IBapi(EWrapper, EClient):
                 indicators["cross50SMA_value"] = None
                 indicators["cross50SMA_pctFromSMA"] = None
 
-        # --- Cross Above 200 SMA (daily) ---
-        if form.get("ComparisonCrossAbove200SMA", "Not used") != "Not used":
+        # --- Cross 200 SMA (daily) ---
+        if form.get("ComparisonCross200SMA", "Not used") != "Not used":
             try:
-                sma_200 = SMAIndicator(close=result_full["close"], window=200)
+                sma_window_200 = int(form.get("Cross200SMA", 200))
+            except Exception:
+                sma_window_200 = 200
+            try:
+                sma_200 = SMAIndicator(close=result_full["close"], window=sma_window_200)
                 sma_200_series = sma_200.sma_indicator()
                 if len(sma_200_series) >= 2 and len(result_full["close"]) >= 2:
                     prev_close = float(result_full["close"].iloc[-2])
                     curr_close = float(result_full["close"].iloc[-1])
                     prev_sma = float(sma_200_series.iloc[-2])
                     curr_sma = float(sma_200_series.iloc[-1])
-                    indicators["crossAbove200SMA"] = (prev_close < prev_sma) and (curr_close > curr_sma)
-                    # within % of 200 SMA
+                    crossed_above = (prev_close < prev_sma) and (curr_close > curr_sma)
+                    crossed_below = (prev_close > prev_sma) and (curr_close < curr_sma)
+                    indicators["cross200SMA_above"] = crossed_above
+                    indicators["cross200SMA_below"] = crossed_below
+                    indicators["cross200SMA_either"] = crossed_above or crossed_below
                     indicators["cross200SMA_value"] = curr_sma
                     if curr_sma != 0:
                         indicators["cross200SMA_pctFromSMA"] = ((curr_close - curr_sma) / curr_sma) * 100.0
                     else:
                         indicators["cross200SMA_pctFromSMA"] = None
                 else:
-                    indicators["crossAbove200SMA"] = False
+                    indicators["cross200SMA_above"] = False
+                    indicators["cross200SMA_below"] = False
+                    indicators["cross200SMA_either"] = False
                     indicators["cross200SMA_value"] = None
                     indicators["cross200SMA_pctFromSMA"] = None
             except Exception:
-                indicators["crossAbove200SMA"] = False
+                indicators["cross200SMA_above"] = False
+                indicators["cross200SMA_below"] = False
+                indicators["cross200SMA_either"] = False
                 indicators["cross200SMA_value"] = None
                 indicators["cross200SMA_pctFromSMA"] = None
 
@@ -1587,7 +1639,7 @@ class IBapi(EWrapper, EClient):
         zero_condition = None
 
         if (
-                form["ComparisonAverageVolume"] not in ("Not used", "between")
+                form["ComparisonAverageVolume"] not in _NON_SIMPLE_MODES
                 and form["averageVolumeBool"] == "value"
         ):
             if form["ComparisonAverageVolume"] == "greater":
@@ -1617,7 +1669,7 @@ class IBapi(EWrapper, EClient):
             )
 
         elif (
-                form["ComparisonAverageVolume"] not in ("Not used", "between")
+                form["ComparisonAverageVolume"] not in _NON_SIMPLE_MODES
                 and form["averageVolumeBool"] == "percentage"
         ):
             avg = data.get("averageVolume")
@@ -1651,6 +1703,16 @@ class IBapi(EWrapper, EClient):
                         and _safe_compare(data.get("volume"), "<=", base1)
                 )
 
+        elif form["ComparisonAverageVolume"] in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form["PercentageAverageVolume"])
+            except Exception:
+                threshold = 5.0
+            zero_condition = _within_percent_check(
+                data.get("averageVolume"), data.get("volume"),
+                form["ComparisonAverageVolume"], threshold
+            )
+
         if zero_condition is not None:
             condition = condition and zero_condition
             counting_ += 1
@@ -1661,7 +1723,7 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         price_condition = None
 
-        if form["ComparisonPrice"] not in ("Not used", "between"):
+        if form["ComparisonPrice"] not in _NON_SIMPLE_MODES:
             if form["ComparisonPrice"] == "greater":
                 price_condition = _safe_compare(data.get("close"), ">", float(form["PercentagePrice"]))
             elif form["ComparisonPrice"] == "greaterEqual":
@@ -1677,6 +1739,16 @@ class IBapi(EWrapper, EClient):
                     and _safe_compare(data.get("close"), "<", float(form["PercentagePrice1"]))
             )
 
+        elif form["ComparisonPrice"] in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form["PercentagePrice"])
+            except Exception:
+                threshold = 5.0
+            price_condition = _within_percent_check(
+                float(form["PercentagePrice"]), data.get("close"),
+                form["ComparisonPrice"], threshold
+            )
+
         if price_condition is not None:
             condition = condition and price_condition
             counting_ += 1
@@ -1688,7 +1760,7 @@ class IBapi(EWrapper, EClient):
         vwap_condition = None
 
         if (
-                form["ComparisonVWAP"] not in ("Not used", "between")
+                form["ComparisonVWAP"] not in _NON_SIMPLE_MODES
                 and form["VWAPBool"] == "percentage"
         ):
             v = data.get("vwap")
@@ -1725,7 +1797,7 @@ class IBapi(EWrapper, EClient):
                 )
 
         elif (
-                form["ComparisonVWAP"] not in ("Not used", "between")
+                form["ComparisonVWAP"] not in _NON_SIMPLE_MODES
                 and form["VWAPBool"] == "value"
         ):
             if form["ComparisonVWAP"] == "greater":
@@ -1746,6 +1818,16 @@ class IBapi(EWrapper, EClient):
                     and _safe_compare(data.get("vwap1"), "<=", float(form["PercentageVWAP1"]))
             )
 
+        elif form["ComparisonVWAP"] in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form["PercentageVWAP"])
+            except Exception:
+                threshold = 5.0
+            vwap_condition = _within_percent_check(
+                data.get("vwap"), data.get("close"),
+                form["ComparisonVWAP"], threshold
+            )
+
         if vwap_condition is not None:
             condition = condition and vwap_condition
             counting_ += 1
@@ -1757,7 +1839,7 @@ class IBapi(EWrapper, EClient):
         fast_sma_condition = None
 
         if (
-                form["ComparisonFastSMA"] not in ("Not used", "between")
+                form["ComparisonFastSMA"] not in _NON_SIMPLE_MODES
                 and form["SMAFastBool"] == "percentage"
         ):
             sf = data.get("smaFast")
@@ -1794,7 +1876,7 @@ class IBapi(EWrapper, EClient):
                 )
 
         elif (
-                form["ComparisonFastSMA"] not in ("Not used", "between")
+                form["ComparisonFastSMA"] not in _NON_SIMPLE_MODES
                 and form["SMAFastBool"] == "value"
         ):
             if form["ComparisonFastSMA"] == "greater":
@@ -1823,6 +1905,16 @@ class IBapi(EWrapper, EClient):
                     and _safe_compare(data.get("smaFast1"), "<=", float(form["PercentageFastSMA1"]))
             )
 
+        elif form["ComparisonFastSMA"] in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form["PercentageFastSMA"])
+            except Exception:
+                threshold = 5.0
+            fast_sma_condition = _within_percent_check(
+                data.get("smaFast"), data.get("close"),
+                form["ComparisonFastSMA"], threshold
+            )
+
         if fast_sma_condition is not None:
             condition = condition and fast_sma_condition
             counting_ += 1
@@ -1834,7 +1926,7 @@ class IBapi(EWrapper, EClient):
         medium_sma_condition = None
 
         if (
-                form["ComparisonMediumSMA"] not in ("Not used", "between")
+                form["ComparisonMediumSMA"] not in _NON_SIMPLE_MODES
                 and form["SMAMediumBool"] == "percentage"
         ):
             sf = data.get("smaMedium")
@@ -1871,7 +1963,7 @@ class IBapi(EWrapper, EClient):
                 )
 
         elif (
-                form["ComparisonMediumSMA"] not in ("Not used", "between")
+                form["ComparisonMediumSMA"] not in _NON_SIMPLE_MODES
                 and form["SMAMediumBool"] == "value"
         ):
             if form["ComparisonMediumSMA"] == "greater":
@@ -1900,6 +1992,16 @@ class IBapi(EWrapper, EClient):
                     and _safe_compare(data.get("smaMedium1"), "<=", float(form["PercentageMediumSMA1"]))
             )
 
+        elif form["ComparisonMediumSMA"] in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form["PercentageMediumSMA"])
+            except Exception:
+                threshold = 5.0
+            medium_sma_condition = _within_percent_check(
+                data.get("smaMedium"), data.get("close"),
+                form["ComparisonMediumSMA"], threshold
+            )
+
         if medium_sma_condition is not None:
             condition = condition and medium_sma_condition
             counting_ += 1
@@ -1911,7 +2013,7 @@ class IBapi(EWrapper, EClient):
         slow_sma_condition = None
 
         if (
-                form["ComparisonSlowSMA"] not in ("Not used", "between")
+                form["ComparisonSlowSMA"] not in _NON_SIMPLE_MODES
                 and form["smaslowyesno"] == "percentage"
         ):
             sh = data.get("smaSlow")
@@ -1948,7 +2050,7 @@ class IBapi(EWrapper, EClient):
                 )
 
         elif (
-                form["ComparisonSlowSMA"] not in ("Not used", "between")
+                form["ComparisonSlowSMA"] not in _NON_SIMPLE_MODES
                 and form["smaslowyesno"] == "value"
         ):
             if form["ComparisonSlowSMA"] == "greater":
@@ -1977,6 +2079,16 @@ class IBapi(EWrapper, EClient):
                     and _safe_compare(data.get("smaSlow1"), "<=", float(form["PercentageSlowSMA1"]))
             )
 
+        elif form["ComparisonSlowSMA"] in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form["PercentageSlowSMA"])
+            except Exception:
+                threshold = 5.0
+            slow_sma_condition = _within_percent_check(
+                data.get("smaSlow"), data.get("close"),
+                form["ComparisonSlowSMA"], threshold
+            )
+
         if slow_sma_condition is not None:
             condition = condition and slow_sma_condition
             counting_ += 1
@@ -1987,7 +2099,7 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         rsi_condition = None
 
-        if form["ComparisonRSI"] not in ("Not used", "between"):
+        if form["ComparisonRSI"] not in _NON_SIMPLE_MODES:
             if form["ComparisonRSI"] == "greater":
                 rsi_condition = _safe_compare(data.get("rsi"), ">", float(form["PercentageRSI"]))
             elif form["ComparisonRSI"] == "greaterEqual":
@@ -2003,6 +2115,16 @@ class IBapi(EWrapper, EClient):
                     and _safe_compare(data.get("rsi1"), "<=", float(form["PercentageRSI1"]))
             )
 
+        elif form["ComparisonRSI"] in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form["PercentageRSI"])
+            except Exception:
+                threshold = 5.0
+            rsi_condition = _within_percent_check(
+                data.get("rsi"), data.get("close"),
+                form["ComparisonRSI"], threshold
+            )
+
         if rsi_condition is not None:
             condition = condition and rsi_condition
             counting_ += 1
@@ -2013,7 +2135,7 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         emaFast_condition = None
 
-        if form.get("ComparisonFastEMA", "Not used") not in ("Not used", "between"):
+        if form.get("ComparisonFastEMA", "Not used") not in _NON_SIMPLE_MODES:
             if form.get("ComparisonFastEMA") == "greater":
                 emaFast_condition = _safe_compare(data.get("emaFast"), ">", float(form.get("PercentageFastEMA")))
             elif form.get("ComparisonFastEMA") == "greaterEqual":
@@ -2028,6 +2150,16 @@ class IBapi(EWrapper, EClient):
                     and _safe_compare(data.get("emaFast1"), "<=", float(form.get("PercentageFastEMA1")))
             )
 
+        elif form.get("ComparisonFastEMA") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form.get("PercentageFastEMA", 5))
+            except Exception:
+                threshold = 5.0
+            emaFast_condition = _within_percent_check(
+                data.get("emaFast"), data.get("close"),
+                form.get("ComparisonFastEMA"), threshold
+            )
+
         if emaFast_condition is not None:
             condition = condition and emaFast_condition
             counting_ += 1
@@ -2038,7 +2170,7 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         emaSlow_condition = None
 
-        if form.get("ComparisonSlowEMA", "Not used") not in ("Not used", "between"):
+        if form.get("ComparisonSlowEMA", "Not used") not in _NON_SIMPLE_MODES:
             if form.get("ComparisonSlowEMA") == "greater":
                 emaSlow_condition = _safe_compare(data.get("emaSlow"), ">", float(form.get("PercentageSlowEMA")))
             elif form.get("ComparisonSlowEMA") == "greaterEqual":
@@ -2053,6 +2185,16 @@ class IBapi(EWrapper, EClient):
                     and _safe_compare(data.get("emaSlow1"), "<=", float(form.get("PercentageSlowEMA1")))
             )
 
+        elif form.get("ComparisonSlowEMA") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form.get("PercentageSlowEMA", 5))
+            except Exception:
+                threshold = 5.0
+            emaSlow_condition = _within_percent_check(
+                data.get("emaSlow"), data.get("close"),
+                form.get("ComparisonSlowEMA"), threshold
+            )
+
         if emaSlow_condition is not None:
             condition = condition and emaSlow_condition
             counting_ += 1
@@ -2063,7 +2205,7 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         obv_condition = None
 
-        if form.get("ComparisonOBV", "Not used") not in ("Not used", "between"):
+        if form.get("ComparisonOBV", "Not used") not in _NON_SIMPLE_MODES:
             if form.get("ComparisonOBV") == "greater":
                 obv_condition = _safe_compare(data.get("obv"), ">", float(form.get("PercentageOBV")))
             elif form.get("ComparisonOBV") == "greaterEqual":
@@ -2078,6 +2220,16 @@ class IBapi(EWrapper, EClient):
                     and _safe_compare(data.get("obv1"), "<=", float(form.get("PercentageOBV1")))
             )
 
+        elif form.get("ComparisonOBV") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form.get("PercentageOBV", 5))
+            except Exception:
+                threshold = 5.0
+            obv_condition = _within_percent_check(
+                data.get("obv"), data.get("close"),
+                form.get("ComparisonOBV"), threshold
+            )
+
         if obv_condition is not None:
             condition = condition and obv_condition
             counting_ += 1
@@ -2088,7 +2240,7 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         atr_condition = None
 
-        if form.get("ComparisonATR", "Not used") not in ("Not used", "between"):
+        if form.get("ComparisonATR", "Not used") not in _NON_SIMPLE_MODES:
             if form.get("ComparisonATR") == "greater":
                 atr_condition = _safe_compare(data.get("atr"), ">", float(form.get("PercentageATR")))
             elif form.get("ComparisonATR") == "greaterEqual":
@@ -2103,6 +2255,16 @@ class IBapi(EWrapper, EClient):
                     and _safe_compare(data.get("atr1"), "<=", float(form.get("PercentageATR1")))
             )
 
+        elif form.get("ComparisonATR") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form.get("PercentageATR", 5))
+            except Exception:
+                threshold = 5.0
+            atr_condition = _within_percent_check(
+                data.get("atr"), data.get("close"),
+                form.get("ComparisonATR"), threshold
+            )
+
         if atr_condition is not None:
             condition = condition and atr_condition
             counting_ += 1
@@ -2113,7 +2275,7 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         prev_condition = None
 
-        if (form.get("ComparisonPrevClose", "Not used") not in ("Not used", "between") and
+        if (form.get("ComparisonPrevClose", "Not used") not in _NON_SIMPLE_MODES and
                 form["PrevCloseBool"] == "percentage"):
             v = data.get("prevClose")
             if v is None:
@@ -2142,7 +2304,7 @@ class IBapi(EWrapper, EClient):
                         and _safe_compare(data.get("close"), "<=", base1)
                 )
 
-        elif (form.get("ComparisonPrevClose", "Not used") not in ("Not used", "between") and
+        elif (form.get("ComparisonPrevClose", "Not used") not in _NON_SIMPLE_MODES and
               form["PrevCloseBool"] == "value"):
             if form["ComparisonPrevClose"] == "greater":
                 prev_condition = _safe_compare(data.get("prevClose"), ">", float(form["PercentagePrevClose"]))
@@ -2158,6 +2320,16 @@ class IBapi(EWrapper, EClient):
                     and _safe_compare(data.get("prevClose1"), "<=", float(form["PercentagePrevClose1"]))
             )
 
+        elif form.get("ComparisonPrevClose") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form["PercentagePrevClose"])
+            except Exception:
+                threshold = 5.0
+            prev_condition = _within_percent_check(
+                data.get("prevClose"), data.get("close"),
+                form["ComparisonPrevClose"], threshold
+            )
+
         if prev_condition is not None:
             condition = condition and prev_condition
             counting_ += 1
@@ -2168,7 +2340,7 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         low_condition = None
 
-        if (form.get("ComparisonLowOfDay", "Not used") not in ("Not used", "between") and
+        if (form.get("ComparisonLowOfDay", "Not used") not in _NON_SIMPLE_MODES and
                 form["LowOfDayBool"] == "percentage"):
             v = data.get("lowOfDay")
             if v is None:
@@ -2197,7 +2369,7 @@ class IBapi(EWrapper, EClient):
                         and _safe_compare(data.get("close"), "<=", base1)
                 )
 
-        elif (form.get("ComparisonLowOfDay", "Not used") not in ("Not used", "between") and
+        elif (form.get("ComparisonLowOfDay", "Not used") not in _NON_SIMPLE_MODES and
               form["LowOfDayBool"] == "value"):
             if form["ComparisonLowOfDay"] == "greater":
                 low_condition = _safe_compare(data.get("lowOfDay"), ">", float(form["PercentageLowOfDay"]))
@@ -2213,6 +2385,16 @@ class IBapi(EWrapper, EClient):
                     and _safe_compare(data.get("lowOfDay1"), "<=", float(form["PercentageLowOfDay1"]))
             )
 
+        elif form.get("ComparisonLowOfDay") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form["PercentageLowOfDay"])
+            except Exception:
+                threshold = 5.0
+            low_condition = _within_percent_check(
+                data.get("lowOfDay"), data.get("close"),
+                form["ComparisonLowOfDay"], threshold
+            )
+
         if low_condition is not None:
             condition = condition and low_condition
             counting_ += 1
@@ -2223,7 +2405,7 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         high_condition = None
 
-        if (form.get("ComparisonHighOfDay", "Not used") not in ("Not used", "between") and
+        if (form.get("ComparisonHighOfDay", "Not used") not in _NON_SIMPLE_MODES and
                 form["HighOfDayBool"] == "percentage"):
             v = data.get("highOfDay")
             if v is None:
@@ -2252,7 +2434,7 @@ class IBapi(EWrapper, EClient):
                         and _safe_compare(data.get("close"), "<=", base1)
                 )
 
-        elif (form.get("ComparisonHighOfDay", "Not used") not in ("Not used", "between") and
+        elif (form.get("ComparisonHighOfDay", "Not used") not in _NON_SIMPLE_MODES and
               form["HighOfDayBool"] == "value"):
             if form["ComparisonHighOfDay"] == "greater":
                 high_condition = _safe_compare(data.get("highOfDay"), ">", float(form["PercentageHighOfDay"]))
@@ -2268,6 +2450,16 @@ class IBapi(EWrapper, EClient):
                     and _safe_compare(data.get("highOfDay1"), "<=", float(form["PercentageHighOfDay1"]))
             )
 
+        elif form.get("ComparisonHighOfDay") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form["PercentageHighOfDay"])
+            except Exception:
+                threshold = 5.0
+            high_condition = _within_percent_check(
+                data.get("highOfDay"), data.get("close"),
+                form["ComparisonHighOfDay"], threshold
+            )
+
         if high_condition is not None:
             condition = condition and high_condition
             counting_ += 1
@@ -2279,7 +2471,7 @@ class IBapi(EWrapper, EClient):
         pivot_condition = None
 
         if (
-                form["ComparisonPivotPoint"] not in ("Not used", "between")
+                form["ComparisonPivotPoint"] not in _NON_SIMPLE_MODES
                 and form["pivotPointBool"] == "percentage"
         ):
             pp_name = list(data["Pivot"].keys())[0]
@@ -2324,7 +2516,7 @@ class IBapi(EWrapper, EClient):
                 )
 
         elif (
-                form["ComparisonPivotPoint"] not in ("Not used", "between")
+                form["ComparisonPivotPoint"] not in _NON_SIMPLE_MODES
                 and form["pivotPointBool"] == "value"
         ):
             pp_name = list(data["Pivot"].keys())[0]
@@ -2356,6 +2548,21 @@ class IBapi(EWrapper, EClient):
                     and _safe_compare(float(form["PercentagePivotPoint1"]), ">=", pivot1)
             )
 
+        elif form["ComparisonPivotPoint"] in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                pp_name = list(data["Pivot"].keys())[0]
+                pivot = data["Pivot"][pp_name]
+            except Exception:
+                pivot = None
+            try:
+                threshold = float(form["PercentagePivotPoint"])
+            except Exception:
+                threshold = 5.0
+            pivot_condition = _within_percent_check(
+                pivot, data.get("close"),
+                form["ComparisonPivotPoint"], threshold
+            )
+
         if pivot_condition is not None:
             condition = condition and pivot_condition
             counting_ += 1
@@ -2366,7 +2573,7 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         relative_volume_condition = None
 
-        if form["ComparisonRelativeVolume"] not in ("Not used", "between"):
+        if form["ComparisonRelativeVolume"] not in _NON_SIMPLE_MODES:
             if form["ComparisonRelativeVolume"] == "greater":
                 relative_volume_condition = (
                     _safe_compare(data.get("relativeVolume"), ">", float(form["PercentageRelativeVolume"]))
@@ -2390,6 +2597,16 @@ class IBapi(EWrapper, EClient):
                     and _safe_compare(data.get("relativeVolume1"), "<", float(form["PercentageRelativeVolume1"]))
             )
 
+        elif form["ComparisonRelativeVolume"] in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form["PercentageRelativeVolume"])
+            except Exception:
+                threshold = 5.0
+            relative_volume_condition = _within_percent_check(
+                data.get("relativeVolume"), data.get("volume"),
+                form["ComparisonRelativeVolume"], threshold
+            )
+
         if relative_volume_condition is not None:
             condition = condition and relative_volume_condition
             counting_ += 1
@@ -2405,16 +2622,19 @@ class IBapi(EWrapper, EClient):
             cross_50_condition = data.get("cross50SMA_above", False)
         elif cross50_mode == "crossBelow":
             cross_50_condition = data.get("cross50SMA_below", False)
-        elif cross50_mode == "crossEither":
-            cross_50_condition = data.get("cross50SMA_either", False)
-        elif cross50_mode == "withinPercent":
+        elif cross50_mode in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
             pct_from = data.get("cross50SMA_pctFromSMA")
             try:
                 threshold = float(form.get("PercentageCross50SMA", 5))
             except Exception:
                 threshold = 5.0
             if pct_from is not None:
-                cross_50_condition = abs(pct_from) <= threshold
+                if cross50_mode == "withinPercentAbove":
+                    cross_50_condition = 0 <= pct_from <= threshold
+                elif cross50_mode == "withinPercentBelow":
+                    cross_50_condition = -threshold <= pct_from <= 0
+                else:  # withinPercentEither
+                    cross_50_condition = abs(pct_from) <= threshold
             else:
                 cross_50_condition = False
 
@@ -2424,35 +2644,42 @@ class IBapi(EWrapper, EClient):
             variable_results["cross50SMA"] = bool(cross_50_condition)
 
         # -------------------------
-        # CROSS ABOVE 200 SMA
+        # CROSS 200 SMA
         # -------------------------
-        cross_above_200_condition = None
+        cross_200_condition = None
 
-        cross200_mode = form.get("ComparisonCrossAbove200SMA", "Not used")
-        if cross200_mode == "Used":
-            cross_above_200_condition = data.get("crossAbove200SMA", False)
-        elif cross200_mode == "withinPercent":
+        cross200_mode = form.get("ComparisonCross200SMA", "Not used")
+        if cross200_mode == "crossAbove":
+            cross_200_condition = data.get("cross200SMA_above", False)
+        elif cross200_mode == "crossBelow":
+            cross_200_condition = data.get("cross200SMA_below", False)
+        elif cross200_mode in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
             pct_from = data.get("cross200SMA_pctFromSMA")
             try:
                 threshold = float(form.get("PercentageCross200SMA", 5))
             except Exception:
                 threshold = 5.0
             if pct_from is not None:
-                cross_above_200_condition = abs(pct_from) <= threshold
+                if cross200_mode == "withinPercentAbove":
+                    cross_200_condition = 0 <= pct_from <= threshold
+                elif cross200_mode == "withinPercentBelow":
+                    cross_200_condition = -threshold <= pct_from <= 0
+                else:  # withinPercentEither
+                    cross_200_condition = abs(pct_from) <= threshold
             else:
-                cross_above_200_condition = False
+                cross_200_condition = False
 
-        if cross_above_200_condition is not None:
-            condition = condition and cross_above_200_condition
+        if cross_200_condition is not None:
+            condition = condition and cross_200_condition
             counting_ += 1
-            variable_results["crossAbove200SMA"] = bool(cross_above_200_condition)
+            variable_results["cross200SMA"] = bool(cross_200_condition)
 
         # -------------------------
         # BREAK HIGH
         # -------------------------
         break_high_condition = None
 
-        if (form.get("ComparisonBreakHigh", "Not used") not in ("Not used", "between") and
+        if (form.get("ComparisonBreakHigh", "Not used") not in _NON_SIMPLE_MODES and
                 form.get("BreakHighBool", "percentage") == "percentage"):
             v = data.get("breakHigh")
             if v is None:
@@ -2482,7 +2709,7 @@ class IBapi(EWrapper, EClient):
                         and _safe_compare(data.get("close"), "<=", base1)
                 )
 
-        elif (form.get("ComparisonBreakHigh", "Not used") not in ("Not used", "between") and
+        elif (form.get("ComparisonBreakHigh", "Not used") not in _NON_SIMPLE_MODES and
               form.get("BreakHighBool", "percentage") == "value"):
             if form["ComparisonBreakHigh"] == "greater":
                 break_high_condition = _safe_compare(data.get("breakHigh"), ">", float(form.get("PercentageBreakHigh", 0)))
@@ -2500,27 +2727,49 @@ class IBapi(EWrapper, EClient):
                     and _safe_compare(data.get("breakHigh1"), "<=", float(form.get("PercentageBreakHigh1", 0)))
             )
 
+        elif form.get("ComparisonBreakHigh") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form.get("PercentageBreakHigh", 5))
+            except Exception:
+                threshold = 5.0
+            break_high_condition = _within_percent_check(
+                data.get("breakHigh"), data.get("close"),
+                form.get("ComparisonBreakHigh"), threshold
+            )
+
         if break_high_condition is not None:
             condition = condition and break_high_condition
             counting_ += 1
             variable_results["breakHigh"] = bool(break_high_condition)
 
         # -------------------------
-        # NEWS (within X hours)
+        # NEWS (within X minutes/hours)
         # -------------------------
         news_condition = None
 
         if form.get("ComparisonNews", "Not used") != "Not used":
-            news_within_hours = 0
+            # Support both the new NewsWithinValue+NewsTimeUnit fields
+            # and the legacy NewsWithinHours field for backward compat.
+            news_within_minutes = 0
             try:
-                news_within_hours = int(form.get("NewsWithinHours", 0))
+                time_unit = form.get("NewsTimeUnit", "minutes").lower()
+                within_value = int(form.get("NewsWithinValue", 0))
+                if within_value > 0:
+                    if time_unit == "hours":
+                        news_within_minutes = within_value * 60
+                    else:  # minutes
+                        news_within_minutes = within_value
+                else:
+                    # fallback to legacy field
+                    legacy_hours = int(form.get("NewsWithinHours", 0))
+                    news_within_minutes = legacy_hours * 60
             except Exception:
                 pass
 
-            if news_within_hours > 0:
+            if news_within_minutes > 0:
                 # Check if any headline falls within the time window
                 from datetime import datetime, timezone, timedelta
-                cutoff = datetime.now(timezone.utc) - timedelta(hours=news_within_hours)
+                cutoff = datetime.now(timezone.utc) - timedelta(minutes=news_within_minutes)
                 headlines = data.get("newsHeadlines", [])
                 has_recent = False
                 for h in headlines:
@@ -2757,11 +3006,43 @@ class IBapi(EWrapper, EClient):
                     resolved_cusip = selected.get("cusip")
                     break
 
+            # --------------------------------------------------
+            # Fallback: if CUSIP-based lookup failed and we have
+            # a valid symbol, try a plain symbol-only lookup.
+            # This covers cases where the CUSIP is stale/wrong
+            # but the ticker symbol itself resolves fine.
+            # --------------------------------------------------
+            if selected is None and m and m != "nan" and not str(m).lower().startswith("custom"):
+                logger.info(
+                    "CUSIP lookup failed for %s (cusip=%s). Trying symbol-only fallback.",
+                    m, i,
+                )
+                # one extra attempt with symbol only (no CUSIP, no conId)
+                self.data[theid] = []
+                self.requestInformation[theid] = False
+
+                self.findContractDetails(theid, None, None, m, contract_id=None)
+
+                waited = 0.0
+                while self.requestInformation.get(theid) is False:
+                    time.sleep(self.config.contract_lookup_poll_sec)
+                    waited += self.config.contract_lookup_poll_sec
+                    if waited >= self.config.contract_lookup_timeout_sec:
+                        break
+
+                contracts_list = self.data.get(theid, []) or []
+                selected = self._select_best_contract(
+                    contracts_list,
+                    requested_symbol=m,
+                )
+                if selected is not None:
+                    resolved_cusip = selected.get("cusip") or i
+
             if selected is None:
                 self.warningTicker[theid] = [
                     m,
                     i,
-                    "Contract lookup failed (CUSIP) after "
+                    "Contract lookup failed (CUSIP + symbol) after "
                     f"{self.config.contract_lookup_max_attempts} attempts due to IBKR TWS API error",
                 ]
                 try:
@@ -2967,11 +3248,14 @@ class IBapi(EWrapper, EClient):
 
             time.sleep(11 / 50)
 
-            self.numberOfTicker += 1
-            self.numberSequence += 1
-
-            theidd = self.numberSequence
-            self.HistoricalDt[theidd] = []
+            self.Locking.acquire()
+            try:
+                self.numberOfTicker += 1
+                self.numberSequence += 1
+                theidd = self.numberSequence
+                self.HistoricalDt[theidd] = []
+            finally:
+                self.Locking.release()
 
             # Keep IB 30 concurrent limit protection
             while self.numberOfTicker >= 30:

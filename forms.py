@@ -98,148 +98,76 @@ class Parameters(FlaskForm):
     # Comparison operators for indicators
     # ------------------------------------------------------------------
 
+    _STANDARD_COMPARISON_CHOICES = [
+        ("greater", ">"),
+        ("greaterEqual", ">="),
+        ("lower", "<"),
+        ("lowerEqual", "<="),
+        ("between", "between"),
+        ("withinPercentAbove", "Within % Above"),
+        ("withinPercentBelow", "Within % Below"),
+        ("withinPercentEither", "Within Either %"),
+        ("Not used", "disabled"),
+    ]
+
     ComparisonFastSMA = SelectField(
         "Programming Language",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
+        choices=_STANDARD_COMPARISON_CHOICES,
     )
 
     ComparisonMediumSMA = SelectField(
         "Programming Language",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
+        choices=_STANDARD_COMPARISON_CHOICES,
     )
 
     ComparisonSlowSMA = SelectField(
         "Programming Language",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
+        choices=_STANDARD_COMPARISON_CHOICES,
     )
 
     ComparisonVWAP = SelectField(
         "Programming Language",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
+        choices=_STANDARD_COMPARISON_CHOICES,
     )
 
     ComparisonRSI = SelectField(
         "Programming Language",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
+        choices=_STANDARD_COMPARISON_CHOICES,
     )
 
     ComparisonFastEMA = SelectField(
         "Programming Language",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
+        choices=_STANDARD_COMPARISON_CHOICES,
     )
 
     ComparisonSlowEMA = SelectField(
         "Programming Language",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
+        choices=_STANDARD_COMPARISON_CHOICES,
     )
 
     ComparisonOBV = SelectField(
         "Programming Language",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
+        choices=_STANDARD_COMPARISON_CHOICES,
     )
 
     ComparisonATR = SelectField(
         "Programming Language",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
+        choices=_STANDARD_COMPARISON_CHOICES,
     )
 
     ComparisonPrevClose = SelectField(
         "Programming Language",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
+        choices=_STANDARD_COMPARISON_CHOICES,
     )
 
     ComparisonLowOfDay = SelectField(
         "Programming Language",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
+        choices=_STANDARD_COMPARISON_CHOICES,
     )
 
     ComparisonHighOfDay = SelectField(
         "Programming Language",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
+        choices=_STANDARD_COMPARISON_CHOICES,
     )
 
     # ------------------------------------------------------------------
@@ -301,24 +229,30 @@ class Parameters(FlaskForm):
         ],
     )
 
-    ComparisonCrossAbove200SMA = SelectField(
-        "Cross Above 200 SMA",
+    Cross200SMA = IntegerField("Cross 200 SMA")
+    ComparisonCross200SMA = SelectField(
+        "Cross 200 SMA",
         choices=[
             ("Not used", "disabled"),
-            ("Used", "enabled"),
-            ("withinPercent", "Within %"),
+            ("crossAbove", "Cross Above"),
+            ("crossBelow", "Cross Below"),
+            ("withinPercentAbove", "Within % Above"),
+            ("withinPercentBelow", "Within % Below"),
+            ("withinPercentEither", "Within Either %"),
         ],
     )
     PercentageCross200SMA = DecimalField("% from 200 SMA")
 
+    Cross50SMA = IntegerField("Cross 50 SMA")
     ComparisonCross50SMA = SelectField(
         "Cross 50 SMA",
         choices=[
             ("Not used", "disabled"),
             ("crossAbove", "Cross Above"),
             ("crossBelow", "Cross Below"),
-            ("crossEither", "Cross Either"),
-            ("withinPercent", "Within %"),
+            ("withinPercentAbove", "Within % Above"),
+            ("withinPercentBelow", "Within % Below"),
+            ("withinPercentEither", "Within Either %"),
         ],
     )
     PercentageCross50SMA = DecimalField("% from 50 SMA")
@@ -332,14 +266,7 @@ class Parameters(FlaskForm):
 
     ComparisonBreakHigh = SelectField(
         "Break High",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
+        choices=_STANDARD_COMPARISON_CHOICES,
     )
 
     BreakHighBool = RadioField(
@@ -350,14 +277,7 @@ class Parameters(FlaskForm):
 
     ComparisonPivotPoint = SelectField(
         "Programming Language",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
+        choices=_STANDARD_COMPARISON_CHOICES,
     )
 
     PercentagePivotPoint = DecimalField("Percentage PivotPoint")
@@ -437,14 +357,7 @@ class Parameters(FlaskForm):
 
     ComparisonPrice = SelectField(
         "Programming Language",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
+        choices=_STANDARD_COMPARISON_CHOICES,
     )
 
     PercentagePrice = DecimalField("Percentage Price")
@@ -459,14 +372,7 @@ class Parameters(FlaskForm):
 
     ComparisonAverageVolume = SelectField(
         "Programming Language",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
+        choices=_STANDARD_COMPARISON_CHOICES,
     )
 
     # ------------------------------------------------------------------
@@ -478,14 +384,7 @@ class Parameters(FlaskForm):
 
     ComparisonRelativeVolume = SelectField(
         "Programming Language",
-        choices=[
-            ("greater", ">"),
-            ("greaterEqual", ">="),
-            ("lower", "<"),
-            ("lowerEqual", "<="),
-            ("between", "between"),
-            ("Not used", "disabled"),
-        ],
+        choices=_STANDARD_COMPARISON_CHOICES,
     )
 
     # ------------------------------------------------------------------
@@ -615,6 +514,15 @@ class Parameters(FlaskForm):
 
     NewsMaxHeadlines = IntegerField("Max Headlines")
     NewsWithinHours = IntegerField("News Within Hours")
+    NewsWithinValue = IntegerField("News Within Value")
+    NewsTimeUnit = SelectField(
+        "Time Unit",
+        choices=[
+            ("minutes", "Minutes"),
+            ("hours", "Hours"),
+        ],
+        default="minutes",
+    )
     NewsExcludePublishers = StringField("Exclude Publishers")
 
     # ------------------------------------------------------------------

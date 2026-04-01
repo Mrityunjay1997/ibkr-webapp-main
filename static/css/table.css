@@ -4,7 +4,7 @@ table {
 
 input[type="text"] {
     height: 40%;
-    width: 140px;
+    width: 100px;
 }
 
 
@@ -14,6 +14,7 @@ form table thead tr {
     color: #ffffff;
     padding: 2px;
     text-align: left;
+    font-size: 12px;
 }
 
 
@@ -21,6 +22,7 @@ form table tbody tr {
     border: 1px solid #dddddd;
     background-color: #f3f3f3;
     padding: 2px;
+    font-size: 12px;
 }
 
 
@@ -201,8 +203,27 @@ form table tbody tr {
 }
 
 #allForm {
-    width: 72%;
+    width: 98%;
     margin-left: 4px;
+}
+
+.two-col-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    align-items: start;
+}
+
+.two-col-grid table {
+    width: 100%;
+}
+
+.bottom-tables-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    align-items: start;
+    margin-top: 10px;
 }
 
 #customformToUse {
@@ -216,5 +237,84 @@ form table tbody tr {
 }
 
 thead .tableHead {
+    font-size: 12px;
+}
+
+/* ── Stock List Management Panel ── */
+#wl_section {
+    margin-top: 14px;
+}
+#wl_panel {
+    margin-top: 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: #fafbfc;
+}
+.wl-panel-inner {
+    padding: 12px 16px;
+}
+.wl-panel-title {
+    margin: 0 0 10px 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: #333;
+}
+.wl-save-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.wl-input {
+    flex: 1;
+    padding: 5px 10px;
+    border: 1px solid #bbb;
+    border-radius: 4px;
     font-size: 13px;
+    height: auto;
+    width: auto;
+}
+.wl-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.wl-table thead tr {
+    background: #e8eef3;
+    border-bottom: 2px solid #bbb;
+}
+.wl-table th {
+    padding: 6px 10px;
+    text-align: left;
+    font-weight: 600;
+    color: #444;
+}
+.wl-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #e0e0e0;
+}
+.wl-table tbody tr:hover {
+    background: #eef4fa;
+}
+.wl-name-cell {
+    font-weight: 500;
+}
+.wl-actions-cell {
+    white-space: nowrap;
+}
+.wl-actions-cell .btn {
+    padding: 2px 10px;
+    font-size: 12px;
+}
+.wl-empty {
+    text-align: center;
+    color: #999;
+    padding: 16px 0;
+}
+
+@media screen and (max-width: 1200px) {
+    .two-col-grid,
+    .bottom-tables-grid {
+        grid-template-columns: 1fr;
+    }
 }

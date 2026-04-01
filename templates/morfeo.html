@@ -252,6 +252,7 @@
 						   		{% endfor %}
 						   		{{ Param.hidden_tag() }}
 
+						   		<div class="two-col-grid">
 						   		<table class = "firstTable">
 									<thead>
 										<tr class = "tableHead">
@@ -411,6 +412,20 @@
 												{% endfor %}
 											</td>
 										</tr>
+									</tbody>
+								</table>
+								<table class = "firstTable">
+									<thead>
+										<tr class = "tableHead">
+											<th class = "headRow">Indicator</th>
+											<th class = "headRow">Time Frame</th>
+											<th class = "headRow">Number of days</th>
+											<th class = "headRow">Sign Indicator</th>
+											<th class = "headRow">Amount </th>
+											<th class = "headRow">Percentage / Val</th>
+										</tr>
+									</thead>
+									<tbody>
 										<tr>
 											<th>{{ Param.OBV.label(class_="LabelHead") }}</th>
                                             <!-- NEW: time frame column for this indicator -->
@@ -567,8 +582,9 @@
 										</tr -->
 									</tbody>
 								</table>
-								<br>
+								</div><!-- end two-col-grid -->
 
+								<div class="bottom-tables-grid">
 								<table class = "secondTable">
 									<thead class = "secondTableHead">
 										<tr>
@@ -581,15 +597,15 @@
 									</thead>
 									<tbody class ="secondTableBody">
 										<tr>
-											<th style="padding:10px">Cross Above 200 SMA</th>
-											<td style="padding:10px">&nbsp;</td>
-											<td style="padding:10px">{{ Param.ComparisonCrossAbove200SMA(class_="ComparisonCrossAbove200SMA") }}</td>
+											<th style="padding:10px">Cross 200 SMA</th>
+											<td style="padding:10px"><div id="changeCross200SMA">{{ Param.Cross200SMA(class_="Cross200SMA", value='200') }}</div></td>
+											<td style="padding:10px">{{ Param.ComparisonCross200SMA(class_="ComparisonCross200SMA") }}</td>
 											<td style="padding:10px"><div id="percentageCross200SMA">{{ Param.PercentageCross200SMA(class_="PercentageCross200SMA", value='5') }}</div></td>
 											<td>&nbsp;</td>
 										</tr>
 										<tr>
 											<th style="padding:10px">Cross 50 SMA</th>
-											<td style="padding:10px">&nbsp;</td>
+											<td style="padding:10px"><div id="changeCross50SMA">{{ Param.Cross50SMA(class_="Cross50SMA", value='50') }}</div></td>
 											<td style="padding:10px">{{ Param.ComparisonCross50SMA(class_="ComparisonCross50SMA") }}</td>
 											<td style="padding:10px"><div id="percentageCross50SMA">{{ Param.PercentageCross50SMA(class_="PercentageCross50SMA", value='5') }}</div></td>
 											<td>&nbsp;</td>
@@ -640,7 +656,7 @@
 								</table>
 
 								<!-- News Configuration -->
-								<table class="table table-bordered" style="margin-top:15px;">
+								<table class="table table-bordered" style="margin-top:0;">
 									<thead>
 										<tr style="background:#2c3e50; color:#fff;">
 											<th style="padding:10px" colspan="5">News Headlines</th>
@@ -661,19 +677,62 @@
 											<td style="padding:10px" colspan="4">{{ Param.NewsMaxHeadlines(class_="NewsMaxHeadlines", value='5') }}</td>
 										</tr>
 										<tr>
-											<th style="padding:10px">News Within Hours (0 = any)</th>
-											<td style="padding:10px" colspan="4">{{ Param.NewsWithinHours(class_="NewsWithinHours", value='0') }}</td>
+											<th style="padding:10px">News Within (0 = any)</th>
+											<td style="padding:10px" colspan="2">
+												{{ Param.NewsWithinValue(class_="NewsWithinValue", value='0', style="width:80px;display:inline-block") }}
+												{{ Param.NewsTimeUnit(class_="NewsTimeUnit", style="width:110px;display:inline-block;margin-left:6px") }}
+											</td>
+											<td style="padding:10px" colspan="2">
+												<span style="font-size:11px;color:#888">e.g. 30 Minutes or 2 Hours</span>
+											</td>
 										</tr>
+										<!-- keep hidden legacy field for backward compat -->
+										<input type="hidden" name="NewsWithinHours" value="0">
 										<tr>
 											<th style="padding:10px">Exclude Publishers (comma-separated)</th>
 											<td style="padding:10px" colspan="4">{{ Param.NewsExcludePublishers(class_="NewsExcludePublishers", placeholder="e.g. BZ, MT", style="width:100%") }}</td>
 										</tr>
 									</tbody>
 								</table>
+								</div><!-- end bottom-tables-grid -->
+
+										<!-- Stock List Management -->
+										<div id="wl_section">
+											<span id="wl_msg" style="font-size:13px;"></span>
+											<div id="wl_panel">
+												<div class="wl-panel-inner">
+													<h4 class="wl-panel-title">Stock List Management</h4>
+													<div class="wl-save-row">
+														<input type="text" id="wl_save_name" class="wl-input" placeholder="Enter list name...">
+														<button id="wl_save" class="btn btn-sm btn-primary" type="button">Save Current List</button>
+													</div>
+													<div id="wl_list_container">
+														<table class="wl-table" id="wl_table">
+															<thead>
+																<tr>
+																	<th>Name</th>
+																	<th>Tickers</th>
+																	<th>Created</th>
+																	<th>Actions</th>
+																</tr>
+															</thead>
+															<tbody id="wl_table_body">
+																<tr><td colspan="4" class="wl-empty">No saved lists</td></tr>
+															</tbody>
+														</table>
+													</div>
+												</div>
+											</div>
+											<div id="customformToUse" style="margin-top:12px;">
+												<button id="AddFinancialInstrument" onclick="AddInstrument()">Add Instrument</button>
+												<div id="addcustomfields"></div>
+											</div>
+										</div>
+										<!-- End Stock List Management -->
 
                                 <div class="card-panel section-fade">
                                   <br>
-                                  <h3>Search for stock meeting variables <span class="badge-soft white-blue">Run</span></h3>
+                                  <h3>Search for stock meeting variables <span id="active_scan_name" style="font-size:14px;color:#1565c0;font-weight:600;margin-left:8px;"></span> <span class="badge-soft white-blue">Run</span></h3>
                                   <div class="SubmitData"> {{ Param.submit() }} </div>
                                 </div>
                                 <div id="bg_poll_times" style="margin-top:6px;">
@@ -692,17 +751,6 @@
 							    <input type="file" name="csvfile" id="csvfile" class="form-control-file csvchildren"/>
 							    <button type="submit" name="importdata" id="importdata" class="btn btn-info badge-soft white-blue">Proceed</button>
 							</form>
-						</div>
-						<div id = "customformToUse">
-							<button id = "AddFinancialInstrument" onclick="AddInstrument()">Add Instrument</button>
-							<!-- Watchlist (stock list) controls -->
-							<div id="watchlist-controls" style="display:inline-block; margin-left:12px;">
-								<button id="wl_save" class="btn btn-sm btn-outline-primary" type="button">Save List</button>
-								<button id="wl_load" class="btn btn-sm btn-outline-secondary" type="button">Load List</button>
-								<button id="wl_manage" class="btn btn-sm btn-outline-info" type="button">Saved Lists</button>
-								<span id="wl_msg" style="margin-left:8px; font-size:13px;"></span>
-							</div>
-							<div id = "addcustomfields"></div>
 						</div>
 					</div>
 
@@ -754,6 +802,22 @@
 			   		<div class="container-fluid">
 			   			<div class="row">
 				   			<div class="col-md-11 col-xs-11 col-md-offset-1 slider-text">
+
+							<!-- ============ NEWS FEED PANEL ============ -->
+							<div id="news-feed-panel" style="display:none; margin-bottom:18px; padding:14px 18px; border:1px solid #2c3e50; border-radius:8px; background:#0d1117;">
+								<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+									<h4 style="margin:0; color:#e6edf3; font-size:15px;">
+										&#128240; Latest News Headlines
+										<span id="news-feed-count" style="font-size:12px; color:#8b949e; margin-left:8px;"></span>
+									</h4>
+									<button type="button" onclick="document.getElementById('news-feed-panel').style.display='none'" style="background:none;border:none;color:#8b949e;font-size:18px;cursor:pointer;">&times;</button>
+								</div>
+								<div id="news-feed-body" style="max-height:420px; overflow-y:auto;">
+									<!-- populated by JS -->
+								</div>
+							</div>
+							<!-- ============ END NEWS FEED PANEL ============ -->
+
 				   			<form>
 				   				<div id="add1" class="card-panel section-fade"></div>
 							</form>
@@ -921,13 +985,16 @@
 		thecolors = ["red", "blue", "green", "brown"]; thecolors = "red";
         var ndaysId = ["FastSMA", "MediumSMA", "SlowSMA", "VWAP", "RSI", "FastEMA", "SlowEMA", "OBV", "ATR",
                        "PrevClose", "LowOfDay", "HighOfDay",
-                       "AverageVolume", "RelativeVolume", "PivotPoint", "Pricelevel"];
+                       "AverageVolume", "RelativeVolume", "PivotPoint", "Pricelevel",
+                       "Cross200SMA", "Cross50SMA"];
         var percentageId = ["PercentageFastSMA", "PercentageMediumSMA", "PercentageSlowSMA", "PercentageVWAP", "PercentageRSI", "PercentageFastEMA", "PercentageSlowEMA", "PercentageOBV", "PercentageATR",
                             "PercentagePrevClose", "PercentageLowOfDay", "PercentageHighOfDay",
-                            "PercentageAverageVolume", "PercentageRelativeVolume", "PercentagePivotPoint", "PercentagePrice"];
+                            "PercentageAverageVolume", "PercentageRelativeVolume", "PercentagePivotPoint", "PercentagePrice",
+                            "PercentageCross200SMA", "PercentageCross50SMA"];
         var comparison = ["ComparisonFastSMA", "ComparisonMediumSMA", "ComparisonSlowSMA", "ComparisonVWAP", "ComparisonRSI", "ComparisonFastEMA",  "ComparisonSlowEMA", "ComparisonOBV", "ComparisonATR",
                            "ComparisonPrevClose", "ComparisonLowOfDay", "ComparisonHighOfDay",
-                           "ComparisonAverageVolume", "ComparisonRelativeVolume", "ComparisonPivotPoint", "ComparisonPrice"];
+                           "ComparisonAverageVolume", "ComparisonRelativeVolume", "ComparisonPivotPoint", "ComparisonPrice",
+                           "ComparisonCross200SMA", "ComparisonCross50SMA"];
 		text_ = "";
 		text2 =  "";
 		var allIndicator = [];
@@ -951,8 +1018,8 @@
 
 
 		//Prevent form to send if there is is not "Not used" and the row input
-		if (validationFailed==false || allIndicator.length == 14) {
-			if (allIndicator.length == 14) {
+		if (validationFailed==false || allIndicator.length == comparison.length) {
+			if (allIndicator.length == comparison.length) {
 				//console.log(allIndicator.length, " rrrr");
 				document.getElementById("validator").innerHTML = "<h3> Select at least one inequality</h3>";
 			} else {
@@ -1334,7 +1401,8 @@ function renderResultsFromBackend(response) {
 
         // append to DOM
         var para = document.createElement("H3");
-        para.innerHTML = etf;
+        var scanLabel = window._activeScanName ? (etf + " — " + window._activeScanName) : etf;
+        para.textContent = scanLabel;
         document.getElementById("add1").appendChild(para);
         var thetable = document.createElement("DIV");
         thetable.innerHTML = txt1;
@@ -1361,6 +1429,112 @@ function renderResultsFromBackend(response) {
 
         tableId += 1;
     } // end for each etf
+
+    // Populate the dedicated News Feed panel
+    populateNewsFeedPanel(response);
+}
+
+/* =====================================================================
+   NEWS FEED PANEL — aggregates all news headlines from all returned
+   stocks, sorted by most recent, with expandable per-symbol groups.
+   ===================================================================== */
+function populateNewsFeedPanel(response) {
+    const panel = document.getElementById("news-feed-panel");
+    const body  = document.getElementById("news-feed-body");
+    const countEl = document.getElementById("news-feed-count");
+    if (!panel || !body) return;
+
+    // collect all (symbol, headline) pairs from the response
+    const allNews = [];
+    const mydata = response.result;
+    if (!mydata) { panel.style.display = "none"; return; }
+
+    for (const etf in mydata) {
+        const msg = mydata[etf];
+        for (const groupKey in msg) {
+            const rows = Array.isArray(msg[groupKey])
+                ? msg[groupKey]
+                : Object.values(msg[groupKey] || {});
+            for (const dta of rows) {
+                const sym = dta.symbol || dta.cusip || "???";
+                const headlines = dta.newsHeadlines || [];
+                for (const h of headlines) {
+                    allNews.push({ symbol: sym, ...h });
+                }
+            }
+        }
+    }
+
+    if (allNews.length === 0) {
+        panel.style.display = "none";
+        return;
+    }
+
+    // sort by parsedTime descending (most recent first)
+    allNews.sort(function(a, b) {
+        const ta = a.parsedTime || a.time || "";
+        const tb = b.parsedTime || b.time || "";
+        return tb.localeCompare(ta);
+    });
+
+    // group by symbol (preserve order of first appearance after sort)
+    const grouped = {};
+    const symbolOrder = [];
+    for (const item of allNews) {
+        if (!grouped[item.symbol]) {
+            grouped[item.symbol] = [];
+            symbolOrder.push(item.symbol);
+        }
+        grouped[item.symbol].push(item);
+    }
+
+    // XSS-safe helper
+    function esc(s) {
+        return (s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    }
+
+    // build HTML
+    let html = "";
+    for (const sym of symbolOrder) {
+        const items = grouped[sym];
+        const panelId = "nfp_" + sym.replace(/[^a-zA-Z0-9]/g, "_");
+        const latestTime = items[0].parsedTime || items[0].time || "";
+        let dispTime = latestTime;
+        try {
+            if (dispTime.includes("T")) dispTime = new Date(dispTime).toLocaleString();
+        } catch(e) {}
+
+        html += `<div style="margin-bottom:6px;">`;
+        html += `<div onclick="var el=document.getElementById('${panelId}');el.style.display=el.style.display==='none'?'block':'none'" `;
+        html += `style="cursor:pointer;padding:7px 10px;background:#161b22;border:1px solid #30363d;border-radius:5px;display:flex;align-items:center;justify-content:space-between;">`;
+        html += `<span style="color:#58a6ff;font-weight:600;font-size:13px;">`;
+        html += `<span class="nfp-arrow" style="display:inline-block;transition:transform .2s;margin-right:6px;">&#9654;</span>`;
+        html += `${esc(sym)} <span style="color:#8b949e;font-weight:400;margin-left:8px;">${items.length} headline${items.length > 1 ? 's' : ''}</span></span>`;
+        html += `<span style="color:#8b949e;font-size:11px;">${esc(dispTime)}</span>`;
+        html += `</div>`;
+        html += `<div id="${panelId}" style="display:none;padding:6px 12px 8px 24px;background:#0d1117;border-left:2px solid #30363d;">`;
+        html += `<table style="width:100%;border-collapse:collapse;font-size:12px;">`;
+        for (const ni of items) {
+            let t = ni.parsedTime || ni.time || "";
+            try { if (t.includes("T")) t = new Date(t).toLocaleString(); } catch(e) {}
+            const escHl = esc(ni.headline);
+            const escProv = esc(ni.provider);
+            const escT = esc(t);
+            const link = ni.articleId
+                ? `<a href="https://www.interactivebrokers.com/en/index.php?f=5765&cntry=&tag=&ib_entity=&src=${encodeURIComponent(ni.provider||'')}&id=${encodeURIComponent(ni.articleId)}" target="_blank" rel="noopener noreferrer" style="color:#58a6ff;text-decoration:underline">${escHl || 'link'}</a>`
+                : (escHl || 'n/a');
+            html += `<tr style="border-bottom:1px solid #21262d;">`;
+            html += `<td style="padding:4px 6px;white-space:nowrap;color:#8b949e;width:150px;">${escT}</td>`;
+            html += `<td style="padding:4px 6px;color:#c9d1d9;width:45px;">${escProv}</td>`;
+            html += `<td style="padding:4px 6px;color:#e6edf3;">${link}</td>`;
+            html += `</tr>`;
+        }
+        html += `</table></div></div>`;
+    }
+
+    body.innerHTML = html;
+    countEl.textContent = `(${allNews.length} total across ${symbolOrder.length} symbols)`;
+    panel.style.display = "block";
 }
 </script>
 
@@ -1369,6 +1543,7 @@ function renderResultsFromBackend(response) {
 <script type="text/javascript">
 	  var morca;
 	  var morcae;
+	  window._activeScanName = "";
 	  $(document).ready(function() {
 
 	  	 $(function(){
@@ -2238,11 +2413,37 @@ const BG_RESULTS_POLL_MS = {{ cfg_dict.get("bg_results_poll_ms", 5000) | int }};
       startSLPolling();
     }).fail(function(xhr){
       if (xhr && xhr.status === 409) {
-        setSLMessage("Scanner loop already running.", true);
+        // Backend thinks it's running — stop it first then auto-retry
+        setSLMessage("Resetting stale scanner state...", false);
+        $.ajax({
+          url: "/scanner-loop/stop",
+          type: "POST",
+          contentType: "application/json; charset=utf-8",
+          data: JSON.stringify({ tab_unique_id: _sl_unique_id }),
+          timeout: 10000
+        }).always(function(){
+          // Retry start after stop
+          $.ajax({
+            url: "/scanner-loop/start",
+            type: "POST",
+            contentType: "application/json; charset=utf-8",
+            data: JSON.stringify(payload),
+            timeout: 20000
+          }).done(function(){
+            _sl_enabled = true;
+            setSLStatus("running");
+            setSLMessage("Scanner loop running", false);
+            startSLPolling();
+            $("#sl_toggle").text("Stop Scanner Loop");
+          }).fail(function(xhr2){
+            setSLMessage("Failed to restart: " + (xhr2.responseJSON && xhr2.responseJSON.error ? xhr2.responseJSON.error : "error"), true);
+            setSLStatus("stopped");
+          });
+        });
       } else {
         setSLMessage("Failed to start: " + (xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : xhr.statusText || "error"), true);
+        setSLStatus("stopped");
       }
-      setSLStatus("stopped");
     });
   }
 
@@ -2566,7 +2767,11 @@ $("#load_setup").on("click", function(){
         }
         // If securities present, optionally update DOM or keep for when user runs
         // (We will not overwrite the add1 DOM here; the user can re-run to refresh)
-        _showSetupMsg("Loaded: " + (data.meta && data.meta.title ? data.meta.title : chosen.name), false);
+        var loadedTitle = (data.meta && data.meta.title) ? data.meta.title : chosen.name;
+        window._activeScanName = loadedTitle;
+        var el = document.getElementById("active_scan_name");
+        if (el) el.textContent = "[ " + loadedTitle + " ]";
+        _showSetupMsg("Loaded: " + loadedTitle, false);
       },
       error: function(xhr){
         _showSetupMsg("Load failed", true);
@@ -2601,7 +2806,6 @@ function _getManualTickers() {
 
 /* Populate the Manual Instruments panel from a ticker list */
 function _loadTickersToManual(tickers) {
-  // clear existing rows
   $("#addcustomfields").empty();
   tickers.forEach(function(t){
     AddInstrument();
@@ -2612,6 +2816,46 @@ function _loadTickersToManual(tickers) {
   });
 }
 
+/* Format date for display */
+function _wlDate(iso) {
+  try {
+    return new Date(iso).toLocaleString("en-US", {
+      month: "short", day: "2-digit", year: "numeric",
+      hour: "numeric", minute: "2-digit", hour12: true
+    });
+  } catch(e) { return iso || "—"; }
+}
+
+/* Refresh the saved-lists table */
+function _refreshWlTable() {
+  $.get("/watchlists/list").done(function(resp){
+    const lists = (resp && resp.watchlists) ? resp.watchlists : [];
+    const $body = $("#wl_table_body");
+    $body.empty();
+    if (lists.length === 0) {
+      $body.append('<tr><td colspan="4" class="wl-empty">No saved lists</td></tr>');
+      return;
+    }
+    lists.forEach(function(s){
+      const dispName = s.title || s.name;
+      const safeName = $("<span>").text(s.name).html();
+      const row = '<tr>' +
+        '<td class="wl-name-cell">' + $("<span>").text(dispName).html() + '</td>' +
+        '<td>' + (s.count || 0) + '</td>' +
+        '<td>' + _wlDate(s.created) + '</td>' +
+        '<td class="wl-actions-cell">' +
+          '<button class="btn btn-sm btn-outline-success wl-load-btn" data-wl-name="' + safeName + '">Load</button> ' +
+          '<button class="btn btn-sm btn-outline-danger wl-del-btn" data-wl-name="' + safeName + '" data-wl-title="' + $("<span>").text(dispName).html() + '">Delete</button>' +
+        '</td>' +
+        '</tr>';
+      $body.append(row);
+    });
+  }).fail(function(){ _showWlMsg("Failed to list stock lists", true); });
+}
+
+/* Auto-load saved lists on page ready */
+$(function(){ _refreshWlTable(); });
+
 /* Save List */
 $("#wl_save").on("click", function(){
   const tickers = _getManualTickers();
@@ -2619,9 +2863,12 @@ $("#wl_save").on("click", function(){
     _showWlMsg("Add tickers first (Manual Instruments)", true);
     return;
   }
-
-  const name = prompt("Save stock list as (choose a name):");
-  if (!name) return;
+  const name = $("#wl_save_name").val().trim();
+  if (!name) {
+    _showWlMsg("Enter a list name", true);
+    $("#wl_save_name").focus();
+    return;
+  }
 
   $.ajax({
     url: "/watchlists/save",
@@ -2631,6 +2878,8 @@ $("#wl_save").on("click", function(){
     success: function(resp) {
       if (resp && resp.ok) {
         _showWlMsg("Saved: " + name + " (" + tickers.length + " tickers)", false);
+        $("#wl_save_name").val("");
+        _refreshWlTable();
       } else if (resp && resp.exists) {
         if (confirm("List '" + name + "' already exists. Overwrite?")) {
           $.ajax({
@@ -2638,7 +2887,13 @@ $("#wl_save").on("click", function(){
             type: "POST",
             contentType: "application/json; charset=utf-8",
             data: JSON.stringify({ name: name, overwrite: true, tickers: tickers }),
-            success: function(r){ if (r && r.ok) _showWlMsg("Overwritten: " + name, false); },
+            success: function(r){
+              if (r && r.ok) {
+                _showWlMsg("Overwritten: " + name, false);
+                $("#wl_save_name").val("");
+                _refreshWlTable();
+              }
+            },
             error: function(){ _showWlMsg("Save failed", true); }
           });
         }
@@ -2647,102 +2902,74 @@ $("#wl_save").on("click", function(){
       }
     },
     error: function(xhr){
-      const msg = (xhr.responseJSON && xhr.responseJSON.error) ? xhr.responseJSON.error : "save failed";
       if (xhr.status === 409) {
-        if (confirm("List already exists. Overwrite?")) {
+        if (confirm("List '" + name + "' already exists. Overwrite?")) {
           $.ajax({
             url: "/watchlists/save",
             type: "POST",
             contentType: "application/json; charset=utf-8",
             data: JSON.stringify({ name: name, overwrite: true, tickers: tickers }),
-            success: function(r){ if (r && r.ok) _showWlMsg("Overwritten: " + name, false); },
+            success: function(r){
+              if (r && r.ok) {
+                _showWlMsg("Overwritten: " + name, false);
+                $("#wl_save_name").val("");
+                _refreshWlTable();
+              }
+            },
             error: function(){ _showWlMsg("Save failed", true); }
           });
         }
       } else {
+        var msg = (xhr.responseJSON && xhr.responseJSON.error) ? xhr.responseJSON.error : "save failed";
         _showWlMsg(msg, true);
       }
     }
   });
 });
 
-/* Load List */
-$("#wl_load").on("click", function(){
-  $.get("/watchlists/list").done(function(resp){
-    const lists = (resp && resp.watchlists) ? resp.watchlists : [];
-    if (lists.length === 0) {
-      alert("No saved stock lists found.");
-      return;
-    }
-    let choices = "Choose a stock list to load:\n\n";
-    lists.forEach(function(s, idx){
-      choices += (idx + 1) + ") " + (s.title || s.name) + " (" + s.count + " tickers, " +
-        new Date(s.created).toLocaleString("en-US", {
-          month: "short", day: "2-digit", year: "numeric",
-          hour: "numeric", minute: "2-digit", hour12: true
-        }) + ")\n";
-    });
-    const sel = prompt(choices + "\nEnter the number to load:");
-    const i = parseInt(sel) - 1;
-    if (!Number.isFinite(i) || i < 0 || i >= lists.length) return;
-    const chosen = lists[i];
-    $.ajax({
-      url: "/watchlists/load",
-      type: "POST",
-      contentType: "application/json; charset=utf-8",
-      data: JSON.stringify({ name: chosen.name }),
-      success: function(data){
-        if (!data || !data.tickers || data.tickers.length === 0) {
-          _showWlMsg("Empty or invalid list", true);
-          return;
-        }
-        _loadTickersToManual(data.tickers);
-        // switch to Manual Instruments tab
-        if (typeof changePage4 === "function") changePage4();
-        else $("#AddFinancialInstrument").closest("#customformToUse").show();
-        _showWlMsg("Loaded: " + (data.meta && data.meta.title ? data.meta.title : chosen.name) +
-                   " (" + data.tickers.length + " tickers)", false);
-      },
-      error: function(){ _showWlMsg("Load failed", true); }
-    });
-  }).fail(function(){ _showWlMsg("Failed to list stock lists", true); });
+/* Load — delegated click on .wl-load-btn */
+$(document).on("click", ".wl-load-btn", function(){
+  const wlName = $(this).data("wl-name");
+  $.ajax({
+    url: "/watchlists/load",
+    type: "POST",
+    contentType: "application/json; charset=utf-8",
+    data: JSON.stringify({ name: wlName }),
+    success: function(data){
+      if (!data || !data.tickers || data.tickers.length === 0) {
+        _showWlMsg("Empty or invalid list", true);
+        return;
+      }
+      _loadTickersToManual(data.tickers);
+      if (typeof changePage4 === "function") changePage4();
+      else $("#AddFinancialInstrument").closest("#customformToUse").show();
+      _showWlMsg("Loaded: " + (data.meta && data.meta.title ? data.meta.title : wlName) +
+                 " (" + data.tickers.length + " tickers)", false);
+    },
+    error: function(){ _showWlMsg("Load failed", true); }
+  });
 });
 
-/* Saved Lists - view & delete */
-$("#wl_manage").on("click", function(){
-  $.get("/watchlists/list").done(function(resp){
-    const lists = (resp && resp.watchlists) ? resp.watchlists : [];
-    if (lists.length === 0) {
-      alert("No saved stock lists found.");
-      return;
-    }
-    let choices = "Saved Stock Lists:\n\n";
-    lists.forEach(function(s, idx){
-      choices += (idx + 1) + ") " + (s.title || s.name) + " — " + s.count + " tickers (" +
-        new Date(s.created).toLocaleString("en-US", {
-          month: "short", day: "2-digit", year: "numeric",
-          hour: "numeric", minute: "2-digit", hour12: true
-        }) + ")\n";
-    });
-    choices += "\nEnter a number to delete that list, or press Cancel:";
-    const sel = prompt(choices);
-    if (!sel) return;
-    const i = parseInt(sel) - 1;
-    if (!Number.isFinite(i) || i < 0 || i >= lists.length) return;
-    const chosen = lists[i];
-    if (!confirm("Delete '" + (chosen.title || chosen.name) + "'?")) return;
-    $.ajax({
-      url: "/watchlists/delete",
-      type: "POST",
-      contentType: "application/json; charset=utf-8",
-      data: JSON.stringify({ name: chosen.name }),
-      success: function(r){
-        if (r && r.ok) _showWlMsg("Deleted: " + (chosen.title || chosen.name), false);
-        else _showWlMsg("Delete failed", true);
-      },
-      error: function(){ _showWlMsg("Delete failed", true); }
-    });
-  }).fail(function(){ _showWlMsg("Failed to list stock lists", true); });
+/* Delete — delegated click on .wl-del-btn */
+$(document).on("click", ".wl-del-btn", function(){
+  const wlName = $(this).data("wl-name");
+  const dispTitle = $(this).data("wl-title") || wlName;
+  if (!confirm("Delete list '" + dispTitle + "'?")) return;
+  $.ajax({
+    url: "/watchlists/delete",
+    type: "POST",
+    contentType: "application/json; charset=utf-8",
+    data: JSON.stringify({ name: wlName }),
+    success: function(r){
+      if (r && r.ok) {
+        _showWlMsg("Deleted: " + dispTitle, false);
+        _refreshWlTable();
+      } else {
+        _showWlMsg("Delete failed", true);
+      }
+    },
+    error: function(){ _showWlMsg("Delete failed", true); }
+  });
 });
 </script>
 <!-- ============ END WATCHLIST JS ============ -->

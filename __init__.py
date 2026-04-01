@@ -1030,11 +1030,26 @@ class BackgroundScanner:
             except Exception as e:
                 logger.exception("Failed to normalize background securities payload: %s", e)
 
+            # propagate conId if present in securities
+            try:
+                if isinstance(securities.get("conId"), list):
+                    normalized_securities["conId"] = list(securities["conId"])
+            except Exception:
+                pass
+
             # preserve backward compatibility flag
             try:
                 self._ib.addFrequency = form.get("addFrequency")
             except Exception:
                 pass
+
+            # Reset screening state so each iteration fetches fresh data
+            # (prices, indicators, signals).  Preserve the contract cache
+            # because the background scanner re-uses the same tickers and
+            # re-resolving them every iteration wastes time and API calls.
+            saved_cache = dict(self._ib.contract_cache)
+            self._ib._reset_screening_state()
+            self._ib.contract_cache = saved_cache
 
             # IMPORTANT: call the IBapi scanning function (this blocks until done)
             self._ib.getFinalResult(normalized_securities, form)
@@ -1288,7 +1303,7 @@ class BackgroundScanner:
             pass
 
         with self.lock:
-            # detect new signals
+            # detect new signals or variable-level changes
             new_signal_found = False
             for cusip, data in self.latest_results.items():
                 prev = self.previous_signals.get(cusip)
@@ -1296,6 +1311,14 @@ class BackgroundScanner:
                     new_signal_found = True
                 elif prev is not None and prev.get("signal") != "yes" and data.get("signal") == "yes":
                     new_signal_found = True
+
+                # Also beep when any individual variable result changed
+                # (e.g. a variable went from passing to failing or vice versa)
+                if prev is not None:
+                    old_vr = prev.get("variableResults", {})
+                    new_vr = data.get("variableResults", {})
+                    if old_vr != new_vr:
+                        new_signal_found = True
 
             # update previous_signals snapshot
             self.previous_signals = {k: dict(v) for k, v in self.latest_results.items()}
@@ -1603,23 +1626,26 @@ class BackgroundTop50Scanner:
                     self._run_count += 1
                 else:
                     # Step 2: Build securities dict from movers
+                    # IMPORTANT: "CSV" must be the first key because
+                    # getFinalResult() uses data[headers[0]] to build
+                    # netPosition and indexes each element with ["change"].
                     securities = {
+                        "CSV": [],
                         "cusip": [],
                         "ticker": [],
                         "conId": [],
-                        "CSV": [],
                     }
                     for idx, m in enumerate(movers):
                         cusip = f"custom{idx}"
-                        securities["cusip"].append(cusip)
-                        securities["ticker"].append(m["symbol"])
-                        securities["conId"].append(m.get("conId"))
                         securities["CSV"].append({
                             "cusip": cusip,
                             "ticker": m["symbol"],
                             "conId": m.get("conId"),
                             "change": 0,
                         })
+                        securities["cusip"].append(cusip)
+                        securities["ticker"].append(m["symbol"])
+                        securities["conId"].append(m.get("conId"))
 
                     # Step 3: Reset screening state and run indicator screening
                     self._ib._reset_screening_state()
@@ -1682,8 +1708,15 @@ class BackgroundTop50Scanner:
             raise ValueError("form must be a dict")
 
         with self.lock:
+            # Auto-recover if enabled flag is stuck but the thread is dead
             if self.enabled:
-                raise RuntimeError("Top 50 scanner loop already started")
+                thread_alive = self.thread and self.thread.is_alive()
+                if not thread_alive:
+                    logger.warning("Top 50 scanner: enabled flag stuck but thread is dead — resetting")
+                    self.enabled = False
+                    self._stop_event.set()
+                else:
+                    raise RuntimeError("Top 50 scanner loop already started")
             self.enabled = True
             self.interval_seconds = float(interval_seconds)
             self._stop_event.clear()
