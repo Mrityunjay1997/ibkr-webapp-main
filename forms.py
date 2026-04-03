@@ -275,6 +275,19 @@ class Parameters(FlaskForm):
         default="percentage",
     )
 
+    # ------------------------------------------------------------------
+    # Pullback Retracement (% retracement of day's move)
+    # ------------------------------------------------------------------
+
+    PullbackPct = IntegerField("Pullback Retracement")
+    PercentagePullbackPct = DecimalField("Pullback Retracement %")
+    PercentagePullbackPct1 = DecimalField("Pullback Retracement %1")
+
+    ComparisonPullbackPct = SelectField(
+        "Pullback Retracement",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
     ComparisonPivotPoint = SelectField(
         "Programming Language",
         choices=_STANDARD_COMPARISON_CHOICES,

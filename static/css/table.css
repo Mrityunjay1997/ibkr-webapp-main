@@ -248,7 +248,7 @@ thead .tableHead {
     margin-top: 10px;
     border: 1px solid #ccc;
     border-radius: 6px;
-    background: #fafbfc;
+    background: #ffffff;
 }
 .wl-panel-inner {
     padding: 12px 16px;
@@ -257,13 +257,19 @@ thead .tableHead {
     margin: 0 0 10px 0;
     font-size: 15px;
     font-weight: 600;
-    color: #333;
+    color: #222;
+}
+.wl-ticker-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
 }
 .wl-save-row {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
-    margin-bottom: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
 }
 .wl-input {
     flex: 1;
@@ -273,38 +279,22 @@ thead .tableHead {
     font-size: 13px;
     height: auto;
     width: auto;
+    background: #fff;
+    color: #222;
 }
-.wl-table {
-    width: 100%;
-    border-collapse: collapse;
+.wl-dropdown {
+    padding: 5px 8px;
+    border: 1px solid #bbb;
+    border-radius: 4px;
     font-size: 13px;
+    background: #fff;
+    color: #222;
+    min-width: 180px;
 }
-.wl-table thead tr {
-    background: #e8eef3;
-    border-bottom: 2px solid #bbb;
-}
-.wl-table th {
-    padding: 6px 10px;
-    text-align: left;
-    font-weight: 600;
-    color: #444;
-}
-.wl-table td {
-    padding: 6px 10px;
-    border-bottom: 1px solid #e0e0e0;
-}
-.wl-table tbody tr:hover {
-    background: #eef4fa;
-}
-.wl-name-cell {
-    font-weight: 500;
-}
-.wl-actions-cell {
-    white-space: nowrap;
-}
-.wl-actions-cell .btn {
-    padding: 2px 10px;
+.wl-save-row .btn {
+    padding: 4px 12px;
     font-size: 12px;
+    white-space: nowrap;
 }
 .wl-empty {
     text-align: center;

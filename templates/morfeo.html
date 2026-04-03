@@ -104,7 +104,7 @@
 			  <li class="lichange" style="display: none !important;"><a id = "lichange1" onclick="changePage1()">ark-funds</a></li>
               <li class="lichange"><a id="lichange4" onclick="toggleIbkrMovers()">IBKR Top 50 Movers</a></li>
 			  <li class="lichange" style="float:right"><a id="lichange2" class="active1" onclick="changePage2()">CSV</a></li>
-			  <li class="lichange" style="float:right"><a id="lichange3" class="active2">Manual Instruments</a></li>
+			  <li class="lichange" style="display:none !important;"><a id="lichange3" class="active2">Manual Instruments</a></li>
 			</ul>
 		</div>
 		<div></div>
@@ -624,6 +624,13 @@
 											</td>
 										</tr>
 										<tr>
+											<th style="padding:10px">Pullback Retracement</th>
+											<td style="padding:10px"><div id="changePullbackPct">{{ Param.PullbackPct(class_="PullbackPct", value='0') }}</div></td>
+											<td style="padding:10px">{{ Param.ComparisonPullbackPct(class_="ComparisonPullbackPct") }}</td>
+											<td style="padding:10px"><div id="percentagePullbackPct">{{ Param.PercentagePullbackPct(class_="PercentagePullbackPct", value='0') }}</div></td>
+											<td>&nbsp;</td>
+										</tr>
+										<tr>
 											<th style="padding:10px">Pivot Point</th>
 											<td style="padding:10px"> <div id = "changePP"> {{ Param.PivotPoint(class_="PivotPoint") }} </div></td>
 											<td style="padding:10px">{{ Param.ComparisonPivotPoint(class_="ComparisonPivotPoint") }}</td>
@@ -696,43 +703,11 @@
 								</table>
 								</div><!-- end bottom-tables-grid -->
 
-										<!-- Stock List Management -->
-										<div id="wl_section">
-											<span id="wl_msg" style="font-size:13px;"></span>
-											<div id="wl_panel">
-												<div class="wl-panel-inner">
-													<h4 class="wl-panel-title">Stock List Management</h4>
-													<div class="wl-save-row">
-														<input type="text" id="wl_save_name" class="wl-input" placeholder="Enter list name...">
-														<button id="wl_save" class="btn btn-sm btn-primary" type="button">Save Current List</button>
-													</div>
-													<div id="wl_list_container">
-														<table class="wl-table" id="wl_table">
-															<thead>
-																<tr>
-																	<th>Name</th>
-																	<th>Tickers</th>
-																	<th>Created</th>
-																	<th>Actions</th>
-																</tr>
-															</thead>
-															<tbody id="wl_table_body">
-																<tr><td colspan="4" class="wl-empty">No saved lists</td></tr>
-															</tbody>
-														</table>
-													</div>
-												</div>
-											</div>
-											<div id="customformToUse" style="margin-top:12px;">
-												<button id="AddFinancialInstrument" onclick="AddInstrument()">Add Instrument</button>
-												<div id="addcustomfields"></div>
-											</div>
-										</div>
-										<!-- End Stock List Management -->
+										<!-- Stock List Management moved after CSV -->
 
                                 <div class="card-panel section-fade">
                                   <br>
-                                  <h3>Search for stock meeting variables <span id="active_scan_name" style="font-size:14px;color:#1565c0;font-weight:600;margin-left:8px;"></span> <span class="badge-soft white-blue">Run</span></h3>
+                                  <h3>Search for stock meeting variables <span id="active_scan_name" style="font-size:16px;color:#000;font-weight:700;margin-left:8px;"></span> <span class="badge-soft white-blue">Run</span></h3>
                                   <div class="SubmitData"> {{ Param.submit() }} </div>
                                 </div>
                                 <div id="bg_poll_times" style="margin-top:6px;">
@@ -751,6 +726,40 @@
 							    <input type="file" name="csvfile" id="csvfile" class="form-control-file csvchildren"/>
 							    <button type="submit" name="importdata" id="importdata" class="btn btn-info badge-soft white-blue">Proceed</button>
 							</form>
+
+							<!-- ============ Stock List Management (after CSV) ============ -->
+							<div id="wl_section">
+								<span id="wl_msg" style="font-size:13px;"></span>
+								<div id="wl_panel">
+									<div class="wl-panel-inner">
+										<h4 class="wl-panel-title">Stock List Management</h4>
+
+										<!-- Comma-delimited ticker input -->
+										<div class="wl-ticker-row">
+											<label for="wl_ticker_input" style="font-size:13px;font-weight:600;color:#333;margin-right:6px;">Tickers:</label>
+											<input type="text" id="wl_ticker_input" class="wl-input" placeholder="e.g. AAPL, MSFT, TSLA, NVDA" style="flex:2;">
+										</div>
+
+										<!-- Save row + dropdown -->
+										<div class="wl-save-row">
+											<select id="wl_dropdown" class="wl-dropdown">
+												<option value="">-- Saved Lists --</option>
+											</select>
+											<input type="text" id="wl_save_name" class="wl-input" placeholder="New list name..." style="max-width:180px;">
+											<button id="wl_save" class="btn btn-sm btn-primary" type="button">Save</button>
+											<button id="wl_load" class="btn btn-sm btn-outline-success" type="button">Load</button>
+											<button id="wl_use_scan" class="btn btn-sm btn-info" type="button">Use for Scan</button>
+											<button id="wl_delete" class="btn btn-sm btn-outline-danger" type="button">Delete</button>
+										</div>
+									</div>
+								</div>
+								<!-- hidden legacy elements for backward compat -->
+								<div id="customformToUse" style="display:none;">
+									<button id="AddFinancialInstrument" style="display:none;">Add Instrument</button>
+									<div id="addcustomfields"></div>
+								</div>
+							</div>
+							<!-- ============ End Stock List Management ============ -->
 						</div>
 					</div>
 
@@ -801,7 +810,7 @@
 			   		<div></div>
 			   		<div class="container-fluid">
 			   			<div class="row">
-				   			<div class="col-md-11 col-xs-11 col-md-offset-1 slider-text">
+				   			<div class="col-md-12 col-xs-12 slider-text">
 
 							<!-- ============ NEWS FEED PANEL ============ -->
 							<div id="news-feed-panel" style="display:none; margin-bottom:18px; padding:14px 18px; border:1px solid #2c3e50; border-radius:8px; background:#0d1117;">
@@ -819,7 +828,7 @@
 							<!-- ============ END NEWS FEED PANEL ============ -->
 
 				   			<form>
-				   				<div id="add1" class="card-panel section-fade"></div>
+				   				<div id="add1" class="card-panel section-fade" style="overflow-x:auto;"></div>
 							</form>
 							<br><br><br>
                                 <div id = "createForm" style= "display: none;"></div>
@@ -986,15 +995,15 @@
         var ndaysId = ["FastSMA", "MediumSMA", "SlowSMA", "VWAP", "RSI", "FastEMA", "SlowEMA", "OBV", "ATR",
                        "PrevClose", "LowOfDay", "HighOfDay",
                        "AverageVolume", "RelativeVolume", "PivotPoint", "Pricelevel",
-                       "Cross200SMA", "Cross50SMA"];
+                       "Cross200SMA", "Cross50SMA", "PullbackPct"];
         var percentageId = ["PercentageFastSMA", "PercentageMediumSMA", "PercentageSlowSMA", "PercentageVWAP", "PercentageRSI", "PercentageFastEMA", "PercentageSlowEMA", "PercentageOBV", "PercentageATR",
                             "PercentagePrevClose", "PercentageLowOfDay", "PercentageHighOfDay",
                             "PercentageAverageVolume", "PercentageRelativeVolume", "PercentagePivotPoint", "PercentagePrice",
-                            "PercentageCross200SMA", "PercentageCross50SMA"];
+                            "PercentageCross200SMA", "PercentageCross50SMA", "PercentagePullbackPct"];
         var comparison = ["ComparisonFastSMA", "ComparisonMediumSMA", "ComparisonSlowSMA", "ComparisonVWAP", "ComparisonRSI", "ComparisonFastEMA",  "ComparisonSlowEMA", "ComparisonOBV", "ComparisonATR",
                            "ComparisonPrevClose", "ComparisonLowOfDay", "ComparisonHighOfDay",
                            "ComparisonAverageVolume", "ComparisonRelativeVolume", "ComparisonPivotPoint", "ComparisonPrice",
-                           "ComparisonCross200SMA", "ComparisonCross50SMA"];
+                           "ComparisonCross200SMA", "ComparisonCross50SMA", "ComparisonPullbackPct"];
 		text_ = "";
 		text2 =  "";
 		var allIndicator = [];
@@ -1151,12 +1160,18 @@ function renderResultsFromBackend(response) {
                     headerCols.push({ key: "highOfDay", label: "High of Day" });
                     if ("HighOfDay1" in dta) headerCols.push({ key: "HighOfDay1", label: "High of Day1" });
                     headerCols.push({ key: "volume", label: "Volume", raw: true });
-                    headerCols.push({ key: "averageVolume", label: "Avg Vol" });
-                    if ("averageVolume1" in dta) headerCols.push({ key: "averageVolume1", label: "Avg Vol1" });
+                    headerCols.push({ key: "averageVolume", label: "Avg Vol", raw: true });
+                    if ("averageVolume1" in dta) headerCols.push({ key: "averageVolume1", label: "Avg Vol1", raw: true });
                     headerCols.push({ key: "relativeVolume", label: "Relative Volume" });
                     if ("relativeVolume1" in dta) headerCols.push({ key: "relativeVolume1", label: "Relative Volume1" });
                     if ("breakHigh" in dta) headerCols.push({ key: "breakHigh", label: "Break High" });
                     if ("breakHigh1" in dta) headerCols.push({ key: "breakHigh1", label: "Break High1" });
+                    if ("pullbackPct" in dta) headerCols.push({ key: "pullbackPct", label: "Pullback %" });
+                    if ("pullbackPct1" in dta) headerCols.push({ key: "pullbackPct1", label: "Pullback %1" });
+                    if ("cross50SMA_value" in dta) headerCols.push({ key: "cross50SMA_value", label: "50 SMA", vrKey: "cross50SMA" });
+                    if ("cross50SMA_pctFromSMA" in dta) headerCols.push({ key: "cross50SMA_pctFromSMA", label: "% from 50", vrKey: "cross50SMA" });
+                    if ("cross200SMA_value" in dta) headerCols.push({ key: "cross200SMA_value", label: "200 SMA", vrKey: "cross200SMA" });
+                    if ("cross200SMA_pctFromSMA" in dta) headerCols.push({ key: "cross200SMA_pctFromSMA", label: "% from 200", vrKey: "cross200SMA" });
 
                     // pivot primary
                     const pivotPrimary = [];
@@ -1179,7 +1194,7 @@ function renderResultsFromBackend(response) {
                     headerHtml += "<th>netPosition</th>";
                     if (pivotSecondary.length > 0) headerHtml += pivotSecondary.map(p => `<th>${p}</th>`).join("");
                     headerHtml += `<th id="SortingTable${tableId}">Change</th><th>Place Order</th>`;
-                    if (hasNews) headerHtml += `<th>News</th>`;
+                    headerHtml += `<th>News</th>`;
                     headerHtml += "</tr></thead><tbody>";
                     txt1 += headerHtml;
 
@@ -1225,6 +1240,12 @@ function renderResultsFromBackend(response) {
                 // variable results for cell coloring
                 const vr = dta.variableResults || {};
 
+                // pre-compute news row ID and items for the inline news arrow on the symbol cell
+                const _newsItems = dta.newsHeadlines || [];
+                const _newsRowId = `newsRow_${tableId}_${secondIdBuySell}`;
+                const _newsCount = _newsItems.length;
+                const _newsArrowColor = _newsCount > 0 ? '#58a6ff' : '#555';
+
                 // standard columns
                 for (const col of headerCols) {
                     let v = dta[col.key];
@@ -1241,11 +1262,16 @@ function renderResultsFromBackend(response) {
 
                     // determine cell background from variableResults
                     let cellStyle = "";
-                    if (col.key in vr) {
-                        cellStyle = vr[col.key] ? " style='background:#4caf50;color:#fff'" : " style='background:#f44336;color:#fff'";
+                    const vrLookup = col.vrKey || col.key;
+                    if (vrLookup in vr) {
+                        cellStyle = vr[vrLookup] ? " style='background:#4caf50;color:#fff'" : " style='background:#f44336;color:#fff'";
                     }
 
-                    if (col.raw) {
+                    // For the symbol column, append an inline news toggle arrow
+                    if (col.key === "symbol") {
+                        const displayVal = (v === null || v === undefined || v === "") ? "n.d" : v;
+                        txt1 += `<td${cellStyle} style='white-space:nowrap'>${displayVal} <span class='news-arrow-sym' title='Toggle news (${_newsCount})' style='cursor:pointer;color:${_newsArrowColor};font-size:11px;margin-left:4px' onclick="event.stopPropagation();var el=document.getElementById('${_newsRowId}');var arrows=el.parentNode.querySelectorAll('.news-arrow');if(el.style.display==='none'){el.style.display='table-row';this.innerHTML='&#9650;';arrows.forEach(function(a){a.innerHTML='&#9650;'})}else{el.style.display='none';this.innerHTML='&#9660;';arrows.forEach(function(a){a.innerHTML='&#9660;'})}">&#9660;</span></td>`;
+                    } else if (col.raw) {
                         txt1 += `<td${cellStyle}>${(v === null || v === undefined || v === "") ? "n.d" : v}</td>`;
                     } else {
                         txt1 += `<td${cellStyle}>${fmt(v)}</td>`;
@@ -1291,54 +1317,61 @@ function renderResultsFromBackend(response) {
                 const totalIdBuySell = idBuySell + secondIdBuySell;
                 txt1 += `<td><button type='button' id='${totalIdBuySell}' data-toggle='modal' data-target='#exampleModalCenter' class='buttonbuysell' onclick='addButtonBuy(${idPlaceOrder}, ${totalIdBuySell})'>click</button></td>`;
 
-                // news toggle cell
-                const newsItems = dta.newsHeadlines || [];
-                const newsRowId = `newsRow_${tableId}_${secondIdBuySell}`;
-                if (hasNews) {
+                // news toggle cell (right side) — reuse pre-computed _newsItems / _newsRowId
+                const newsItems = _newsItems;
+                const newsRowId = _newsRowId;
+                {
+                    let newsStyle = "";
                     if (newsItems.length > 0) {
-                        let newsStyle = "";
                         const vr2 = dta.variableResults || {};
                         if ("news" in vr2) {
                             newsStyle = vr2["news"] ? " style='background:#4caf50;color:#fff;cursor:pointer'" : " style='background:#f44336;color:#fff;cursor:pointer'";
                         } else {
                             newsStyle = " style='cursor:pointer'";
                         }
-                        txt1 += `<td${newsStyle} onclick="var el=document.getElementById('${newsRowId}');el.style.display=el.style.display==='none'?'table-row':'none'">&#9660; ${newsItems.length}</td>`;
                     } else {
-                        txt1 += `<td>-</td>`;
+                        newsStyle = " style='cursor:pointer;color:#666'";
                     }
+                    const newsLabel = newsItems.length > 0 ? newsItems.length : '0';
+                    txt1 += `<td${newsStyle} onclick="event.stopPropagation();var el=document.getElementById('${newsRowId}');var arrows=el.parentNode.querySelectorAll('.news-arrow-sym');var arrow=this.querySelector('.news-arrow');if(el.style.display==='none'){el.style.display='table-row';arrow.innerHTML='&#9650;';arrows.forEach(function(a){a.innerHTML='&#9650;'})}else{el.style.display='none';arrow.innerHTML='&#9660;';arrows.forEach(function(a){a.innerHTML='&#9660;'})}"><span class='news-arrow'>&#9660;</span> ${newsLabel}</td>`;
                 }
 
                 txt1 += "</tr>";
 
-                // expandable news sub-row
-                if (hasNews && newsItems.length > 0) {
+                // expandable news sub-row (always present)
+                {
                     const totalCols = (groupHeaderCols || []).length
                         + (groupPivotPrimary || []).length
                         + 1 /* netPosition */
                         + (groupPivotSecondary || []).length
                         + 2 /* change + place order */
                         + 1 /* news col */;
-                    txt1 += `<tr id='${newsRowId}' style='display:none;background:#1a1a2e'>`;
-                    txt1 += `<td colspan='${totalCols}' style='padding:8px 15px'>`;
-                    txt1 += `<table style='width:100%;border-collapse:collapse;font-size:11px'>`;
-                    txt1 += `<tr style='border-bottom:1px solid #444'><th style='padding:4px;text-align:left'>Time</th><th style='padding:4px;text-align:left'>Source</th><th style='padding:4px;text-align:left'>Headline</th></tr>`;
-                    for (const ni of newsItems) {
-                        let displayTime = ni.parsedTime || ni.time || "";
-                        try {
-                            if (displayTime.includes("T")) {
-                                const d = new Date(displayTime);
-                                displayTime = d.toLocaleString();
-                            }
-                        } catch(e) {}
-                        // HTML-escape headline to prevent XSS
-                        const escHl = (ni.headline || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-                        const escProv = (ni.provider || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-                        const escTime = displayTime.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-                        const articleLink = ni.articleId ? `<a href='https://www.interactivebrokers.com/en/index.php?f=5765&cntry=&tag=&ib_entity=&src=${encodeURIComponent(ni.provider)}&id=${encodeURIComponent(ni.articleId)}' target='_blank' rel='noopener noreferrer' style='color:#4fc3f7;text-decoration:underline'>${escHl || "link"}</a>` : (escHl || "n/a");
-                        txt1 += `<tr style='border-bottom:1px solid #333'><td style='padding:3px 4px;white-space:nowrap'>${escTime}</td><td style='padding:3px 4px'>${escProv}</td><td style='padding:3px 4px'>${articleLink}</td></tr>`;
+                    txt1 += `<tr id='${newsRowId}' style='display:none;background:#101828'>`;
+                    txt1 += `<td colspan='${totalCols}' style='padding:10px 18px'>`;
+                    txt1 += `<div style='font-size:12px;font-weight:600;color:#58a6ff;margin-bottom:6px'>&#128240; News for ${(dta.symbol||'').replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>`;
+                    if (newsItems.length > 0) {
+                        txt1 += `<table style='width:100%;border-collapse:collapse;font-size:12px'>`;
+                        txt1 += `<tr style='border-bottom:1px solid #30363d'><th style='padding:5px 6px;text-align:left;color:#8b949e'>Date/Time</th><th style='padding:5px 6px;text-align:left;color:#8b949e'>Source</th><th style='padding:5px 6px;text-align:left;color:#8b949e'>Headline</th></tr>`;
+                        for (const ni of newsItems) {
+                            let displayTime = ni.parsedTime || ni.time || "";
+                            try {
+                                if (displayTime.includes("T")) {
+                                    const d = new Date(displayTime);
+                                    displayTime = d.toLocaleString();
+                                }
+                            } catch(e) {}
+                            const escHl = (ni.headline || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+                            const escProv = (ni.provider || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+                            const escTime = displayTime.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+                            const searchQuery = encodeURIComponent((ni.headline || '') + ' ' + (dta.symbol || ''));
+                            const articleLink = `<a href='https://www.google.com/search?q=${searchQuery}&tbm=nws' target='_blank' rel='noopener noreferrer' style='color:#58a6ff;text-decoration:underline'>${escHl || "link"}</a>`;
+                            txt1 += `<tr style='border-bottom:1px solid #21262d'><td style='padding:4px 6px;white-space:nowrap;color:#8b949e'>${escTime}</td><td style='padding:4px 6px;color:#c9d1d9'>${escProv}</td><td style='padding:4px 6px;color:#e6edf3'>${articleLink}</td></tr>`;
+                        }
+                        txt1 += `</table>`;
+                    } else {
+                        txt1 += `<div style='color:#8b949e;font-size:12px;padding:6px 0;'>No news available</div>`;
                     }
-                    txt1 += `</table></td></tr>`;
+                    txt1 += `</td></tr>`;
                 }
 
                 secondIdBuySell += 1;
@@ -1403,6 +1436,7 @@ function renderResultsFromBackend(response) {
         var para = document.createElement("H3");
         var scanLabel = window._activeScanName ? (etf + " — " + window._activeScanName) : etf;
         para.textContent = scanLabel;
+        para.style.color = "#e6edf3";
         document.getElementById("add1").appendChild(para);
         var thetable = document.createElement("DIV");
         thetable.innerHTML = txt1;
@@ -1520,9 +1554,8 @@ function populateNewsFeedPanel(response) {
             const escHl = esc(ni.headline);
             const escProv = esc(ni.provider);
             const escT = esc(t);
-            const link = ni.articleId
-                ? `<a href="https://www.interactivebrokers.com/en/index.php?f=5765&cntry=&tag=&ib_entity=&src=${encodeURIComponent(ni.provider||'')}&id=${encodeURIComponent(ni.articleId)}" target="_blank" rel="noopener noreferrer" style="color:#58a6ff;text-decoration:underline">${escHl || 'link'}</a>`
-                : (escHl || 'n/a');
+            const searchQ = encodeURIComponent((ni.headline || '') + ' ' + (ni.symbol || sym));
+            const link = `<a href="https://www.google.com/search?q=${searchQ}&tbm=nws" target="_blank" rel="noopener noreferrer" style="color:#58a6ff;text-decoration:underline">${escHl || 'link'}</a>`;
             html += `<tr style="border-bottom:1px solid #21262d;">`;
             html += `<td style="padding:4px 6px;white-space:nowrap;color:#8b949e;width:150px;">${escT}</td>`;
             html += `<td style="padding:4px 6px;color:#c9d1d9;width:45px;">${escProv}</td>`;
@@ -1576,6 +1609,8 @@ function populateNewsFeedPanel(response) {
                     $("#firstFormToFlask").data("movers-active") === true
                     ||
                     document.getElementById("AddFinancialInstrument").style.display == "block"
+                    ||
+                    ($("#wl_ticker_input").val() || "").trim().length > 0
                 ) {
 
                     var myCache = false;
@@ -1588,6 +1623,17 @@ function populateNewsFeedPanel(response) {
 
                         securitiesPayload = {
                             securities: moversSymbols.map((sym, index) => ({
+                                ticker: sym,
+                                cusip: "custom" + index
+                            }))
+                        };
+
+                    } else if (($("#wl_ticker_input").val() || "").trim().length > 0) {
+
+                        // Comma-delimited ticker input
+                        const commaSyms = _getManualTickers();
+                        securitiesPayload = {
+                            securities: commaSyms.map((sym, index) => ({
                                 ticker: sym,
                                 cusip: "custom" + index
                             }))
@@ -2554,9 +2600,19 @@ const BG_RESULTS_POLL_MS = {{ cfg_dict.get("bg_results_poll_ms", 5000) | int }};
         }
         const formObj = buildFormObjectFromPage();
         const scannerParams = getScannerParams();
+
+        // If Stock List Management has tickers, use them instead of Top 50 scanner
+        const customTickers = (typeof _getManualTickers === "function") ? _getManualTickers() : [];
+        if (customTickers.length > 0) {
+          scannerParams.custom_tickers = customTickers;
+        }
+
         startScannerLoop(v, u, formObj, scannerParams).always(function(){
           if (_sl_enabled) {
             $btn.text("Stop Scanner Loop");
+            if (customTickers.length > 0) {
+              setSLMessage("Scanner loop running (custom list: " + customTickers.length + " tickers)", false);
+            }
             // Scroll to results
             setTimeout(function(){
               const target = document.querySelector("#firstFormToFlask > div.card-panel.section-fade");
@@ -2656,6 +2712,9 @@ $("#save_setup").on("click", function(){
     success: function(resp) {
       if (resp && resp.ok) {
         _showSetupMsg("Saved: " + name, false);
+        window._activeScanName = name;
+        var el = document.getElementById("active_scan_name");
+        if (el) el.textContent = "[ " + name + " ]";
       } else if (resp && resp.exists) {
         if (confirm("Setup already exists. Overwrite?")) {
           payload.overwrite = true;
@@ -2665,7 +2724,12 @@ $("#save_setup").on("click", function(){
             contentType: "application/json; charset=utf-8",
             data: JSON.stringify(payload),
             success: function(resp2){
-              if (resp2 && resp2.ok) _showSetupMsg("Overwritten: " + name, false);
+              if (resp2 && resp2.ok) {
+                _showSetupMsg("Overwritten: " + name, false);
+                window._activeScanName = name;
+                var el = document.getElementById("active_scan_name");
+                if (el) el.textContent = "[ " + name + " ]";
+              }
             },
             error: function(){ _showSetupMsg("Save failed", true); }
           });
@@ -2788,110 +2852,96 @@ function _showWlMsg(msg, isErr) {
   setTimeout(() => $("#wl_msg").text(""), 4000);
 }
 
-/* Collect tickers currently in the Manual Instruments panel */
+/* Get tickers from the comma-delimited input */
 function _getManualTickers() {
-  const tickers = [];
-  $("#addcustomfields .securityRow").each(function(){
-    const inputs = $(this).find("input");
-    const ticker = (inputs.eq(0).val() || "").trim().toUpperCase();
-    if (ticker) {
-      tickers.push({
-        ticker: ticker,
-        cusip: (inputs.eq(1).val() || "").trim()
-      });
-    }
+  const raw = ($("#wl_ticker_input").val() || "").trim();
+  if (!raw) return [];
+  return raw.split(/[,\s]+/).map(function(s){ return s.trim().toUpperCase(); }).filter(function(s){ return s.length > 0; });
+}
+
+/* Populate the comma-delimited input from a ticker array */
+function _loadTickersToInput(tickers) {
+  const symbols = tickers.map(function(t){
+    return (typeof t === "string") ? t : (t.ticker || "");
+  }).filter(function(s){ return s.length > 0; });
+  $("#wl_ticker_input").val(symbols.join(", "));
+}
+
+/* Also populate hidden addcustomfields for backward compat with formatInstrument */
+function _syncToLegacyFields() {
+  const tickers = _getManualTickers();
+  $("#addcustomfields").empty();
+  tickers.forEach(function(sym){
+    var div = document.createElement("DIV");
+    div.setAttribute("class", "securityRow");
+    div.innerHTML = "<div class='securityName'><label class='subtitleSecurity'>Ticker</label><input type='text' class='subtitleSecurityInput' value='" + sym + "'></div>" +
+                    "<div class='securityName'><label class='subtitleSecurity'>Cusip</label><input type='text' class='subtitleSecurityInput'></div>";
+    document.getElementById("addcustomfields").appendChild(div);
   });
   return tickers;
 }
 
-/* Populate the Manual Instruments panel from a ticker list */
-function _loadTickersToManual(tickers) {
-  $("#addcustomfields").empty();
-  tickers.forEach(function(t){
-    AddInstrument();
-    const lastRow = $("#addcustomfields .securityRow").last();
-    const inputs = lastRow.find("input");
-    inputs.eq(0).val(t.ticker || "");
-    inputs.eq(1).val(t.cusip || "");
-  });
-}
-
-/* Format date for display */
-function _wlDate(iso) {
-  try {
-    return new Date(iso).toLocaleString("en-US", {
-      month: "short", day: "2-digit", year: "numeric",
-      hour: "numeric", minute: "2-digit", hour12: true
-    });
-  } catch(e) { return iso || "—"; }
-}
-
-/* Refresh the saved-lists table */
-function _refreshWlTable() {
+/* Refresh the dropdown with saved lists */
+function _refreshWlDropdown() {
   $.get("/watchlists/list").done(function(resp){
     const lists = (resp && resp.watchlists) ? resp.watchlists : [];
-    const $body = $("#wl_table_body");
-    $body.empty();
-    if (lists.length === 0) {
-      $body.append('<tr><td colspan="4" class="wl-empty">No saved lists</td></tr>');
-      return;
-    }
+    const $dd = $("#wl_dropdown");
+    $dd.empty().append('<option value="">-- Saved Lists --</option>');
     lists.forEach(function(s){
       const dispName = s.title || s.name;
-      const safeName = $("<span>").text(s.name).html();
-      const row = '<tr>' +
-        '<td class="wl-name-cell">' + $("<span>").text(dispName).html() + '</td>' +
-        '<td>' + (s.count || 0) + '</td>' +
-        '<td>' + _wlDate(s.created) + '</td>' +
-        '<td class="wl-actions-cell">' +
-          '<button class="btn btn-sm btn-outline-success wl-load-btn" data-wl-name="' + safeName + '">Load</button> ' +
-          '<button class="btn btn-sm btn-outline-danger wl-del-btn" data-wl-name="' + safeName + '" data-wl-title="' + $("<span>").text(dispName).html() + '">Delete</button>' +
-        '</td>' +
-        '</tr>';
-      $body.append(row);
+      const count = s.count || 0;
+      $dd.append('<option value="' + $("<span>").text(s.name).html() + '">' +
+                 $("<span>").text(dispName).html() + ' (' + count + ')' +
+                 '</option>');
     });
   }).fail(function(){ _showWlMsg("Failed to list stock lists", true); });
 }
 
-/* Auto-load saved lists on page ready */
-$(function(){ _refreshWlTable(); });
+/* Auto-load on page ready */
+$(function(){ _refreshWlDropdown(); });
 
 /* Save List */
 $("#wl_save").on("click", function(){
   const tickers = _getManualTickers();
   if (tickers.length === 0) {
-    _showWlMsg("Add tickers first (Manual Instruments)", true);
+    _showWlMsg("Enter tickers first (comma-separated)", true);
+    $("#wl_ticker_input").focus();
     return;
   }
-  const name = $("#wl_save_name").val().trim();
+  let name = $("#wl_save_name").val().trim();
   if (!name) {
-    _showWlMsg("Enter a list name", true);
+    // try dropdown selection as name
+    name = $("#wl_dropdown").val();
+  }
+  if (!name) {
+    _showWlMsg("Enter a list name or select one to overwrite", true);
     $("#wl_save_name").focus();
     return;
   }
+  const tickerObjs = tickers.map(function(sym, i){ return { ticker: sym, cusip: "custom" + i }; });
 
   $.ajax({
     url: "/watchlists/save",
     type: "POST",
     contentType: "application/json; charset=utf-8",
-    data: JSON.stringify({ name: name, overwrite: false, tickers: tickers }),
+    data: JSON.stringify({ name: name, overwrite: false, tickers: tickerObjs }),
     success: function(resp) {
       if (resp && resp.ok) {
         _showWlMsg("Saved: " + name + " (" + tickers.length + " tickers)", false);
         $("#wl_save_name").val("");
-        _refreshWlTable();
+        _refreshWlDropdown();
       } else if (resp && resp.exists) {
         if (confirm("List '" + name + "' already exists. Overwrite?")) {
           $.ajax({
             url: "/watchlists/save",
             type: "POST",
             contentType: "application/json; charset=utf-8",
-            data: JSON.stringify({ name: name, overwrite: true, tickers: tickers }),
+            data: JSON.stringify({ name: name, overwrite: true, tickers: tickerObjs }),
             success: function(r){
               if (r && r.ok) {
                 _showWlMsg("Overwritten: " + name, false);
                 $("#wl_save_name").val("");
-                _refreshWlTable();
+                _refreshWlDropdown();
               }
             },
             error: function(){ _showWlMsg("Save failed", true); }
@@ -2908,12 +2958,12 @@ $("#wl_save").on("click", function(){
             url: "/watchlists/save",
             type: "POST",
             contentType: "application/json; charset=utf-8",
-            data: JSON.stringify({ name: name, overwrite: true, tickers: tickers }),
+            data: JSON.stringify({ name: name, overwrite: true, tickers: tickerObjs }),
             success: function(r){
               if (r && r.ok) {
                 _showWlMsg("Overwritten: " + name, false);
                 $("#wl_save_name").val("");
-                _refreshWlTable();
+                _refreshWlDropdown();
               }
             },
             error: function(){ _showWlMsg("Save failed", true); }
@@ -2927,9 +2977,13 @@ $("#wl_save").on("click", function(){
   });
 });
 
-/* Load — delegated click on .wl-load-btn */
-$(document).on("click", ".wl-load-btn", function(){
-  const wlName = $(this).data("wl-name");
+/* Load selected list into ticker input */
+$("#wl_load").on("click", function(){
+  const wlName = $("#wl_dropdown").val();
+  if (!wlName) {
+    _showWlMsg("Select a list from the dropdown first", true);
+    return;
+  }
   $.ajax({
     url: "/watchlists/load",
     type: "POST",
@@ -2940,21 +2994,64 @@ $(document).on("click", ".wl-load-btn", function(){
         _showWlMsg("Empty or invalid list", true);
         return;
       }
-      _loadTickersToManual(data.tickers);
-      if (typeof changePage4 === "function") changePage4();
-      else $("#AddFinancialInstrument").closest("#customformToUse").show();
-      _showWlMsg("Loaded: " + (data.meta && data.meta.title ? data.meta.title : wlName) +
-                 " (" + data.tickers.length + " tickers)", false);
+      _loadTickersToInput(data.tickers);
+      _showWlMsg("Loaded: " + wlName + " (" + data.tickers.length + " tickers)", false);
     },
     error: function(){ _showWlMsg("Load failed", true); }
   });
 });
 
-/* Delete — delegated click on .wl-del-btn */
-$(document).on("click", ".wl-del-btn", function(){
-  const wlName = $(this).data("wl-name");
-  const dispTitle = $(this).data("wl-title") || wlName;
-  if (!confirm("Delete list '" + dispTitle + "'?")) return;
+/* Use for Scan — load list into input and trigger scan */
+$("#wl_use_scan").on("click", function(){
+  const tickers = _getManualTickers();
+  if (tickers.length === 0) {
+    // If dropdown selected but input empty, load first
+    const wlName = $("#wl_dropdown").val();
+    if (wlName) {
+      $.ajax({
+        url: "/watchlists/load",
+        type: "POST",
+        contentType: "application/json; charset=utf-8",
+        data: JSON.stringify({ name: wlName }),
+        success: function(data){
+          if (!data || !data.tickers || data.tickers.length === 0) {
+            _showWlMsg("Empty or invalid list", true);
+            return;
+          }
+          _loadTickersToInput(data.tickers);
+          _syncToLegacyFields();
+          // Show submit and mark as manual instruments active
+          document.getElementById("AddFinancialInstrument").style.display = "block";
+          $(".SubmitData").show();
+          if (document.getElementById("csvimportdataform").style.display !== "none") {
+            document.getElementById("csvimportdataform").style.display = "none";
+          }
+          _showWlMsg("Ready to scan: " + data.tickers.length + " tickers", false);
+        },
+        error: function(){ _showWlMsg("Load failed", true); }
+      });
+    } else {
+      _showWlMsg("Enter tickers or select a list first", true);
+    }
+    return;
+  }
+  _syncToLegacyFields();
+  document.getElementById("AddFinancialInstrument").style.display = "block";
+  $(".SubmitData").show();
+  if (document.getElementById("csvimportdataform").style.display !== "none") {
+    document.getElementById("csvimportdataform").style.display = "none";
+  }
+  _showWlMsg("Ready to scan: " + tickers.length + " tickers", false);
+});
+
+/* Delete selected list */
+$("#wl_delete").on("click", function(){
+  const wlName = $("#wl_dropdown").val();
+  if (!wlName) {
+    _showWlMsg("Select a list from the dropdown first", true);
+    return;
+  }
+  if (!confirm("Delete list '" + wlName + "'?")) return;
   $.ajax({
     url: "/watchlists/delete",
     type: "POST",
@@ -2962,8 +3059,8 @@ $(document).on("click", ".wl-del-btn", function(){
     data: JSON.stringify({ name: wlName }),
     success: function(r){
       if (r && r.ok) {
-        _showWlMsg("Deleted: " + dispTitle, false);
-        _refreshWlTable();
+        _showWlMsg("Deleted: " + wlName, false);
+        _refreshWlDropdown();
       } else {
         _showWlMsg("Delete failed", true);
       }

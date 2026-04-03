@@ -861,6 +861,7 @@ class BackgroundScanner:
         self.latest_results = {}  # latest sendToFlaskIB results
         self.previous_signals = {}  # previous signal states to detect new ones
         self.latest_warning = {}
+        self._beep_pending = False  # set True each loop iteration when conditions met
         self.last_run_time = None
         self._stop_event = threading.Event()
         self._start_request_time = None
@@ -1078,6 +1079,12 @@ class BackgroundScanner:
                 self.latest_results = clean_results
                 self.latest_warning = clean_warning
 
+                # Beep every loop iteration when any stock meets conditions
+                for v in clean_results.values():
+                    if v.get("signal") == "yes":
+                        self._beep_pending = True
+                        break
+
         except Exception as e:
             # If the IB instance produced an error that may indicate a broken connection,
             # disconnect it so a fresh connection will be created on next iteration.
@@ -1292,9 +1299,10 @@ class BackgroundScanner:
 
     def results(self):
         """
-        Return latest results and a simple beep indicator if new signals
-        were found since last poll. This does not play sound itself.
-        Frontend should poll and play beep when `beep` is True.
+        Return latest results and a beep indicator.
+        Beep is True whenever the most recent loop iteration found
+        any stock meeting conditions.  The flag is cleared after reading
+        so the frontend beeps once per loop iteration.
         """
         # Update client heartbeat (lease) whenever frontend polls results
         try:
@@ -1303,29 +1311,12 @@ class BackgroundScanner:
             pass
 
         with self.lock:
-            # detect new signals or variable-level changes
-            new_signal_found = False
-            for cusip, data in self.latest_results.items():
-                prev = self.previous_signals.get(cusip)
-                if prev is None and data.get("signal") == "yes":
-                    new_signal_found = True
-                elif prev is not None and prev.get("signal") != "yes" and data.get("signal") == "yes":
-                    new_signal_found = True
-
-                # Also beep when any individual variable result changed
-                # (e.g. a variable went from passing to failing or vice versa)
-                if prev is not None:
-                    old_vr = prev.get("variableResults", {})
-                    new_vr = data.get("variableResults", {})
-                    if old_vr != new_vr:
-                        new_signal_found = True
-
-            # update previous_signals snapshot
-            self.previous_signals = {k: dict(v) for k, v in self.latest_results.items()}
+            should_beep = self._beep_pending
+            self._beep_pending = False
 
             return {
                 "results": dict(self.latest_results),
-                "beep": new_signal_found,
+                "beep": should_beep,
                 "warning": dict(self.latest_warning),
                 "last_run_time": self.last_run_time,
             }
@@ -1456,6 +1447,11 @@ def background_results():
 # -------------------------------------------------------------------------
 
 
+class _SkipIteration(Exception):
+    """Sentinel exception to skip the current loop iteration without error."""
+    pass
+
+
 class BackgroundTop50Scanner:
     """
     Background loop that:
@@ -1474,6 +1470,7 @@ class BackgroundTop50Scanner:
         self.latest_movers = []
         self.previous_signals = {}
         self.latest_warning = {}
+        self._beep_pending = False  # set True each loop iteration when conditions met
         self.last_run_time = None
         self._stop_event = threading.Event()
         self._start_request_time = None
@@ -1603,32 +1600,63 @@ class BackgroundTop50Scanner:
                 if not ok:
                     raise RuntimeError("IB not connected for top50 scanner")
 
-                # Step 1: Reset scanner state and fetch top 50 movers
-                self._ib._reset_scanner_state()
+                # ----------------------------------------------------------
+                # Determine ticker source: custom stock list OR Top 50 scan
+                # ----------------------------------------------------------
+                custom_tickers = scanner_params.get("custom_tickers") or []
 
-                current_scan_code = scanner_params.get("scan_code", "TOP_PERC_GAIN")
-                movers = self._ib.request_price_movers(
-                    timeout_sec=cfg.movers_timeout_sec,
-                    location_code=cfg.location_code,
-                    scan_code=current_scan_code,
-                    above_price=float(scanner_params.get("min_price", 0.05)),
-                    above_volume=int(scanner_params.get("min_volume", 75000)),
-                )
+                if custom_tickers:
+                    # ---- Custom stock list mode (from Stock List Management) ----
+                    movers = None  # no scanner scan needed
 
-                with self.lock:
-                    self.latest_movers = movers or []
-                    self.scan_code = current_scan_code
+                    securities = {
+                        "CSV": [],
+                        "cusip": [],
+                        "ticker": [],
+                        "conId": [],
+                    }
+                    for idx, sym in enumerate(custom_tickers):
+                        cusip = f"custom{idx}"
+                        securities["CSV"].append({
+                            "cusip": cusip,
+                            "ticker": sym,
+                            "conId": None,
+                            "change": 0,
+                        })
+                        securities["cusip"].append(cusip)
+                        securities["ticker"].append(sym)
+                        securities["conId"].append(None)
 
-                if not movers:
                     with self.lock:
-                        self.latest_warning = {"scanner_loop": "No movers returned from IBKR scanner"}
-                    self.last_run_time = time.time()
-                    self._run_count += 1
+                        self.latest_movers = [{"symbol": s, "rank": i} for i, s in enumerate(custom_tickers)]
+                        self.scan_code = "CUSTOM_LIST"
+
                 else:
-                    # Step 2: Build securities dict from movers
-                    # IMPORTANT: "CSV" must be the first key because
-                    # getFinalResult() uses data[headers[0]] to build
-                    # netPosition and indexes each element with ["change"].
+                    # ---- Top 50 scanner mode (original behavior) ----
+                    # Step 1: Reset scanner state and fetch top 50 movers
+                    self._ib._reset_scanner_state()
+
+                    current_scan_code = scanner_params.get("scan_code", "TOP_PERC_GAIN")
+                    movers = self._ib.request_price_movers(
+                        timeout_sec=cfg.movers_timeout_sec,
+                        location_code=cfg.location_code,
+                        scan_code=current_scan_code,
+                        above_price=float(scanner_params.get("min_price", 0.05)),
+                        above_volume=int(scanner_params.get("min_volume", 75000)),
+                    )
+
+                    with self.lock:
+                        self.latest_movers = movers or []
+                        self.scan_code = current_scan_code
+
+                    if not movers:
+                        with self.lock:
+                            self.latest_warning = {"scanner_loop": "No movers returned from IBKR scanner"}
+                        self.last_run_time = time.time()
+                        self._run_count += 1
+                        raise _SkipIteration()
+
+                    # Build securities dict from movers
                     securities = {
                         "CSV": [],
                         "cusip": [],
@@ -1647,33 +1675,49 @@ class BackgroundTop50Scanner:
                         securities["ticker"].append(m["symbol"])
                         securities["conId"].append(m.get("conId"))
 
-                    # Step 3: Reset screening state and run indicator screening
-                    self._ib._reset_screening_state()
-                    self._ib._reset_scanner_state()
-                    self._ib.addFrequency = form.get("addFrequency")
-                    self._ib.getFinalResult(securities, form)
+                # ----------------------------------------------------------
+                # Common path: screen the securities against indicators
+                # ----------------------------------------------------------
+                # Preserve contract_cache across iterations to avoid
+                # redundant reqContractDetails calls and IB pacing violations
+                saved_cache = dict(self._ib.contract_cache)
+                self._ib._reset_screening_state()
+                self._ib.contract_cache = saved_cache
+                self._ib._reset_scanner_state()
+                self._ib.addFrequency = form.get("addFrequency")
+                self._ib.getFinalResult(securities, form)
 
-                    # Step 4: Collect results
-                    with self.lock:
-                        raw_results = getattr(self._ib, "sendToFlaskIB", {}) or {}
-                        raw_warning = getattr(self._ib, "warningTicker", {}) or {}
+                # Collect results
+                with self.lock:
+                    raw_results = getattr(self._ib, "sendToFlaskIB", {}) or {}
+                    raw_warning = getattr(self._ib, "warningTicker", {}) or {}
 
-                        clean_results = {}
-                        for k, v in raw_results.items():
-                            key = str(k) if k is not None else f"custom{random.randint(51, 99)}"
-                            clean_results[key] = v
+                    clean_results = {}
+                    for k, v in raw_results.items():
+                        key = str(k) if k is not None else f"custom{random.randint(51, 99)}"
+                        clean_results[key] = v
 
-                        clean_warning = {}
-                        for k, v in raw_warning.items():
-                            if k is None:
-                                continue
-                            clean_warning[str(k)] = v
+                    clean_warning = {}
+                    for k, v in raw_warning.items():
+                        if k is None:
+                            continue
+                        clean_warning[str(k)] = v
 
-                        self.latest_results = clean_results
-                        self.latest_warning = clean_warning
+                    self.latest_results = clean_results
+                    self.latest_warning = clean_warning
 
-                    self.last_run_time = time.time()
-                    self._run_count += 1
+                    # Beep every loop iteration when any stock meets conditions
+                    for v in clean_results.values():
+                        if v.get("signal") == "yes":
+                            self._beep_pending = True
+                            break
+
+                self.last_run_time = time.time()
+                self._run_count += 1
+
+            except _SkipIteration:
+                # No movers returned — skip screening, move to wait
+                pass
 
             except Exception as e:
                 logger.exception("Top 50 scanner loop error: %s", e)
@@ -1769,20 +1813,13 @@ class BackgroundTop50Scanner:
             pass
 
         with self.lock:
-            new_signal_found = False
-            for cusip, data in self.latest_results.items():
-                prev = self.previous_signals.get(cusip)
-                if prev is None and data.get("signal") == "yes":
-                    new_signal_found = True
-                elif prev is not None and prev.get("signal") != "yes" and data.get("signal") == "yes":
-                    new_signal_found = True
-
-            self.previous_signals = {k: dict(v) for k, v in self.latest_results.items()}
+            should_beep = self._beep_pending
+            self._beep_pending = False
 
             return {
                 "results": dict(self.latest_results),
                 "movers": list(self.latest_movers),
-                "beep": new_signal_found,
+                "beep": should_beep,
                 "warning": dict(self.latest_warning),
                 "last_run_time": self.last_run_time,
                 "run_count": self._run_count,

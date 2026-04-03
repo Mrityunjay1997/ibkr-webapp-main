@@ -188,6 +188,11 @@ class IBapi(EWrapper, EClient):
 
         self.Locking = threading.Lock()
 
+        # Semaphore to limit concurrent reqHistoricalData calls
+        # IB allows ~6 concurrent historical data requests; we use 10
+        # to allow some headroom while preventing silent drops.
+        self._hist_semaphore = threading.Semaphore(10)
+
         self.errorSymbol = {}
         self.otherErrorCounter = 0
 
@@ -232,6 +237,8 @@ class IBapi(EWrapper, EClient):
         # reqId -> bool (historicalNewsEnd received)
         self._news_done = {}
         self._news_lock = threading.Lock()
+        # Subscribed provider codes discovered via reqNewsProviders()
+        self._subscribed_news_providers = None  # None = not yet queried
 
     def _to_dict(self, obj):
         if obj is None:
@@ -289,13 +296,22 @@ class IBapi(EWrapper, EClient):
                 continue
 
             try:
+                cached_exchange = data["exchange"]
+                cached_primary = data.get("primaryExchange", "")
+                # Always route through SMART; preserve specific exchange
+                # as primaryExchange for listing venue identification.
+                if cached_exchange != "SMART" and not cached_primary:
+                    cached_primary = cached_exchange
                 c = self.marketContract(
                     data["symbol"],
                     data["secType"],
-                    data["exchange"],
-                    data.get("primaryExchange", ""),
+                    "SMART",
+                    cached_primary,
                     data["currency"],
                 )
+                # Restore conId so news fetch works from cached contracts
+                if data.get("conId"):
+                    c.conId = int(data["conId"])
                 self.contract_cache[symbol] = c
             except Exception:
                 continue
@@ -343,6 +359,7 @@ class IBapi(EWrapper, EClient):
                         "exchange": contract.exchange,
                         "primaryExchange": getattr(contract, "primaryExchange", ""),
                         "currency": contract.currency,
+                        "conId": getattr(contract, "conId", None),
                     }
                 }
             except Exception:
@@ -414,6 +431,11 @@ class IBapi(EWrapper, EClient):
         while True:
             if isinstance(self.nextOrderId, int):
                 print("connected")
+                # Query which news providers are subscribed (logs via newsProviders callback)
+                try:
+                    self.reqNewsProviders()
+                except Exception:
+                    pass
                 break
 
             print("waiting for connection")
@@ -450,6 +472,10 @@ class IBapi(EWrapper, EClient):
             float(bar.volume),
         ]
 
+        # Guard against late callbacks for already-cleaned-up request IDs
+        if req_id not in self.HistoricalDt:
+            return
+
         # Assumes the list is already initialized elsewhere
         self.HistoricalDt[req_id].append(current_bar)
 
@@ -462,8 +488,9 @@ class IBapi(EWrapper, EClient):
 
         print("HistoricalDataEnd. ReqId:", req_id, "from", start, "to", end)
 
-        # mark this request as completed
-        self.hisdtId[req_id] = True
+        # mark this request as completed (guard against stale req_ids)
+        if req_id in self.hisdtId:
+            self.hisdtId[req_id] = True
 
     # ------------------------------------------------------------------
     # News callbacks
@@ -487,7 +514,29 @@ class IBapi(EWrapper, EClient):
         """
         Callback fired when all historical news for request_id were sent.
         """
+        count = len(self._news_data.get(request_id, []))
+        logger.info("historicalNewsEnd reqId=%s headlines=%d hasMore=%s", request_id, count, has_more)
         self._news_done[request_id] = True
+
+    def newsProviders(self, news_providers):
+        """
+        Callback fired when reqNewsProviders() returns the list of
+        subscribed news providers.  We log the result and store the
+        provider codes so fetchNews() only requests subscribed ones.
+        """
+        if news_providers:
+            codes = [np.code for np in news_providers]
+            display = [f"{np.code} ({np.name})" for np in news_providers]
+            logger.info("Subscribed news providers: %s", ", ".join(display))
+            self._subscribed_news_providers = "+".join(codes)
+        else:
+            logger.warning(
+                "No news providers subscribed.  "
+                "Enable at least 'Benzinga General News (BZ:BZ_FREE)' in "
+                "IBKR Account Management → Settings → Market Data Subscriptions "
+                "to see news headlines."
+            )
+            self._subscribed_news_providers = ""
 
     def tickPrice(self, req_id, tick_type, price, attrib):
         """
@@ -596,8 +645,10 @@ class IBapi(EWrapper, EClient):
         elif req_id not in self.errorSymbol and error_code != 300:
 
             self.otherErrorCounter += 1
+            # Use a large offset to avoid colliding with screening theid values
+            other_key = 900000 + self.otherErrorCounter
 
-            self.warningTicker[self.otherErrorCounter] = [
+            self.warningTicker[other_key] = [
                 req_id,
                 "Internal Error",
                 f"Error: {error_code}. {error_string}",
@@ -610,6 +661,12 @@ class IBapi(EWrapper, EClient):
         # timeout.  Signal completion here so it can proceed immediately.
         if req_id in self.requestInformation and not self.requestInformation[req_id]:
             self.requestInformation[req_id] = True
+
+        # Unblock the news waiting loop in fetchNews().
+        # If IB rejects the news request, historicalNewsEnd never fires.
+        if req_id in self._news_done and not self._news_done[req_id]:
+            logger.info("News request %s got error %s: %s — unblocking", req_id, error_code, error_string)
+            self._news_done[req_id] = True
 
         # Unblock the historical-data waiting loop in getDataResult().
         # When IB rejects a request (pacing violation, no data, etc.) the
@@ -679,14 +736,16 @@ class IBapi(EWrapper, EClient):
         }
 
         # store result
-        self.data[req_id].append(contract_info)
+        if req_id in self.data:
+            self.data[req_id].append(contract_info)
 
     def contractDetailsEnd(self, req_id):
         """
         IB callback fired when all contract details for req_id are received.
         """
 
-        self.requestInformation[req_id] = True
+        if req_id in self.requestInformation:
+            self.requestInformation[req_id] = True
 
         print("\ncontractDetails End\n")
 
@@ -714,12 +773,16 @@ class IBapi(EWrapper, EClient):
 
         # --------------------------------------------------
         # Existing CUSIP logic
+        # Skip CINS codes (international CUSIPs starting with
+        # a letter like G/Y) — IB doesn't resolve them via
+        # secIdType="CUSIP"; fall through to symbol lookup.
         # --------------------------------------------------
         elif (
                 sec_id
                 and sec_id != "nan"
                 and sec_id_type == "CUSIP"
                 and not str(sec_id).lower().startswith("custom")
+                and str(sec_id)[0:1].isdigit()
         ):
 
             contract.secIdType = "CUSIP"
@@ -740,6 +803,16 @@ class IBapi(EWrapper, EClient):
         contract.currency = "USD"
         contract.secType = "STK"
 
+        logger.debug(
+            "reqContractDetails id=%s symbol=%s conId=%s secIdType=%s secId=%s exchange=%s",
+            id_sec,
+            getattr(contract, "symbol", None),
+            getattr(contract, "conId", None),
+            getattr(contract, "secIdType", None),
+            getattr(contract, "secId", None),
+            getattr(contract, "exchange", None),
+        )
+
         self.reqContractDetails(id_sec, contract)
 
     @staticmethod
@@ -758,53 +831,53 @@ class IBapi(EWrapper, EClient):
 
         return contract
 
-    def getData(self, contract, form, theid):
+    def getData(self, contract, form, theid, override_tf=None, override_lookback=None):
         """
-        Request historical market data for a contract based on the indicator
-        configuration contained in `form`.
+        Request historical market data for a contract.
 
-        Behavior:
-        - Compute maximum lookback window required by enabled indicators (lo
-        okback_window).
-        - Detect per-indicator time frame fields. If any are present,
-          choose the *finest* (smallest) timeframe among them.
-          Otherwise fall back to self.addFrequency or a safe default.
-        - Request IB historical data using the chosen bar size. For intraday
-          minute bar sizes the function requests enough *days* to cover lookback_window bars
-          (approx 390 trading minutes/day).
+        When override_tf and override_lookback are provided they are used
+        directly instead of being derived from the form.  This enables
+        per-indicator timeframe support where each unique timeframe gets
+        its own historical data request.
         """
         # ------------------------------------------------------------------
         # Determine the maximum lookback required by all indicators
         # ------------------------------------------------------------------
-        maxlength = []
-
-        # Primary indicator fields
-        for key in ("FastSMA", "MediumSMA", "SlowSMA", "VWAP", "RSI",
-                    "AverageVolume", "FastEMA", "SlowEMA", "OBV", "ATR"):
-            if key in form and form[key] != "":
-                try:
-                    maxlength.append(int(form[key]))
-                except Exception:
-                    # ignore non-integer entries
-                    pass
-
-        # Secondary indicator fields (a duplicated set)
-        for key in ("FastSMA1", "MediumSMA1", "SlowSMA1", "VWAP1", "RSI1",
-                    "AverageVolume1", "FastEMA1", "SlowEMA1", "OBV1", "ATR1"):
-            if key in form and form[key] != "":
-                try:
-                    maxlength.append(int(form[key]))
-                except Exception:
-                    pass
-
-        if len(maxlength) > 0:
-            max_required = max(maxlength) + 1
+        if override_lookback is not None:
+            lookback_window = override_lookback
             if self.maxlength is None:
-                self.maxlength = max_required
-            lookback_window = max_required
+                self.maxlength = lookback_window
         else:
-            # Default lookback when no indicator requires a window
-            lookback_window = 252
+            maxlength = []
+
+            # Primary indicator fields
+            for key in ("FastSMA", "MediumSMA", "SlowSMA", "VWAP", "RSI",
+                        "AverageVolume", "FastEMA", "SlowEMA", "OBV", "ATR",
+                        "Cross50SMA", "Cross200SMA"):
+                if key in form and form[key] != "":
+                    try:
+                        maxlength.append(int(form[key]))
+                    except Exception:
+                        # ignore non-integer entries
+                        pass
+
+            # Secondary indicator fields (a duplicated set)
+            for key in ("FastSMA1", "MediumSMA1", "SlowSMA1", "VWAP1", "RSI1",
+                        "AverageVolume1", "FastEMA1", "SlowEMA1", "OBV1", "ATR1"):
+                if key in form and form[key] != "":
+                    try:
+                        maxlength.append(int(form[key]))
+                    except Exception:
+                        pass
+
+            if len(maxlength) > 0:
+                max_required = max(maxlength) + 1
+                if self.maxlength is None:
+                    self.maxlength = max_required
+                lookback_window = max_required
+            else:
+                # Default lookback when no indicator requires a window
+                lookback_window = 252
 
         # ------------------------------------------------------------------
         # Map friendly timeframes to IB barSize strings and approximate seconds
@@ -821,70 +894,69 @@ class IBapi(EWrapper, EClient):
         }
 
         # ------------------------------------------------------------------
-        # Collect requested per-indicator timeframes (new per-indicator fields)
+        # Determine the selected timeframe
         # ------------------------------------------------------------------
-        requested_tfs = []
-        per_indicator_tf_fields = (
-            "FastSMA_tf",
-            "FastSMA1_tf",
-            "MediumSMA_tf",
-            "MediumSMA1_tf",
-            "SlowSMA_tf",
-            "SlowSMA1_tf",
-            "VWAP_tf",
-            "VWAP1_tf",
-            "RSI_tf",
-            "RSI1_tf",
-            "FastEMA_tf",
-            "FastEMA1_tf",
-            "SlowEMA_tf",
-            "SlowEMA1_tf",
-            "OBV_tf",
-            "OBV1_tf",
-            "ATR_tf",
-            "ATR1_tf",
-            "PrevClose_tf",
-            "PrevClose1_tf",
-            "LowOfDay_tf",
-            "LowOfDay1_tf",
-            "HighOfDay_tf",
-            "HighOfDay1_tf",
-            "averageVolume_tf",
-            "averageVolume1_tf",
-            "relativeVolume_tf",
-            "relativeVolume1_tf",
-        )
+        if override_tf is not None:
+            # Caller supplied the exact timeframe – skip detection
+            selected_tf = override_tf
+            ib_bar_size, bar_seconds = TIMEFRAME_TO_IB.get(selected_tf, ("1 day", 86400))
+            requested_tfs = [selected_tf]
+        else:
+            # Collect requested per-indicator timeframes
+            requested_tfs = []
+            per_indicator_tf_fields = (
+                "FastSMA_tf",
+                "FastSMA1_tf",
+                "MediumSMA_tf",
+                "MediumSMA1_tf",
+                "SlowSMA_tf",
+                "SlowSMA1_tf",
+                "VWAP_tf",
+                "VWAP1_tf",
+                "RSI_tf",
+                "RSI1_tf",
+                "FastEMA_tf",
+                "FastEMA1_tf",
+                "SlowEMA_tf",
+                "SlowEMA1_tf",
+                "OBV_tf",
+                "OBV1_tf",
+                "ATR_tf",
+                "ATR1_tf",
+                "PrevClose_tf",
+                "PrevClose1_tf",
+                "LowOfDay_tf",
+                "LowOfDay1_tf",
+                "HighOfDay_tf",
+                "HighOfDay1_tf",
+                "averageVolume_tf",
+                "averageVolume1_tf",
+                "relativeVolume_tf",
+                "relativeVolume1_tf",
+            )
 
-        for tf_field in per_indicator_tf_fields:
-            if tf_field in form and form[tf_field] not in (None, ""):
-                requested_tfs.append(form[tf_field])
+            for tf_field in per_indicator_tf_fields:
+                if tf_field in form and form[tf_field] not in (None, ""):
+                    requested_tfs.append(form[tf_field])
 
-        # Fallback to the global selector if no per-indicator TFs were provided
-        if not requested_tfs:
-            # try attribute on the engine first
-            if getattr(self, "addFrequency", None):
-                requested_tfs.append(self.addFrequency)
-            # otherwise try the form-posted global value
-            elif "addFrequency" in form and form["addFrequency"] not in (None, ""):
-                requested_tfs.append(form["addFrequency"])
-            else:
-                requested_tfs.append("1 day")  # safe default
+            # Fallback to the global selector if no per-indicator TFs were provided
+            if not requested_tfs:
+                if getattr(self, "addFrequency", None):
+                    requested_tfs.append(self.addFrequency)
+                elif "addFrequency" in form and form["addFrequency"] not in (None, ""):
+                    requested_tfs.append(form["addFrequency"])
+                else:
+                    requested_tfs.append("1 day")
 
-        # Normalize and filter requested timeframes to known choices
-        requested_tfs = [tf for tf in requested_tfs if tf in TIMEFRAME_TO_IB]
+            requested_tfs = [tf for tf in requested_tfs if tf in TIMEFRAME_TO_IB]
+            if not requested_tfs:
+                requested_tfs = ["1 day"]
 
-        if not requested_tfs:
-            # if none matched, fallback to daily
-            requested_tfs = ["1 day"]
+            def tf_seconds(tf):
+                return TIMEFRAME_TO_IB.get(tf, ("1 day", 86400))[1]
 
-        # ------------------------------------------------------------------
-        # Choose the *finest* (smallest duration) timeframe among requested
-        # ------------------------------------------------------------------
-        def tf_seconds(tf):
-            return TIMEFRAME_TO_IB.get(tf, ("1 day", 86400))[1]
-
-        selected_tf = min(requested_tfs, key=tf_seconds)
-        ib_bar_size, bar_seconds = TIMEFRAME_TO_IB.get(selected_tf, ("1 day", 86400))
+            selected_tf = min(requested_tfs, key=tf_seconds)
+            ib_bar_size, bar_seconds = TIMEFRAME_TO_IB.get(selected_tf, ("1 day", 86400))
 
         # ------------------------------------------------------------------
         # Determine an appropriate 'timeperiod' string for IB's reqHistoricalData
@@ -922,6 +994,7 @@ class IBapi(EWrapper, EClient):
 
         # ------------------------------------------------------------------
         # Make the historical data request using the selected bar size
+        # Acquire semaphore to limit concurrent IB historical requests
         # ------------------------------------------------------------------
         idreqHistDt = theid
 
@@ -938,37 +1011,15 @@ class IBapi(EWrapper, EClient):
         except Exception:
             pass
 
+        self._hist_semaphore.acquire()
         try:
-            self.reqHistoricalData(
-                idreqHistDt,
-                contract,
-                "",
-                timeperiod,
-                ib_bar_size,
-                "TRADES",
-                0,
-                1,
-                False,
-                [],
-            )
-        except Exception:
-            # keep behavior safe: log but don't crash
-            try:
-                logger.exception(
-                    "reqHistoricalData failed for %s with bar size %s; falling back to 1 day",
-                    getattr(contract, "symbol", "<unknown>"),
-                    ib_bar_size,
-                )
-            except Exception:
-                pass
-            # fallback to a safe daily request
             try:
                 self.reqHistoricalData(
                     idreqHistDt,
                     contract,
                     "",
                     timeperiod,
-                    "1 day",
+                    ib_bar_size,
                     "TRADES",
                     0,
                     1,
@@ -976,8 +1027,34 @@ class IBapi(EWrapper, EClient):
                     [],
                 )
             except Exception:
-                # if fallback also fails, raise so caller can notice
-                raise
+                # keep behavior safe: log but don't crash
+                try:
+                    logger.exception(
+                        "reqHistoricalData failed for %s with bar size %s; falling back to 1 day",
+                        getattr(contract, "symbol", "<unknown>"),
+                        ib_bar_size,
+                    )
+                except Exception:
+                    pass
+                # fallback to a safe daily request
+                try:
+                    self.reqHistoricalData(
+                        idreqHistDt,
+                        contract,
+                        "",
+                        timeperiod,
+                        "1 day",
+                        "TRADES",
+                        0,
+                        1,
+                        False,
+                        [],
+                    )
+                except Exception:
+                    # if fallback also fails, raise so caller can notice
+                    raise
+        finally:
+            self._hist_semaphore.release()
 
         # Store the required window length per symbol
         try:
@@ -985,6 +1062,126 @@ class IBapi(EWrapper, EClient):
         except Exception:
             # defensive: if contract has no symbol, skip assignment
             pass
+
+    # ------------------------------------------------------------------
+    # Multi-timeframe helpers
+    # ------------------------------------------------------------------
+
+    _KNOWN_TFS = {"1 min", "2 min", "5 min", "15 min", "1 hour", "1 day", "1 year"}
+
+    # Maps indicator result key -> form field that holds its per-indicator TF
+    _INDICATOR_TF_FIELD = {
+        "smaFast": "FastSMA_tf",
+        "smaFast1": "FastSMA1_tf",
+        "smaMedium": "MediumSMA_tf",
+        "smaMedium1": "MediumSMA1_tf",
+        "smaSlow": "SlowSMA_tf",
+        "smaSlow1": "SlowSMA1_tf",
+        "vwap": "VWAP_tf",
+        "vwap1": "VWAP1_tf",
+        "rsi": "RSI_tf",
+        "rsi1": "RSI1_tf",
+        "emaFast": "FastEMA_tf",
+        "emaFast1": "FastEMA1_tf",
+        "emaSlow": "SlowEMA_tf",
+        "emaSlow1": "SlowEMA1_tf",
+        "obv": "OBV_tf",
+        "obv1": "OBV1_tf",
+        "atr": "ATR_tf",
+        "atr1": "ATR1_tf",
+        "averageVolume": "averageVolume_tf",
+        "averageVolume1": "averageVolume1_tf",
+        "relativeVolume": "relativeVolume_tf",
+        "relativeVolume1": "relativeVolume1_tf",
+        "prevClose": "PrevClose_tf",
+        "prevClose1": "PrevClose1_tf",
+        "lowOfDay": "LowOfDay_tf",
+        "lowOfDay1": "LowOfDay1_tf",
+        "highOfDay": "HighOfDay_tf",
+        "highOfDay1": "HighOfDay1_tf",
+    }
+
+    @staticmethod
+    def _build_tf_plan(form):
+        """
+        Determine which unique timeframes are needed and the max lookback
+        window for each.
+
+        Returns (default_tf, tf_plan) where tf_plan is {tf_str: max_lookback}.
+        """
+        KNOWN = IBapi._KNOWN_TFS
+
+        # Global / default timeframe
+        default_tf = form.get("addFrequency") or "1 day"
+        if default_tf not in KNOWN:
+            default_tf = "1 day"
+
+        # (value_key, tf_form_key, default_lookback)
+        LOOKBACK_INDICATORS = [
+            ("FastSMA", "FastSMA_tf", 10),
+            ("FastSMA1", "FastSMA1_tf", 10),
+            ("MediumSMA", "MediumSMA_tf", 10),
+            ("MediumSMA1", "MediumSMA1_tf", 10),
+            ("SlowSMA", "SlowSMA_tf", 50),
+            ("SlowSMA1", "SlowSMA1_tf", 50),
+            ("VWAP", "VWAP_tf", 20),
+            ("VWAP1", "VWAP1_tf", 20),
+            ("RSI", "RSI_tf", 14),
+            ("RSI1", "RSI1_tf", 14),
+            ("FastEMA", "FastEMA_tf", 21),
+            ("FastEMA1", "FastEMA1_tf", 21),
+            ("SlowEMA", "SlowEMA_tf", 21),
+            ("SlowEMA1", "SlowEMA1_tf", 21),
+            ("OBV", "OBV_tf", 14),
+            ("OBV1", "OBV1_tf", 14),
+            ("ATR", "ATR_tf", 14),
+            ("ATR1", "ATR1_tf", 14),
+            ("AverageVolume", "averageVolume_tf", 14),
+            ("AverageVolume1", "averageVolume1_tf", 14),
+            ("RelativeVolume", "relativeVolume_tf", 5),
+            ("RelativeVolume1", "relativeVolume1_tf", 5),
+        ]
+
+        tf_plan = {}  # {tf_str: max_lookback}
+
+        for val_key, tf_key, default_lb in LOOKBACK_INDICATORS:
+            if val_key in form and form[val_key] not in (None, ""):
+                try:
+                    lookback = int(form[val_key]) + 1
+                except Exception:
+                    lookback = default_lb + 1
+            else:
+                continue
+            tf = form.get(tf_key)
+            if not tf or tf not in KNOWN:
+                tf = default_tf
+            tf_plan[tf] = max(tf_plan.get(tf, 0), lookback)
+
+        # Indicators that always use the default TF (no per-indicator TF field)
+        for val_key, default_lb in [("Cross50SMA", 50), ("Cross200SMA", 200), ("BreakHigh", 5)]:
+            if val_key in form and form[val_key] not in (None, ""):
+                try:
+                    lookback = int(form[val_key]) + 1
+                except Exception:
+                    lookback = default_lb + 1
+                tf_plan[default_tf] = max(tf_plan.get(default_tf, 0), lookback)
+
+        # Indicators with TF fields but small fixed lookback
+        for comp_key, tf_key, lb in [
+            ("ComparisonPrevClose", "PrevClose_tf", 5),
+            ("ComparisonLowOfDay", "LowOfDay_tf", 2),
+            ("ComparisonHighOfDay", "HighOfDay_tf", 2),
+        ]:
+            if form.get(comp_key, "Not used") != "Not used":
+                tf = form.get(tf_key)
+                if not tf or tf not in KNOWN:
+                    tf = default_tf
+                tf_plan[tf] = max(tf_plan.get(tf, 0), lb)
+
+        if not tf_plan:
+            tf_plan[default_tf] = 252
+
+        return default_tf, tf_plan
 
     @staticmethod
     def getIndicators(data, cusip, contract, form, net_position, symbol):
@@ -1058,14 +1255,13 @@ class IBapi(EWrapper, EClient):
         daily_volume = grouped["volume"].sum()
 
         def _avg_daily_volume(_lookback):
-            # use last `_lookback` days available (exclude current incomplete session if it is partial)
+            # use last `_lookback` complete days (exclude current incomplete session)
             days = daily_volume.copy()
-            # if latest_date is today and session may be partial, exclude it for 'average daily volume'
             if len(days) > 1:
-                days_to_use = days.iloc[-(min(len(days) - 1, _lookback)): -0] if len(days) > 1 else days
-                # but above slicing can be empty; fallback:
-                if days_to_use.empty:
-                    days_to_use = days.iloc[-_lookback:]
+                # Exclude the last entry (today's partial session) and take
+                # up to _lookback previous complete days.
+                complete_days = days.iloc[:-1]
+                days_to_use = complete_days.iloc[-_lookback:]
             else:
                 days_to_use = days.iloc[-_lookback:]
             if days_to_use.empty:
@@ -1112,7 +1308,7 @@ class IBapi(EWrapper, EClient):
                 avg_vol = float(result_full["volume"].iloc[-lookback:].mean()) if result_full.shape[0] >= 1 else float(
                     np.nan)
 
-            indicators["averageVolume"] = avg_vol
+            indicators["averageVolume"] = int(round(avg_vol)) if not np.isnan(avg_vol) else None
 
             if form.get("ComparisonAverageVolume") == "between":
                 try:
@@ -1125,7 +1321,7 @@ class IBapi(EWrapper, EClient):
                 else:
                     avg_vol1 = float(result_full["volume"].iloc[-lookback1:].mean()) if result_full.shape[
                                                                                             0] >= 1 else float(np.nan)
-                indicators["averageVolume1"] = avg_vol1
+                indicators["averageVolume1"] = int(round(avg_vol1)) if not np.isnan(avg_vol1) else None
 
         # --- Relative volume ---
         if form.get("ComparisonRelativeVolume") != "Not used":
@@ -1618,11 +1814,43 @@ class IBapi(EWrapper, EClient):
             if form.get("ComparisonBreakHigh") == "between":
                 indicators["breakHigh1"] = indicators.get("breakHigh")
 
+        # --- Pullback Retracement (% retracement of day's move) ---
+        if form.get("ComparisonPullbackPct", "Not used") != "Not used":
+            try:
+                # high of day (session)
+                if not result_session.empty:
+                    hod = float(result_session["high"].max())
+                else:
+                    hod = float(result_full["high"].iloc[-1])
+
+                # previous close
+                if len(unique_dates) >= 2:
+                    prev_date = unique_dates[-2]
+                    prev_mask = result_full.index.normalize() == prev_date
+                    pc = float(result_full.loc[prev_mask]["close"].iloc[-1])
+                else:
+                    pc = float(result_full["close"].iloc[-2]) if len(result_full) >= 2 else float(
+                        result_full["close"].iloc[-1])
+
+                close_price = float(result_full["close"].iloc[-1])
+                move = hod - pc
+
+                if move > 0:
+                    pullback_pct = ((hod - close_price) / move) * 100.0
+                    indicators["pullbackPct"] = pullback_pct
+                else:
+                    indicators["pullbackPct"] = None
+
+                if form.get("ComparisonPullbackPct") == "between":
+                    indicators["pullbackPct1"] = indicators.get("pullbackPct")
+            except Exception:
+                indicators["pullbackPct"] = None
+
         # --- final housekeeping ---
-        # ensure volume metadata
+        # ensure volume metadata (integer — no decimals)
         try:
-            indicators["volume"] = float(result_session["volume"].iloc[-1]) if not result_session.empty else float(
-                result_full["volume"].iloc[-1])
+            raw_vol = result_session["volume"].iloc[-1] if not result_session.empty else result_full["volume"].iloc[-1]
+            indicators["volume"] = int(round(float(raw_vol)))
         except Exception:
             indicators["volume"] = None
 
@@ -2743,6 +2971,42 @@ class IBapi(EWrapper, EClient):
             variable_results["breakHigh"] = bool(break_high_condition)
 
         # -------------------------
+        # PULLBACK RETRACEMENT
+        # -------------------------
+        pullback_condition = None
+
+        if form.get("ComparisonPullbackPct", "Not used") not in _NON_SIMPLE_MODES:
+            if form.get("ComparisonPullbackPct") == "greater":
+                pullback_condition = _safe_compare(data.get("pullbackPct"), ">", float(form.get("PercentagePullbackPct", 0)))
+            elif form.get("ComparisonPullbackPct") == "greaterEqual":
+                pullback_condition = _safe_compare(data.get("pullbackPct"), ">=", float(form.get("PercentagePullbackPct", 0)))
+            elif form.get("ComparisonPullbackPct") == "lower":
+                pullback_condition = _safe_compare(data.get("pullbackPct"), "<", float(form.get("PercentagePullbackPct", 0)))
+            elif form.get("ComparisonPullbackPct") == "lowerEqual":
+                pullback_condition = _safe_compare(data.get("pullbackPct"), "<=", float(form.get("PercentagePullbackPct", 0)))
+
+        elif form.get("ComparisonPullbackPct") == "between":
+            pullback_condition = (
+                    _safe_compare(data.get("pullbackPct"), ">=", float(form.get("PercentagePullbackPct", 0)))
+                    and _safe_compare(data.get("pullbackPct1"), "<=", float(form.get("PercentagePullbackPct1", 0)))
+            )
+
+        elif form.get("ComparisonPullbackPct") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form.get("PercentagePullbackPct", 5))
+            except Exception:
+                threshold = 5.0
+            pullback_condition = _within_percent_check(
+                data.get("pullbackPct"), data.get("close"),
+                form.get("ComparisonPullbackPct"), threshold
+            )
+
+        if pullback_condition is not None:
+            condition = condition and pullback_condition
+            counting_ += 1
+            variable_results["pullbackPct"] = bool(pullback_condition)
+
+        # -------------------------
         # NEWS (within X minutes/hours)
         # -------------------------
         news_condition = None
@@ -2860,19 +3124,41 @@ class IBapi(EWrapper, EClient):
 
         # IBKR reqHistoricalNews:
         #   reqId, conId, providerCodes, startDateTime, endDateTime, totalResults, historicalNewsOptions
-        # providerCodes: "BZ+FLY+DJ+MT+GS" (or empty for all)
+        # providerCodes: "BZ+FLY+DJ+MT+GS" etc. separated by "+"
         # Date format: "YYYYMMDD-HH:MM:SS" or "" for open-ended
+        #
+        # Use only the providers actually subscribed on this account.
+        # The list is populated by the newsProviders() callback after
+        # reqNewsProviders() on connect.  If not yet known, fall back
+        # to "" which tells IB to query all subscribed providers.
+        if self._subscribed_news_providers is not None:
+            provider_codes = self._subscribed_news_providers
+        else:
+            # Callback hasn't fired yet — pass "" so IB queries all subscribed
+            provider_codes = ""
+
+        if self._subscribed_news_providers == "":
+            # We definitively know no providers are subscribed — skip
+            logger.info("fetchNews skipped for conId %s: no subscribed news providers", con_id)
+            return []
         end_dt = ""  # now
         start_dt = ""  # open-ended (let maxResults limit it)
+
+        total_to_request = max_headlines + 20  # over-request to allow for filtering
+
+        logger.info(
+            "reqHistoricalNews reqId=%s conId=%s providers=%s totalResults=%s",
+            news_req_id, con_id, provider_codes, total_to_request,
+        )
 
         try:
             self.reqHistoricalNews(
                 news_req_id,
                 con_id,
-                "",  # all providers
+                provider_codes,
                 start_dt,
                 end_dt,
-                max_headlines + 20,  # over-request to allow for filtering
+                total_to_request,
                 [],
             )
         except Exception as e:
@@ -2889,6 +3175,10 @@ class IBapi(EWrapper, EClient):
                 break
 
         raw_headlines = self._news_data.get(news_req_id, [])
+        logger.info(
+            "reqHistoricalNews reqId=%s returned %d raw headlines (done=%s, waited=%.1fs)",
+            news_req_id, len(raw_headlines), self._news_done.get(news_req_id), waited,
+        )
 
         # Filter excluded publishers
         filtered = []
@@ -2984,8 +3274,12 @@ class IBapi(EWrapper, EClient):
                 self.data[theid] = []
                 self.requestInformation[theid] = False
 
-                # request details from IB
-                self.findContractDetails(theid, i, "CUSIP", m, contract_id=contract_id)
+                # request details from IB (protected against socket errors)
+                try:
+                    self.findContractDetails(theid, i, "CUSIP", m, contract_id=contract_id)
+                except Exception as e:
+                    logger.warning("findContractDetails raised for %s: %s", m, e)
+                    self.requestInformation[theid] = True  # unblock
 
                 waited = 0.0
                 while self.requestInformation.get(theid) is False:
@@ -2993,6 +3287,7 @@ class IBapi(EWrapper, EClient):
                     waited += self.config.contract_lookup_poll_sec
 
                     if waited >= self.config.contract_lookup_timeout_sec:
+                        logger.warning("Contract lookup timeout for %s (attempt %d)", m, attempt + 1)
                         break
 
                 contracts_list = self.data.get(theid, []) or []
@@ -3006,6 +3301,10 @@ class IBapi(EWrapper, EClient):
                     resolved_cusip = selected.get("cusip")
                     break
 
+                # small delay between retry attempts to avoid IB pacing
+                if attempt < self.config.contract_lookup_max_attempts - 1:
+                    time.sleep(0.25)
+
             # --------------------------------------------------
             # Fallback: if CUSIP-based lookup failed and we have
             # a valid symbol, try a plain symbol-only lookup.
@@ -3014,14 +3313,18 @@ class IBapi(EWrapper, EClient):
             # --------------------------------------------------
             if selected is None and m and m != "nan" and not str(m).lower().startswith("custom"):
                 logger.info(
-                    "CUSIP lookup failed for %s (cusip=%s). Trying symbol-only fallback.",
-                    m, i,
+                    "CUSIP lookup failed for %s (cusip=%s, conId=%s). Trying symbol-only fallback.",
+                    m, i, contract_id,
                 )
                 # one extra attempt with symbol only (no CUSIP, no conId)
                 self.data[theid] = []
                 self.requestInformation[theid] = False
 
-                self.findContractDetails(theid, None, None, m, contract_id=None)
+                try:
+                    self.findContractDetails(theid, None, None, m, contract_id=None)
+                except Exception as e:
+                    logger.warning("findContractDetails fallback raised for %s: %s", m, e)
+                    self.requestInformation[theid] = True  # unblock
 
                 waited = 0.0
                 while self.requestInformation.get(theid) is False:
@@ -3039,12 +3342,19 @@ class IBapi(EWrapper, EClient):
                     resolved_cusip = selected.get("cusip") or i
 
             if selected is None:
-                self.warningTicker[theid] = [
-                    m,
-                    i,
-                    "Contract lookup failed (CUSIP + symbol) after "
-                    f"{self.config.contract_lookup_max_attempts} attempts due to IBKR TWS API error",
-                ]
+                # Preserve the actual IB error detail if the error callback already
+                # stored a more specific message for this request id.
+                existing = self.warningTicker.get(theid)
+                if existing and len(existing) >= 3 and "Error:" in str(existing[2]):
+                    # Keep the IB error message — don't overwrite with generic text
+                    pass
+                else:
+                    self.warningTicker[theid] = [
+                        m,
+                        i,
+                        "Contract lookup failed (CUSIP + symbol) after "
+                        f"{self.config.contract_lookup_max_attempts} attempts due to IBKR TWS API error",
+                    ]
                 try:
                     self.numberOfTicker -= 1
                 except Exception:
@@ -3059,9 +3369,16 @@ class IBapi(EWrapper, EClient):
             try:
                 symbol_for_contract = selected.get("symbol", m)
                 sec_type = selected.get("secType", "STK")
-                exchange = selected.get("exchange", "SMART")
+                raw_exchange = selected.get("exchange", "SMART")
                 primary_exchange = selected.get("primaryExchange", "")
                 currency = selected.get("currency", "USD")
+
+                # Always route through SMART for market data; use the
+                # specific exchange as primaryExchange so IB can still
+                # identify the correct listing venue.
+                if raw_exchange and raw_exchange != "SMART" and not primary_exchange:
+                    primary_exchange = raw_exchange
+                exchange = "SMART"
 
                 contract = self.marketContract(
                     symbol_for_contract,
@@ -3070,6 +3387,11 @@ class IBapi(EWrapper, EClient):
                     primary_exchange,
                     currency,
                 )
+                # Preserve conId from IB contractDetails so news fetch and
+                # other conId-dependent calls work correctly.
+                resolved_conId = selected.get("conId")
+                if resolved_conId:
+                    contract.conId = int(resolved_conId)
             except Exception:
                 contract = self.marketContract(m, "STK", "SMART", "", "USD")
 
@@ -3099,90 +3421,166 @@ class IBapi(EWrapper, EClient):
         time.sleep(0.1)
 
         # -------------------------
-        # Request historical data
+        # Determine the per-indicator timeframe plan
         # -------------------------
-        try:
-            self.getData(contract, form, theid)
-        except Exception:
-            # If requesting historical data fails, warn and exit gracefully
-            self.warningTicker[theid] = [m, i, "Failed to request historical data"]
-            try:
-                self.numberOfTicker -= 1
-            except Exception:
-                pass
-            # cleanup
-            self.data.pop(theid, None)
-            self.HistoricalDt.pop(theid, None)
-            return
+        default_tf, tf_plan = self._build_tf_plan(form)
 
         # -------------------------
-        # Wait for historical data to finish (bounded)
+        # Request historical data for each unique timeframe (with retry)
         # -------------------------
-        self.initial += 1
-        waited = 0.0
+        max_hist_attempts = 2
+        tf_history = {}  # {tf_str: [bar_list]}
 
-        while not self.hisdtId.get(theid, False):
-            time.sleep(self.config.history_lookup_poll_sec)
-            waited += self.config.history_lookup_poll_sec
-            if waited >= self.config.history_lookup_timeout_sec:
-                # timeout: warn and continue to attempt processing with whatever we have
-                self.warningTicker[theid] = [
-                    m,
-                    i,
-                    "Historical data download timeout",
-                ]
-                break
+        for tf_str, tf_lookback in tf_plan.items():
+            # Allocate a request ID for this timeframe
+            with self.Locking:
+                self.idInc += 1
+                tf_req_id = self.idInc
+            hist_req_id = tf_req_id
+            tf_bars = []
 
-        # Ensure historical data exists
-        history = self.HistoricalDt.get(theid, []) or []
+            for hist_attempt in range(max_hist_attempts):
+                self.HistoricalDt[hist_req_id] = []
+                self.hisdtId[hist_req_id] = False
 
-        # Process any symbol that returned at least 1 bar of data.
-        # Individual indicators handle insufficient lookback gracefully
-        # (return None), and buySellSignalCheck treats None as False via
-        # _safe_compare.  The old rigid gate (len >= maxlength) rejected
-        # many valid symbols whose IB history was simply shorter than the
-        # longest configured lookback window.
+                try:
+                    self.getData(contract, form, hist_req_id,
+                                 override_tf=tf_str, override_lookback=tf_lookback)
+                except Exception:
+                    if not tf_history:
+                        # First TF failed: treat as fatal
+                        self.warningTicker[theid] = [m, i, "Failed to request historical data"]
+                        try:
+                            self.numberOfTicker -= 1
+                        except Exception:
+                            pass
+                        self.data.pop(theid, None)
+                        self.HistoricalDt.pop(hist_req_id, None)
+                        return
+                    break  # skip this TF, continue with what we have
+
+                self.initial += 1
+                waited = 0.0
+                while not self.hisdtId.get(hist_req_id, False):
+                    time.sleep(self.config.history_lookup_poll_sec)
+                    waited += self.config.history_lookup_poll_sec
+                    if waited >= self.config.history_lookup_timeout_sec:
+                        break
+
+                tf_bars = self.HistoricalDt.get(hist_req_id, []) or []
+
+                if len(tf_bars) >= 1 or self.hisdtId.get(hist_req_id, False):
+                    break
+
+                if hist_attempt < max_hist_attempts - 1:
+                    logger.warning(
+                        "Historical data timeout for %s tf=%s (attempt %d/%d), retrying...",
+                        m, tf_str, hist_attempt + 1, max_hist_attempts,
+                    )
+                    try:
+                        self.cancelHistoricalData(hist_req_id)
+                    except Exception:
+                        pass
+                    self.HistoricalDt.pop(hist_req_id, None)
+                    self.hisdtId.pop(hist_req_id, None)
+                    with self.Locking:
+                        self.idInc += 1
+                        hist_req_id = self.idInc
+                    time.sleep(1.0)
+
+            # Store bars for this timeframe
+            if tf_bars:
+                tf_history[tf_str] = tf_bars
+
+            # Cleanup request state
+            self.HistoricalDt.pop(hist_req_id, None)
+            self.hisdtId.pop(hist_req_id, None)
+            if hist_req_id != tf_req_id:
+                self.HistoricalDt.pop(tf_req_id, None)
+                self.hisdtId.pop(tf_req_id, None)
+
+        # Determine primary history (the default TF, or first available)
+        history = tf_history.get(default_tf) or next(iter(tf_history.values()), [])
+
+        if not tf_history:
+            # No data at all for any TF — warn
+            self.warningTicker[theid] = [
+                m, i, "Historical data download timeout",
+            ]
+
+        # -------------------------
+        # Compute indicators, merging across timeframes
+        # -------------------------
         if len(history) >= 1:
             try:
-                indic = self.getIndicators(
-                    history,
-                    i,
-                    contract,
-                    form,
-                    net_position.get(i, 0),
-                    m,
-                )
+                if len(tf_history) <= 1:
+                    # Single timeframe: use the standard path (no merge needed)
+                    indic = self.getIndicators(
+                        history, i, contract, form,
+                        net_position.get(i, 0), m,
+                    )
+                else:
+                    # Multiple timeframes: compute indicators per TF, then merge
+                    tf_indicators = {}
+                    for tf_str, tf_bars in tf_history.items():
+                        if tf_bars:
+                            try:
+                                tf_indicators[tf_str] = self.getIndicators(
+                                    tf_bars, i, contract, form,
+                                    net_position.get(i, 0), m,
+                                )
+                            except Exception:
+                                pass
+
+                    # Start with default TF indicators as the base
+                    if default_tf in tf_indicators:
+                        indic = tf_indicators[default_tf].copy()
+                    else:
+                        # Fall back to the first available TF
+                        indic = next(iter(tf_indicators.values()), {}).copy()
+
+                    # Override each indicator value from its assigned TF
+                    for indic_key, tf_field in self._INDICATOR_TF_FIELD.items():
+                        assigned_tf = form.get(tf_field) or default_tf
+                        if assigned_tf not in self._KNOWN_TFS:
+                            assigned_tf = default_tf
+                        if assigned_tf in tf_indicators and indic_key in tf_indicators[assigned_tf]:
+                            indic[indic_key] = tf_indicators[assigned_tf][indic_key]
+
+                    logger.info(
+                        "[MULTI-TF] %s merged indicators from TFs: %s",
+                        m, list(tf_history.keys()),
+                    )
                 indic["cusip"] = resolved_cusip
 
                 # -------------------------
-                # Fetch news headlines if enabled
+                # Always fetch news headlines for all returned stocks
                 # -------------------------
-                if form.get("ComparisonNews", "Not used") != "Not used":
-                    con_id = getattr(contract, "conId", None)
-                    if con_id:
-                        try:
-                            with self.Locking:
-                                self.idInc += 1
-                                news_req_id = self.idInc
-                            news_headlines = self.fetchNews(con_id, form, news_req_id)
-                            indic["newsHeadlines"] = news_headlines
+                con_id = getattr(contract, "conId", None)
+                if con_id:
+                    try:
+                        with self.Locking:
+                            self.idInc += 1
+                            news_req_id = self.idInc
+                        news_headlines = self.fetchNews(con_id, form, news_req_id)
+                        indic["newsHeadlines"] = news_headlines
 
-                            # Compute latest news timestamp for sorting & signal check
-                            if news_headlines:
-                                indic["latestNewsTime"] = news_headlines[0].get("parsedTime", "")
-                                indic["newsCount"] = len(news_headlines)
-                            else:
-                                indic["latestNewsTime"] = ""
-                                indic["newsCount"] = 0
-                        except Exception as e:
-                            logger.warning("News fetch error for %s: %s", m, e)
-                            indic["newsHeadlines"] = []
+                        # Compute latest news timestamp for sorting & signal check
+                        if news_headlines:
+                            indic["latestNewsTime"] = news_headlines[0].get("parsedTime", "")
+                            indic["newsCount"] = len(news_headlines)
+                        else:
                             indic["latestNewsTime"] = ""
                             indic["newsCount"] = 0
-                    else:
+                    except Exception as e:
+                        logger.warning("News fetch error for %s: %s", m, e)
                         indic["newsHeadlines"] = []
                         indic["latestNewsTime"] = ""
                         indic["newsCount"] = 0
+                else:
+                    indic["newsHeadlines"] = []
+                    indic["latestNewsTime"] = ""
+                    indic["newsCount"] = 0
 
                 _ = self.buySellSignalCheck(indic, form)
             except Exception as e:
@@ -3191,7 +3589,7 @@ class IBapi(EWrapper, EClient):
         else:
             # zero rows -> register a warning
             if theid not in self.warningTicker:
-                if self.hisdtId.get(theid, False):
+                if tf_history:
                     self.warningTicker[theid] = [
                         self.data.get(theid, [{}])[0].get("symbol", m) if self.data.get(theid) else m,
                         i,
@@ -3582,7 +3980,8 @@ class IBapi(EWrapper, EClient):
             data = percent_map.get(row["symbol"])
 
             pct = data["percent"] if data else None
-            conId = data["conId"] if data else None
+            # Preserve conId from scanner results; fall back to percent_map only if available
+            conId = (data["conId"] if data else None) or row.get("conId")
             volume = data["volume"] if data else None
 
             if min_percent is not None and pct is not None and pct < min_percent:
