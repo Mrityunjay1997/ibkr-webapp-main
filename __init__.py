@@ -419,13 +419,14 @@ def something():
 def sendorders():
     from ibkr_signal_engine import IBapi
 
-    IBAPI = None  # <-- FIX: ensure it always exists
+    IBAPI = None
 
     response = {
         "status": "error",
         "ordersId": None,
         "sentOrders": [],
         "message": None,
+        "Connection": None,
     }
 
     try:
@@ -440,23 +441,22 @@ def sendorders():
         orders_id = int(time.time())
         response["ordersId"] = orders_id
 
+        # ===== STEP 1: Connect to IBKR =====
+        client_id = random.randint(300, 399)
         IBAPI = IBapi()
-        IBAPI.connect("127.0.0.1", cfg.ibkr_api_port, 302)
+        IBAPI.connect("127.0.0.1", cfg.ibkr_api_port, client_id)
 
-        try:
-            IBAPI.nextOrderId = None
-        except Exception:
-            pass
-
-        time.sleep(2)
-
-        def run_loop():
-            IBAPI.run()
-
-        api_thread = threading.Thread(target=run_loop, daemon=True)
+        # Start event loop IMMEDIATELY so callbacks can fire
+        api_thread = threading.Thread(target=IBAPI.run, daemon=True)
         api_thread.start()
 
-        time.sleep(1.5)
+        # Wait for IB to confirm the connection (nextValidId callback)
+        IBAPI.checkForConnection()
+
+        if getattr(IBAPI, "indicateNotCondition", False):
+            response["Connection"] = "There was not connection with Interactive Brokers. Please try again"
+            response["message"] = response["Connection"]
+            return response
 
         # ------------------------------------------------------------
         # Read input
@@ -469,32 +469,47 @@ def sendorders():
         low_bracket = asset["lowBraket"]
         quantity = int(asset["quantity"])
 
-        sec_id_type = "CUSIP"
+        # ------------------------------------------------------------
+        # Resolve contract via symbol lookup
+        # ------------------------------------------------------------
+        req_id = IBAPI.initialSec
+        IBAPI.data[req_id] = []
+        IBAPI.requestInformation[req_id] = False
 
-        # ------------------------------------------------------------
-        # Resolve contract
-        # ------------------------------------------------------------
-        IBAPI.data[IBAPI.initialSec] = []
         IBAPI.findContractDetails(
-            IBAPI.initialSec,
+            req_id,
             "nan",
-            sec_id_type,
+            "CUSIP",
             ticker_order,
         )
 
-        time.sleep(1.5)
+        # Poll for contract details with timeout instead of blind sleep
+        waited = 0.0
+        timeout = cfg.contract_lookup_timeout_sec
+        poll_interval = cfg.contract_lookup_poll_sec
+        while not IBAPI.requestInformation.get(req_id, False):
+            time.sleep(poll_interval)
+            waited += poll_interval
+            if waited >= timeout:
+                break
 
-        if not IBAPI.data.get(IBAPI.initialSec):
-            raise RuntimeError("No contract details returned from IB")
+        if not IBAPI.data.get(req_id):
+            raise RuntimeError(
+                f"No contract details returned from IB for '{ticker_order}'. "
+                "Check that the symbol is valid and TWS/Gateway is running."
+            )
 
-        mydata_ = IBAPI.data[IBAPI.initialSec][0]
+        # Pick the best contract (prefer SMART exchange)
+        best = IBAPI._select_best_contract(IBAPI.data[req_id], ticker_order)
+        if best is None:
+            best = IBAPI.data[req_id][0]
 
         contract = IBAPI.marketContract(
-            mydata_["symbol"],
+            best["symbol"],
             "STK",
-            mydata_["exchange"],
-            mydata_["primaryExchange"],
-            mydata_["currency"],
+            "SMART",
+            best.get("primaryExchange") or "",
+            best["currency"],
         )
 
         IBAPI.reqMarketDataType(4)
@@ -560,11 +575,9 @@ def sendorders():
 
         response["status"] = "error"
         response["message"] = str(e)
+        response["Connection"] = str(e)
 
     finally:
-        # ------------------------------------------------------------
-        # Always try to disconnect safely
-        # ------------------------------------------------------------
         if IBAPI is not None:
             try:
                 IBAPI.disconnect()

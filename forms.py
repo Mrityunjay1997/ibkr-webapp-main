@@ -229,33 +229,43 @@ class Parameters(FlaskForm):
         ],
     )
 
+    _CROSS_SMA_COMPARISON_CHOICES = [
+        ("greater", ">"),
+        ("greaterEqual", ">="),
+        ("lower", "<"),
+        ("lowerEqual", "<="),
+        ("between", "between"),
+        ("crossAbove", "Cross Above"),
+        ("crossBelow", "Cross Below"),
+        ("withinPercentAbove", "Within % Above"),
+        ("withinPercentBelow", "Within % Below"),
+        ("withinPercentEither", "Within Either %"),
+        ("Not used", "disabled"),
+    ]
+
     Cross200SMA = IntegerField("Cross 200 SMA")
     ComparisonCross200SMA = SelectField(
         "Cross 200 SMA",
-        choices=[
-            ("Not used", "disabled"),
-            ("crossAbove", "Cross Above"),
-            ("crossBelow", "Cross Below"),
-            ("withinPercentAbove", "Within % Above"),
-            ("withinPercentBelow", "Within % Below"),
-            ("withinPercentEither", "Within Either %"),
-        ],
+        choices=_CROSS_SMA_COMPARISON_CHOICES,
     )
     PercentageCross200SMA = DecimalField("% from 200 SMA")
+    Cross200SMABool = RadioField(
+        "",
+        choices=[("percentage", "%"), ("value", "val")],
+        default="percentage",
+    )
 
     Cross50SMA = IntegerField("Cross 50 SMA")
     ComparisonCross50SMA = SelectField(
         "Cross 50 SMA",
-        choices=[
-            ("Not used", "disabled"),
-            ("crossAbove", "Cross Above"),
-            ("crossBelow", "Cross Below"),
-            ("withinPercentAbove", "Within % Above"),
-            ("withinPercentBelow", "Within % Below"),
-            ("withinPercentEither", "Within Either %"),
-        ],
+        choices=_CROSS_SMA_COMPARISON_CHOICES,
     )
     PercentageCross50SMA = DecimalField("% from 50 SMA")
+    Cross50SMABool = RadioField(
+        "",
+        choices=[("percentage", "%"), ("value", "val")],
+        default="percentage",
+    )
 
     # ------------------------------------------------------------------
     # Break High (recent X-day high)
@@ -349,6 +359,9 @@ class Parameters(FlaskForm):
     averageVolume1_tf = SelectField("Average Volume1 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     relativeVolume_tf = SelectField("Relative Volume Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     relativeVolume1_tf = SelectField("Relative Volume1 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+
+    Cross50SMA_tf = SelectField("Cross 50 SMA Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    Cross200SMA_tf = SelectField("Cross 200 SMA Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
 
     # ------------------------------------------------------------------
     # Price level comparisons

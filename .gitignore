@@ -24,9 +24,10 @@ venv.bak/
 *.db3
 *.bak
 *.backup
+*.log
+*.tmp
 *.swp
 *.swo
-*.swn
-*.swn
-*.swo
-*.swn
+*.DS_Store
+*.egg-info/
+dist/

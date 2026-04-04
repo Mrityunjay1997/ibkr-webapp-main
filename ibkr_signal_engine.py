@@ -416,6 +416,11 @@ class IBapi(EWrapper, EClient):
         and the first valid order id is received.
         """
         self.nextOrderId = order_id
+        # Discover subscribed news providers as soon as connected
+        try:
+            self.reqNewsProviders()
+        except Exception:
+            pass
 
     def checkForConnection(self):
         """
@@ -431,11 +436,6 @@ class IBapi(EWrapper, EClient):
         while True:
             if isinstance(self.nextOrderId, int):
                 print("connected")
-                # Query which news providers are subscribed (logs via newsProviders callback)
-                try:
-                    self.reqNewsProviders()
-                except Exception:
-                    pass
                 break
 
             print("waiting for connection")
@@ -933,6 +933,8 @@ class IBapi(EWrapper, EClient):
                 "averageVolume1_tf",
                 "relativeVolume_tf",
                 "relativeVolume1_tf",
+                "Cross50SMA_tf",
+                "Cross200SMA_tf",
             )
 
             for tf_field in per_indicator_tf_fields:
@@ -1099,6 +1101,20 @@ class IBapi(EWrapper, EClient):
         "lowOfDay1": "LowOfDay1_tf",
         "highOfDay": "HighOfDay_tf",
         "highOfDay1": "HighOfDay1_tf",
+        "cross50SMA": "Cross50SMA_tf",
+        "cross50SMA_above": "Cross50SMA_tf",
+        "cross50SMA_below": "Cross50SMA_tf",
+        "cross50SMA_either": "Cross50SMA_tf",
+        "cross50SMA_value": "Cross50SMA_tf",
+        "cross50SMA_pctFromSMA": "Cross50SMA_tf",
+        "cross50SMA_isAbove": "Cross50SMA_tf",
+        "cross200SMA": "Cross200SMA_tf",
+        "cross200SMA_above": "Cross200SMA_tf",
+        "cross200SMA_below": "Cross200SMA_tf",
+        "cross200SMA_either": "Cross200SMA_tf",
+        "cross200SMA_value": "Cross200SMA_tf",
+        "cross200SMA_pctFromSMA": "Cross200SMA_tf",
+        "cross200SMA_isAbove": "Cross200SMA_tf",
     }
 
     @staticmethod
@@ -1140,6 +1156,8 @@ class IBapi(EWrapper, EClient):
             ("AverageVolume1", "averageVolume1_tf", 14),
             ("RelativeVolume", "relativeVolume_tf", 5),
             ("RelativeVolume1", "relativeVolume1_tf", 5),
+            ("Cross50SMA", "Cross50SMA_tf", 50),
+            ("Cross200SMA", "Cross200SMA_tf", 200),
         ]
 
         tf_plan = {}  # {tf_str: max_lookback}
@@ -1158,7 +1176,7 @@ class IBapi(EWrapper, EClient):
             tf_plan[tf] = max(tf_plan.get(tf, 0), lookback)
 
         # Indicators that always use the default TF (no per-indicator TF field)
-        for val_key, default_lb in [("Cross50SMA", 50), ("Cross200SMA", 200), ("BreakHigh", 5)]:
+        for val_key, default_lb in [("BreakHigh", 5)]:
             if val_key in form and form[val_key] not in (None, ""):
                 try:
                     lookback = int(form[val_key]) + 1
@@ -1736,6 +1754,7 @@ class IBapi(EWrapper, EClient):
                     indicators["cross50SMA_below"] = crossed_below
                     indicators["cross50SMA_either"] = crossed_above or crossed_below
                     indicators["cross50SMA_value"] = curr_sma50
+                    indicators["cross50SMA_isAbove"] = curr_close >= curr_sma50
                     if curr_sma50 != 0:
                         indicators["cross50SMA_pctFromSMA"] = ((curr_close - curr_sma50) / curr_sma50) * 100.0
                     else:
@@ -1745,12 +1764,14 @@ class IBapi(EWrapper, EClient):
                     indicators["cross50SMA_below"] = False
                     indicators["cross50SMA_either"] = False
                     indicators["cross50SMA_value"] = None
+                    indicators["cross50SMA_isAbove"] = None
                     indicators["cross50SMA_pctFromSMA"] = None
             except Exception:
                 indicators["cross50SMA_above"] = False
                 indicators["cross50SMA_below"] = False
                 indicators["cross50SMA_either"] = False
                 indicators["cross50SMA_value"] = None
+                indicators["cross50SMA_isAbove"] = None
                 indicators["cross50SMA_pctFromSMA"] = None
 
         # --- Cross 200 SMA (daily) ---
@@ -1773,6 +1794,7 @@ class IBapi(EWrapper, EClient):
                     indicators["cross200SMA_below"] = crossed_below
                     indicators["cross200SMA_either"] = crossed_above or crossed_below
                     indicators["cross200SMA_value"] = curr_sma
+                    indicators["cross200SMA_isAbove"] = curr_close >= curr_sma
                     if curr_sma != 0:
                         indicators["cross200SMA_pctFromSMA"] = ((curr_close - curr_sma) / curr_sma) * 100.0
                     else:
@@ -1782,12 +1804,14 @@ class IBapi(EWrapper, EClient):
                     indicators["cross200SMA_below"] = False
                     indicators["cross200SMA_either"] = False
                     indicators["cross200SMA_value"] = None
+                    indicators["cross200SMA_isAbove"] = None
                     indicators["cross200SMA_pctFromSMA"] = None
             except Exception:
                 indicators["cross200SMA_above"] = False
                 indicators["cross200SMA_below"] = False
                 indicators["cross200SMA_either"] = False
                 indicators["cross200SMA_value"] = None
+                indicators["cross200SMA_isAbove"] = None
                 indicators["cross200SMA_pctFromSMA"] = None
 
         # --- Break High (recent X-day high) ---
@@ -2844,8 +2868,13 @@ class IBapi(EWrapper, EClient):
         # CROSS 50 SMA
         # -------------------------
         cross_50_condition = None
-
         cross50_mode = form.get("ComparisonCross50SMA", "Not used")
+
+        # Always set the SMA-value column color (green = above, red = below)
+        is_above_50 = data.get("cross50SMA_isAbove")
+        if is_above_50 is not None:
+            variable_results["cross50SMA_val"] = bool(is_above_50)
+
         if cross50_mode == "crossAbove":
             cross_50_condition = data.get("cross50SMA_above", False)
         elif cross50_mode == "crossBelow":
@@ -2865,6 +2894,55 @@ class IBapi(EWrapper, EClient):
                     cross_50_condition = abs(pct_from) <= threshold
             else:
                 cross_50_condition = False
+        elif (
+            cross50_mode not in _NON_SIMPLE_MODES
+            and form.get("Cross50SMABool", "percentage") == "percentage"
+        ):
+            sf = data.get("cross50SMA_value")
+            if sf is None:
+                cross_50_condition = False
+            else:
+                base = sf * (1.0 + float(form.get("PercentageCross50SMA", 0)) / 100.0)
+                if cross50_mode == "greater":
+                    cross_50_condition = _safe_compare(data.get("close"), ">", base)
+                elif cross50_mode == "greaterEqual":
+                    cross_50_condition = _safe_compare(data.get("close"), ">=", base)
+                elif cross50_mode == "lower":
+                    cross_50_condition = _safe_compare(data.get("close"), "<", base)
+                elif cross50_mode == "lowerEqual":
+                    cross_50_condition = _safe_compare(data.get("close"), "<=", base)
+        elif cross50_mode == "between" and form.get("Cross50SMABool", "percentage") == "percentage":
+            sf = data.get("cross50SMA_value")
+            if sf is None:
+                cross_50_condition = False
+            else:
+                base = sf * (1.0 + float(form.get("PercentageCross50SMA", 0)) / 100.0)
+                cross_50_condition = (
+                    _safe_compare(data.get("close"), ">=", base)
+                )
+        elif (
+            cross50_mode not in _NON_SIMPLE_MODES
+            and form.get("Cross50SMABool", "percentage") == "value"
+        ):
+            try:
+                threshold = float(form.get("PercentageCross50SMA", 0))
+            except Exception:
+                threshold = 0
+            sf = data.get("cross50SMA_value")
+            if cross50_mode == "greater":
+                cross_50_condition = _safe_compare(sf, ">", threshold)
+            elif cross50_mode == "greaterEqual":
+                cross_50_condition = _safe_compare(sf, ">=", threshold)
+            elif cross50_mode == "lower":
+                cross_50_condition = _safe_compare(sf, "<", threshold)
+            elif cross50_mode == "lowerEqual":
+                cross_50_condition = _safe_compare(sf, "<=", threshold)
+        elif cross50_mode == "between" and form.get("Cross50SMABool", "percentage") == "value":
+            try:
+                threshold = float(form.get("PercentageCross50SMA", 0))
+            except Exception:
+                threshold = 0
+            cross_50_condition = _safe_compare(data.get("cross50SMA_value"), ">=", threshold)
 
         if cross_50_condition is not None:
             condition = condition and cross_50_condition
@@ -2875,8 +2953,13 @@ class IBapi(EWrapper, EClient):
         # CROSS 200 SMA
         # -------------------------
         cross_200_condition = None
-
         cross200_mode = form.get("ComparisonCross200SMA", "Not used")
+
+        # Always set the SMA-value column color (green = above, red = below)
+        is_above_200 = data.get("cross200SMA_isAbove")
+        if is_above_200 is not None:
+            variable_results["cross200SMA_val"] = bool(is_above_200)
+
         if cross200_mode == "crossAbove":
             cross_200_condition = data.get("cross200SMA_above", False)
         elif cross200_mode == "crossBelow":
@@ -2896,6 +2979,55 @@ class IBapi(EWrapper, EClient):
                     cross_200_condition = abs(pct_from) <= threshold
             else:
                 cross_200_condition = False
+        elif (
+            cross200_mode not in _NON_SIMPLE_MODES
+            and form.get("Cross200SMABool", "percentage") == "percentage"
+        ):
+            sf = data.get("cross200SMA_value")
+            if sf is None:
+                cross_200_condition = False
+            else:
+                base = sf * (1.0 + float(form.get("PercentageCross200SMA", 0)) / 100.0)
+                if cross200_mode == "greater":
+                    cross_200_condition = _safe_compare(data.get("close"), ">", base)
+                elif cross200_mode == "greaterEqual":
+                    cross_200_condition = _safe_compare(data.get("close"), ">=", base)
+                elif cross200_mode == "lower":
+                    cross_200_condition = _safe_compare(data.get("close"), "<", base)
+                elif cross200_mode == "lowerEqual":
+                    cross_200_condition = _safe_compare(data.get("close"), "<=", base)
+        elif cross200_mode == "between" and form.get("Cross200SMABool", "percentage") == "percentage":
+            sf = data.get("cross200SMA_value")
+            if sf is None:
+                cross_200_condition = False
+            else:
+                base = sf * (1.0 + float(form.get("PercentageCross200SMA", 0)) / 100.0)
+                cross_200_condition = (
+                    _safe_compare(data.get("close"), ">=", base)
+                )
+        elif (
+            cross200_mode not in _NON_SIMPLE_MODES
+            and form.get("Cross200SMABool", "percentage") == "value"
+        ):
+            try:
+                threshold = float(form.get("PercentageCross200SMA", 0))
+            except Exception:
+                threshold = 0
+            sf = data.get("cross200SMA_value")
+            if cross200_mode == "greater":
+                cross_200_condition = _safe_compare(sf, ">", threshold)
+            elif cross200_mode == "greaterEqual":
+                cross_200_condition = _safe_compare(sf, ">=", threshold)
+            elif cross200_mode == "lower":
+                cross_200_condition = _safe_compare(sf, "<", threshold)
+            elif cross200_mode == "lowerEqual":
+                cross_200_condition = _safe_compare(sf, "<=", threshold)
+        elif cross200_mode == "between" and form.get("Cross200SMABool", "percentage") == "value":
+            try:
+                threshold = float(form.get("PercentageCross200SMA", 0))
+            except Exception:
+                threshold = 0
+            cross_200_condition = _safe_compare(data.get("cross200SMA_value"), ">=", threshold)
 
         if cross_200_condition is not None:
             condition = condition and cross_200_condition
@@ -3127,20 +3259,23 @@ class IBapi(EWrapper, EClient):
         # providerCodes: "BZ+FLY+DJ+MT+GS" etc. separated by "+"
         # Date format: "YYYYMMDD-HH:MM:SS" or "" for open-ended
         #
-        # Use only the providers actually subscribed on this account.
-        # The list is populated by the newsProviders() callback after
-        # reqNewsProviders() on connect.  If not yet known, fall back
-        # to "" which tells IB to query all subscribed providers.
-        if self._subscribed_news_providers is not None:
+        # Wait briefly for the newsProviders callback if it hasn't fired yet
+        if self._subscribed_news_providers is None:
+            _pw = 0.0
+            while self._subscribed_news_providers is None and _pw < 2.0:
+                time.sleep(0.1)
+                _pw += 0.1
+
+        # Use discovered providers, or fall back to all known IBKR
+        # news provider codes so at least one will match a subscription.
+        if self._subscribed_news_providers:
             provider_codes = self._subscribed_news_providers
         else:
-            # Callback hasn't fired yet — pass "" so IB queries all subscribed
-            provider_codes = ""
+            # Pass all common provider codes — IB will silently ignore
+            # any the account is not subscribed to and return data from
+            # the ones that match.
+            provider_codes = "BRFUPDN+BRFG+DJNL+BZ+FLY+CZ+MT+DJ-N+DJ-RT"
 
-        if self._subscribed_news_providers == "":
-            # We definitively know no providers are subscribed — skip
-            logger.info("fetchNews skipped for conId %s: no subscribed news providers", con_id)
-            return []
         end_dt = ""  # now
         start_dt = ""  # open-ended (let maxResults limit it)
 
@@ -3167,11 +3302,12 @@ class IBapi(EWrapper, EClient):
 
         # Wait for news (bounded)
         waited = 0.0
-        timeout = 10.0  # seconds
+        timeout = 5.0  # seconds
         while not self._news_done.get(news_req_id, False):
             time.sleep(0.1)
             waited += 0.1
             if waited >= timeout:
+                logger.warning("fetchNews timeout for conId %s after %.1fs", con_id, waited)
                 break
 
         raw_headlines = self._news_data.get(news_req_id, [])
@@ -3625,6 +3761,14 @@ class IBapi(EWrapper, EClient):
 
         Spawns worker threads which call getDataResult().
         """
+        # Wait for IB connection to be ready before starting threads
+        waited = 0.0
+        while not isinstance(self.nextOrderId, int):
+            time.sleep(0.2)
+            waited += 0.2
+            if waited >= 10.0:
+                logger.warning("getFinalResult: timed out waiting for IB connection")
+                break
 
         self.cusip = data["cusip"][0:50]
 
@@ -3731,9 +3875,14 @@ class IBapi(EWrapper, EClient):
             stopLoss.auxPrice = stop_loss_price
             stopLoss.totalQuantity = quantity
             stopLoss.parentId = parent_order_id
-            stopLoss.transmit = True
+            stopLoss.transmit = False
 
             bracketOrder.append(stopLoss)
+
+        # The LAST order must have transmit=True to trigger IB to submit
+        # the entire group.  Without this the orders sit in "held" state
+        # and never reach the exchange.
+        bracketOrder[-1].transmit = True
 
         return bracketOrder
 

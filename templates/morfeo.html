@@ -589,6 +589,7 @@
 									<thead class = "secondTableHead">
 										<tr>
 											<th style="padding:10px">Indicator</th>
+											<th style="padding:10px">Time Frame</th>
 											<th style="padding:10px">Variable</th>
 											<th style="padding:10px">Sign </th>
 											<th style="padding:10px">Percentage PP</th>
@@ -598,20 +599,35 @@
 									<tbody class ="secondTableBody">
 										<tr>
 											<th style="padding:10px">Cross 200 SMA</th>
+											<td style="padding:10px"><div id="tf_cross200_sma">{{ Param.Cross200SMA_tf(class_="Cross200SMA_tf") }}</div></td>
 											<td style="padding:10px"><div id="changeCross200SMA">{{ Param.Cross200SMA(class_="Cross200SMA", value='200') }}</div></td>
 											<td style="padding:10px">{{ Param.ComparisonCross200SMA(class_="ComparisonCross200SMA") }}</td>
 											<td style="padding:10px"><div id="percentageCross200SMA">{{ Param.PercentageCross200SMA(class_="PercentageCross200SMA", value='5') }}</div></td>
-											<td>&nbsp;</td>
+											<td>
+												{% for subfield in Param.Cross200SMABool %}
+													<div class="formatingyesno">
+														<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} <div>
+													</div>
+												{% endfor %}
+											</td>
 										</tr>
 										<tr>
 											<th style="padding:10px">Cross 50 SMA</th>
+											<td style="padding:10px"><div id="tf_cross50_sma">{{ Param.Cross50SMA_tf(class_="Cross50SMA_tf") }}</div></td>
 											<td style="padding:10px"><div id="changeCross50SMA">{{ Param.Cross50SMA(class_="Cross50SMA", value='50') }}</div></td>
 											<td style="padding:10px">{{ Param.ComparisonCross50SMA(class_="ComparisonCross50SMA") }}</td>
 											<td style="padding:10px"><div id="percentageCross50SMA">{{ Param.PercentageCross50SMA(class_="PercentageCross50SMA", value='5') }}</div></td>
-											<td>&nbsp;</td>
+											<td>
+												{% for subfield in Param.Cross50SMABool %}
+													<div class="formatingyesno">
+														<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} <div>
+													</div>
+												{% endfor %}
+											</td>
 										</tr>
 										<tr>
 											<th style="padding:10px">Break High</th>
+											<td>&nbsp;</td>
 											<td style="padding:10px"><div id="changeBreakHigh">{{ Param.BreakHigh(class_="BreakHigh", value='5') }}</div></td>
 											<td style="padding:10px">{{ Param.ComparisonBreakHigh(class_="ComparisonBreakHigh") }}</td>
 											<td style="padding:10px"><div id="percentageBreakHigh">{{ Param.PercentageBreakHigh(class_="PercentageBreakHigh", value='0') }}</div></td>
@@ -625,6 +641,7 @@
 										</tr>
 										<tr>
 											<th style="padding:10px">Pullback Retracement</th>
+											<td>&nbsp;</td>
 											<td style="padding:10px"><div id="changePullbackPct">{{ Param.PullbackPct(class_="PullbackPct", value='0') }}</div></td>
 											<td style="padding:10px">{{ Param.ComparisonPullbackPct(class_="ComparisonPullbackPct") }}</td>
 											<td style="padding:10px"><div id="percentagePullbackPct">{{ Param.PercentagePullbackPct(class_="PercentagePullbackPct", value='0') }}</div></td>
@@ -632,6 +649,7 @@
 										</tr>
 										<tr>
 											<th style="padding:10px">Pivot Point</th>
+											<td>&nbsp;</td>
 											<td style="padding:10px"> <div id = "changePP"> {{ Param.PivotPoint(class_="PivotPoint") }} </div></td>
 											<td style="padding:10px">{{ Param.ComparisonPivotPoint(class_="ComparisonPivotPoint") }}</td>
 											<td style="padding:10px"><div id = "percentagePP"> {{ Param.PercentagePivotPoint(class_="PercentagePivotPoint", value = '0') }} </div> </td>
@@ -645,6 +663,7 @@
 										</tr>
 										<tr>
 											<th style="padding:10px">Price Level</th>
+											<td>&nbsp;</td>
 											<td style="padding:10px">
 												<div id = "ChangePric">
 													{{ Param.Pricelevel(class_="Pricelevel") }}
@@ -1168,9 +1187,9 @@ function renderResultsFromBackend(response) {
                     if ("breakHigh1" in dta) headerCols.push({ key: "breakHigh1", label: "Break High1" });
                     if ("pullbackPct" in dta) headerCols.push({ key: "pullbackPct", label: "Pullback %" });
                     if ("pullbackPct1" in dta) headerCols.push({ key: "pullbackPct1", label: "Pullback %1" });
-                    if ("cross50SMA_value" in dta) headerCols.push({ key: "cross50SMA_value", label: "50 SMA", vrKey: "cross50SMA" });
+                    if ("cross50SMA_value" in dta) headerCols.push({ key: "cross50SMA_value", label: "50 SMA", vrKey: "cross50SMA_val" });
                     if ("cross50SMA_pctFromSMA" in dta) headerCols.push({ key: "cross50SMA_pctFromSMA", label: "% from 50", vrKey: "cross50SMA" });
-                    if ("cross200SMA_value" in dta) headerCols.push({ key: "cross200SMA_value", label: "200 SMA", vrKey: "cross200SMA" });
+                    if ("cross200SMA_value" in dta) headerCols.push({ key: "cross200SMA_value", label: "200 SMA", vrKey: "cross200SMA_val" });
                     if ("cross200SMA_pctFromSMA" in dta) headerCols.push({ key: "cross200SMA_pctFromSMA", label: "% from 200", vrKey: "cross200SMA" });
 
                     // pivot primary
@@ -1315,7 +1334,7 @@ function renderResultsFromBackend(response) {
 
                 // place order button
                 const totalIdBuySell = idBuySell + secondIdBuySell;
-                txt1 += `<td><button type='button' id='${totalIdBuySell}' data-toggle='modal' data-target='#exampleModalCenter' class='buttonbuysell' onclick='addButtonBuy(${idPlaceOrder}, ${totalIdBuySell})'>click</button></td>`;
+                txt1 += `<td><button type='button' id='${totalIdBuySell}' data-toggle='modal' data-target='#exampleModalCenter' class='buttonbuysell' onclick='addButtonBuy(${idPlaceOrder}, "${totalIdBuySell}")'>click</button></td>`;
 
                 // news toggle cell (right side) — reuse pre-computed _newsItems / _newsRowId
                 const newsItems = _newsItems;
@@ -1737,21 +1756,26 @@ function populateNewsFeedPanel(response) {
 				url: '/sendorders',
 				data: sendOrderToIB,
 				type: 'POST',
+				dataType: 'json',
 				success: function(response){
-					if (response["Connection"] == "There was not connection with Interactive Brokers. Please try again") {
-						document.getElementById("notConnected").classList.remove("loader");
-						var connectionSelrver = document.createElement("H4");
-						connectionSelrver.innerHTML = response["Connection"];
-						document.getElementById("notConnected").appendChild(connectionSelrver);
+					document.getElementById("notConnected").classList.remove("loader");
+					var msgEl = document.createElement("H4");
+					if (response["status"] === "ok") {
+						msgEl.style.color = "#4caf50";
+						msgEl.innerHTML = "Order Sent Successfully";
 					} else {
-						document.getElementById("notConnected").classList.remove("loader");
-						var connectionSelrver = document.createElement("H4");
-						connectionSelrver.innerHTML = "Order Sent";
-						document.getElementById("notConnected").appendChild(connectionSelrver);
+						msgEl.style.color = "#f44336";
+						msgEl.innerHTML = response["message"] || response["Connection"] || "Order failed — check TWS/Gateway";
 					}
+					document.getElementById("notConnected").appendChild(msgEl);
 				},
-				error: function(error){
-					console.log(error);
+				error: function(xhr, status, error){
+					document.getElementById("notConnected").classList.remove("loader");
+					var msgEl = document.createElement("H4");
+					msgEl.style.color = "#f44336";
+					msgEl.innerHTML = "Request failed: " + (error || "server unreachable");
+					document.getElementById("notConnected").appendChild(msgEl);
+					console.log(xhr, status, error);
 				}
 			});
 		});
@@ -1781,23 +1805,35 @@ function populateNewsFeedPanel(response) {
 				url: '/sendorders',
 				data: sendOrderToIB,
 				type: 'POST',
+				dataType: 'json',
 				success: function(response){
-					if (response["Connection"] == "There was not connection with Interactive Brokers. Please try again") {
-						document.getElementById("notConnected").classList.remove("loader");
-						var connectionSelrver = document.createElement("H4");
-						connectionSelrver.innerHTML = response["Connection"];
-						document.getElementById("notConnected").appendChild(connectionSelrver);
+					document.getElementById("notConnected").classList.remove("loader");
+					var msgEl = document.createElement("H4");
+					if (response["status"] === "ok") {
+						msgEl.style.color = "#4caf50";
+						msgEl.innerHTML = "Order Sent Successfully";
 					} else {
-						document.getElementById("notConnected").classList.remove("loader");
-						var connectionSelrver = document.createElement("H4");
-						connectionSelrver.innerHTML = "Order Sent";
-						document.getElementById("notConnected").appendChild(connectionSelrver);
+						msgEl.style.color = "#f44336";
+						msgEl.innerHTML = response["message"] || response["Connection"] || "Order failed — check TWS/Gateway";
 					}
+					document.getElementById("notConnected").appendChild(msgEl);
 				},
-				error: function(error){
-					console.log(error);
+				error: function(xhr, status, error){
+					document.getElementById("notConnected").classList.remove("loader");
+					var msgEl = document.createElement("H4");
+					msgEl.style.color = "#f44336";
+					msgEl.innerHTML = "Request failed: " + (error || "server unreachable");
+					document.getElementById("notConnected").appendChild(msgEl);
+					console.log(xhr, status, error);
 				}
 			});
+		});
+
+		// Clear stale form data and status whenever the modal is closed
+		$('#exampleModalCenter').on('hidden.bs.modal', function () {
+			document.getElementById("elementToAppendBuySell").innerHTML = "";
+			document.getElementById("notConnected").innerHTML = "";
+			document.getElementById("notConnected").classList.remove("loader");
 		});
 	});
 
@@ -1837,19 +1873,23 @@ function clearFilter(nInt)
 
 
 function addButtonBuy (nelm, idtouse) {
-												var currentId = idtouse.id;
-											  	var nameTicker = document.getElementById(currentId).parentElement.parentElement.children[0].innerHTML;
+												// idtouse is now a string id, not a DOM element
+												var currentId = (typeof idtouse === 'string') ? idtouse : idtouse.id;
+												var el = document.getElementById(currentId);
+												if (!el) { console.error('addButtonBuy: element not found:', currentId); return; }
+												var symbolCell = el.parentElement.parentElement.children[0];
+												var nameTicker = (symbolCell.childNodes[0] ? symbolCell.childNodes[0].textContent : symbolCell.innerText).trim();
 
-												var stockName = nameTicker;//document.getElementById(currentId).parentElement.children[1].innerHTML;
-												var longshort = "LONG" //document.getElementsByClassName("LongShort")[0].value";
-												var parentChildren = 7 //document.getElementById("appendFormIndicator").children.length;
-												var actualPrice = document.getElementById(currentId).parentElement.parentElement.children[2].innerHTML  //document.getElementById(currentId).parentElement.children[2].innerHTML;
-												var supporT = (parseFloat(actualPrice) * 0.99).toFixed(2) //(actualPrice)toFixed(2)
-												var resistencE = (parseFloat(actualPrice) * 1.01).toFixed(2) //(actualPrice)toFixed(2)
+												var stockName = nameTicker;
+												var longshort = "LONG";
+												var parentChildren = 7;
+												var actualPrice = el.parentElement.parentElement.children[2].innerText.trim();
+												var supporT = (parseFloat(actualPrice) * 0.99).toFixed(2);
+												var resistencE = (parseFloat(actualPrice) * 1.01).toFixed(2);
 												var startDiv = "<div class = 'buysell'>";
 												var startForm = "<form id = 'formToSendToFlask'>";
 												var divBuySell = "<div class = 'buysell'>";
-												var divStock = "<div class = 'makeColum'> <label class='labelbuysell'>Stock</label> <input type='text' value=" +stockName + " class = 'buysellinput mystock'></div>";
+												var divStock = "<div class = 'makeColum'> <label class='labelbuysell'>Stock</label> <input type='text' value='" + stockName + "' class = 'buysellinput mystock'></div>";
 												var divNShare = "<div class = 'makeColum'> <label class='labelbuysell'>N Share</label> <input type='number' value='1' class = 'buysellinput nshare'></div>";
 												var divBrackteLimit = "<div class = 'makeColum'> <label class='labelbuysell'>Type</label> <select class = 'buysellSelect bracketLimit' id = 'changevalues" + nelm + "'> <option value='bracket' selected=''>Bracket </option> <option value='limit'>Limit</option> </select> </div>";
 												var divBuySell = "<div class = 'makeColum'> <label class='labelbuysell'>Side</label> <select class = 'buysellSelect longshortside' onchange='SupportResistenceChange()'> <option value='long' selected=''>Long </option> <option value='short'>Short</option> </select> </div>";
