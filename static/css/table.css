@@ -308,3 +308,239 @@ thead .tableHead {
         grid-template-columns: 1fr;
     }
 }
+
+/* ================================================================
+   FLUID LAYOUT & DATA-TABLE OPTIMIZATIONS
+   ================================================================ */
+
+/* --- Full-width fluid overrides --- */
+.layout-fluid {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+    margin: 0 auto !important;
+}
+
+#page {
+    overflow-x: hidden;
+}
+
+/* --- Results table wrapper with horizontal scroll --- */
+.data-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    background: #ffffff;
+}
+
+/* --- Results data table --- */
+#responsive-data-table,
+table[id^="responsive-data-table"] {
+    width: 100%;
+    border-collapse: collapse;
+    border-spacing: 0;
+    font-size: 7px;
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    table-layout: auto;
+}
+
+.data-table-wrapper table th,
+.data-table-wrapper table td {
+    padding: 1px 2px;
+    white-space: nowrap;
+    border-bottom: 1px solid #d0d7de;
+    border-right: 1px solid #e8e8e8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #1f2328;
+    font-size: 7px;
+    line-height: 1.1;
+}
+
+/* --- Sticky header row --- */
+.data-table-wrapper thead th {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #f6f8fa;
+    color: #1f2328;
+    font-weight: 600;
+    font-size: 6.5px;
+    text-transform: uppercase;
+    letter-spacing: 0px;
+    border-bottom: 1px solid #d0d7de;
+    cursor: grab;
+    user-select: none;
+}
+
+/* --- Sticky ticker (first) column --- */
+.data-table-wrapper td.sticky-col,
+.data-table-wrapper th.sticky-col {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background: #ffffff;
+    border-right: 2px solid #d0d7de;
+    min-width: 30px;
+    max-width: 50px;
+}
+
+.data-table-wrapper thead th.sticky-col {
+    z-index: 30; /* above both sticky row and sticky col */
+    background: #f6f8fa;
+}
+
+/* --- Row hover --- */
+.data-table-wrapper tbody tr:hover td {
+    background: #f0f3f6;
+}
+.data-table-wrapper tbody tr:hover td.sticky-col {
+    background: #f0f3f6;
+}
+
+/* --- Signal-yes row highlight --- */
+.data-table-wrapper tbody tr.yescondition td {
+    background: #dcffe4;
+}
+.data-table-wrapper tbody tr.yescondition:hover td {
+    background: #c6f6d0;
+}
+.data-table-wrapper tbody tr.yescondition td.sticky-col {
+    background: #dcffe4;
+}
+
+/* --- Column hidden via toggle --- */
+.col-hidden {
+    display: none !important;
+}
+
+/* --- Drag-over visual --- */
+.data-table-wrapper thead th.drag-over {
+    border-left: 3px solid #0969da;
+    background: #ddf4ff;
+}
+
+.data-table-wrapper thead th.dragging {
+    opacity: 0.4;
+}
+
+/* ================================================================
+   TOP CONTROL BAR
+   ================================================================ */
+#data-control-bar {
+    display: none;
+    background: #f6f8fa;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 8px 14px;
+    margin-bottom: 10px;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+#data-control-bar.active {
+    display: flex;
+}
+
+#data-control-bar .ctrl-section {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+#data-control-bar .ctrl-label {
+    color: #57606a;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+#data-control-bar .ctrl-sep {
+    width: 1px;
+    height: 24px;
+    background: #d0d7de;
+    margin: 0 6px;
+}
+
+/* --- Column toggle chips --- */
+.col-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    font-size: 10.5px;
+    border-radius: 12px;
+    border: 1px solid #d0d7de;
+    background: #ffffff;
+    color: #1f2328;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.col-chip:hover {
+    background: #ddf4ff;
+    border-color: #0969da;
+}
+
+.col-chip.chip-off {
+    opacity: 0.45;
+    text-decoration: line-through;
+}
+
+/* --- Column group nav buttons --- */
+.col-group-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    font-size: 10.5px;
+    border-radius: 4px;
+    border: 1px solid #d0d7de;
+    background: #ffffff;
+    color: #0969da;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+}
+
+.col-group-btn:hover {
+    background: #ddf4ff;
+}
+
+.col-group-btn.active {
+    background: #ddf4ff;
+    border-color: #0969da;
+}
+
+/* --- Compact density --- */
+.density-compact .data-table-wrapper table th,
+.density-compact .data-table-wrapper table td {
+    padding: 2px 5px;
+    font-size: 10px;
+}
+
+/* ================================================================
+   RESPONSIVE BREAKPOINTS
+   ================================================================ */
+@media screen and (max-width: 768px) {
+    .layout-fluid {
+        padding-left: 4px !important;
+        padding-right: 4px !important;
+    }
+    #data-control-bar {
+        padding: 6px 8px;
+    }
+    .col-chip {
+        font-size: 9.5px;
+        padding: 1px 6px;
+    }
+}

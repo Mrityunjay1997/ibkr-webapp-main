@@ -240,6 +240,11 @@ class IBapi(EWrapper, EClient):
         # Subscribed provider codes discovered via reqNewsProviders()
         self._subscribed_news_providers = None  # None = not yet queried
 
+        # reqId -> {"articleType": int, "articleText": str}
+        self._article_data = {}
+        # reqId -> bool (newsArticle callback received)
+        self._article_done = {}
+
     def _to_dict(self, obj):
         if obj is None:
             return None
@@ -538,6 +543,19 @@ class IBapi(EWrapper, EClient):
             )
             self._subscribed_news_providers = ""
 
+    def newsArticle(self, request_id, article_type, article_text):
+        """
+        Callback fired when reqNewsArticle() returns the article body.
+        articleType: 0 = plain text, 1 = HTML.
+        """
+        logger.info("newsArticle reqId=%s type=%s len=%d", request_id, article_type,
+                    len(article_text) if article_text else 0)
+        self._article_data[request_id] = {
+            "articleType": article_type,
+            "articleText": article_text,
+        }
+        self._article_done[request_id] = True
+
     def tickPrice(self, req_id, tick_type, price, attrib):
         """
         Callback for live / delayed market price updates.
@@ -667,6 +685,10 @@ class IBapi(EWrapper, EClient):
         if req_id in self._news_done and not self._news_done[req_id]:
             logger.info("News request %s got error %s: %s — unblocking", req_id, error_code, error_string)
             self._news_done[req_id] = True
+
+        # Unblock the article-body waiting loop in fetchNewsArticle().
+        if req_id in self._article_done and not self._article_done[req_id]:
+            self._article_done[req_id] = True
 
         # Unblock the historical-data waiting loop in getDataResult().
         # When IB rejects a request (pacing violation, no data, etc.) the
@@ -3338,12 +3360,19 @@ class IBapi(EWrapper, EClient):
         deduped = deduped[:max_headlines]
 
         # Parse times and build clean output
+        import re as _re
+        import urllib.parse as _urlparse
+
         result = []
         for h in deduped:
             time_str = h.get("time", "")
             article_id = h.get("articleId", "")
             provider = h.get("provider", "")
-            headline = h.get("headline", "")
+            raw_headline = h.get("headline", "")
+
+            # Strip {PROVIDER} tags and stray punctuation that IBKR embeds
+            headline = _re.sub(r"\{[^}]*\}", "", raw_headline)
+            headline = headline.replace("!", "").strip()
 
             # IBKR time format: "2024-03-25 14:30:00.0" or epoch
             parsed_time = None
@@ -3360,18 +3389,68 @@ class IBapi(EWrapper, EClient):
             except Exception:
                 pass
 
+            # Build the article URL pointing to IBKR article detail endpoint
+            url = ""
+            try:
+                if provider and article_id:
+                    url = "/news/article?" + _urlparse.urlencode({
+                        "provider": provider,
+                        "articleId": article_id,
+                    })
+            except Exception:
+                pass
+
             result.append({
                 "time": time_str,
                 "parsedTime": parsed_time.isoformat() if parsed_time else time_str,
                 "provider": provider,
                 "articleId": article_id,
                 "headline": headline,
+                "url": url,
             })
 
         # Cleanup
         self._news_data.pop(news_req_id, None)
         self._news_done.pop(news_req_id, None)
 
+        return result
+
+    def fetchNewsArticle(self, provider_code, article_id):
+        """
+        Fetch the full body of a news article from IBKR using reqNewsArticle.
+
+        Returns dict: {"articleType": int, "articleText": str}
+          articleType: 0 = plain text, 1 = HTML
+        Returns None on timeout or error.
+        """
+        with self.Locking:
+            self.idInc += 1
+            req_id = self.idInc
+
+        self._article_data.pop(req_id, None)
+        self._article_done[req_id] = False
+
+        try:
+            self.reqNewsArticle(req_id, provider_code, article_id, [])
+        except Exception as e:
+            logger.warning("reqNewsArticle failed provider=%s articleId=%s: %s",
+                           provider_code, article_id, e)
+            self._article_done.pop(req_id, None)
+            return None
+
+        # Wait for callback (bounded)
+        waited = 0.0
+        timeout = 10.0
+        while not self._article_done.get(req_id, False):
+            time.sleep(0.1)
+            waited += 0.1
+            if waited >= timeout:
+                logger.warning("fetchNewsArticle timeout provider=%s articleId=%s",
+                               provider_code, article_id)
+                break
+
+        result = self._article_data.pop(req_id, None)
+        self._article_done.pop(req_id, None)
         return result
 
     def getDataResult(self, i, m, net_position, form, theid, contract_id=None):

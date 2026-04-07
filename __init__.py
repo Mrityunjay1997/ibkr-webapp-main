@@ -841,6 +841,153 @@ def watchlists_delete():
 
 
 # -------------------------------------------------------------------------
+# News article detail endpoint
+# -------------------------------------------------------------------------
+@app.route("/news/article", methods=["GET"])
+def news_article():
+    """
+    Fetch a full IBKR news article via the TWS API and return as JSON.
+
+    Query params:
+      provider  – IBKR provider code (e.g. "BZ", "DJ-N")
+      articleId – IBKR article identifier (e.g. "BZ$12345")
+
+    Returns JSON: {"articleType": 0|1, "articleText": "...", "provider": "...", "articleId": "..."}
+    """
+    from ibkr_signal_engine import IBapi
+    import re as _re
+
+    provider = request.args.get("provider", "").strip()
+    article_id = request.args.get("articleId", "").strip()
+
+    if not provider or not article_id:
+        return jsonify({"error": "Missing provider or articleId parameter."}), 400
+
+    # Basic input validation
+    if len(provider) > 20 or len(article_id) > 200:
+        return jsonify({"error": "Invalid parameters."}), 400
+
+    ib = None
+    try:
+        ib = IBapi()
+        ib.connect("127.0.0.1", cfg.ibkr_api_port, random.randint(100, 999))
+        try:
+            ib.nextOrderId = None
+        except Exception:
+            pass
+
+        def run_loop():
+            ib.run()
+
+        t = threading.Thread(target=run_loop, daemon=True)
+        t.start()
+
+        # Wait for connection
+        waited = 0.0
+        while not isinstance(ib.nextOrderId, int) and waited < 5.0:
+            time.sleep(0.1)
+            waited += 0.1
+
+        result = ib.fetchNewsArticle(provider, article_id)
+
+        if result and result.get("articleText"):
+            article_type = result.get("articleType", 0)
+            article_text = result["articleText"]
+
+            if article_type == 1:
+                # HTML article — sanitize script tags
+                article_text = _re.sub(
+                    r"<script[^>]*>.*?</script>",
+                    "",
+                    article_text,
+                    flags=_re.IGNORECASE | _re.DOTALL,
+                )
+
+            return jsonify({
+                "articleType": article_type,
+                "articleText": article_text,
+                "provider": provider,
+                "articleId": article_id,
+            })
+        else:
+            return jsonify({"error": "Article not available. This may be due to your news subscription level."}), 404
+
+    except Exception as e:
+        logger.exception("news_article endpoint error: %s", e)
+        return jsonify({"error": "Error fetching article."}), 500
+    finally:
+        if ib:
+            try:
+                ib.disconnect()
+            except Exception:
+                pass
+
+
+# -------------------------------------------------------------------------
+# Bring IBKR TWS window to foreground
+# -------------------------------------------------------------------------
+@app.route("/focus-ibkr", methods=["POST"])
+def focus_ibkr():
+    """
+    Bring the running IBKR Trader Workstation window to the foreground.
+    Uses the Windows API to find and activate the TWS window.
+    """
+    import ctypes
+    import ctypes.wintypes
+
+    user32 = ctypes.windll.user32
+
+    # Callback to enumerate windows and find TWS
+    found_hwnd = []
+
+    @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
+    def enum_callback(hwnd, lparam):
+        length = user32.GetWindowTextLengthW(hwnd)
+        if length > 0:
+            buf = ctypes.create_unicode_buffer(length + 1)
+            user32.GetWindowTextW(hwnd, buf, length + 1)
+            title = buf.value
+            title_lower = title.lower()
+            # Exclude editors/browsers that may contain "ibkr" in their title bar
+            exclude_keywords = ("visual studio code", "vscode", "vs code", "code - ")
+            if any(ex in title_lower for ex in exclude_keywords):
+                return True
+            # Match various IBKR window titles:
+            # "Interactive Brokers", "Trader Workstation", "TWS", "IB Gateway"
+            ib_keywords = ("interactive brokers", "trader workstation", "tws", "ib gateway", "ibkr")
+            if any(kw in title_lower for kw in ib_keywords) and user32.IsWindowVisible(hwnd):
+                found_hwnd.append(hwnd)
+        return True
+
+    user32.EnumWindows(enum_callback, 0)
+
+    if found_hwnd:
+        hwnd = found_hwnd[0]
+        SW_RESTORE = 9
+        SW_SHOW = 5
+        # Restore if minimized
+        if user32.IsIconic(hwnd):
+            user32.ShowWindow(hwnd, SW_RESTORE)
+        else:
+            user32.ShowWindow(hwnd, SW_SHOW)
+
+        # Windows blocks SetForegroundWindow from background processes.
+        # Workaround: simulate an Alt key press to satisfy the OS check,
+        # then call SetForegroundWindow + BringWindowToTop.
+        KEYEVENTF_EXTENDEDKEY = 0x0001
+        KEYEVENTF_KEYUP = 0x0002
+        VK_MENU = 0x12  # Alt key
+        user32.keybd_event(VK_MENU, 0, KEYEVENTF_EXTENDEDKEY, 0)
+        user32.SetForegroundWindow(hwnd)
+        user32.keybd_event(VK_MENU, 0, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0)
+        user32.BringWindowToTop(hwnd)
+
+        return jsonify({"status": "ok", "message": "IBKR TWS brought to foreground."})
+    else:
+        return jsonify({"status": "error", "message": "IBKR TWS window not found. Make sure TWS is running."}), 404
+
+
+# -------------------------------------------------------------------------
 # START OF ADDED BACKGROUND SCANNER CODE
 #
 # - BackgroundScanner class

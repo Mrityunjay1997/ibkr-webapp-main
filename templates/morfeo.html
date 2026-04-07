@@ -62,7 +62,7 @@
 
 	<div id="page">
 	<nav class="fh5co-nav" role="navigation">
-		<div class="container">
+		<div class="container-fluid layout-fluid">
 			<div class="top-menu">
 				<div class="row">
 					<div class="col-sm-2">
@@ -82,7 +82,7 @@
 			</div>
 		</div>
 	</nav>
-	<div class="container">
+	<div class="container-fluid layout-fluid">
 		<div id="fh5co-intro">
 			<div class="row animate-box">
 				<div class="col-md-8 col-md-offset-2 col-md-pull-2">
@@ -813,6 +813,25 @@
 							  </div>
 							</div>
 					</div>
+
+					<script>
+					function focusIBKR() {
+					    $.ajax({
+					        url: '/focus-ibkr',
+					        type: 'POST',
+					        dataType: 'json',
+					        error: function(xhr) {
+					            try {
+					                var resp = JSON.parse(xhr.responseText);
+					                if (resp.message) alert(resp.message);
+					            } catch(e) {
+					                alert('Could not bring IBKR TWS to foreground. Make sure TWS is running.');
+					            }
+					        }
+					    });
+					}
+					</script>
+
 					<div id="elfeo"></div>
 					<div id = "WarningData">Run the algorithm to see the erros</div>
 				</div>
@@ -827,18 +846,18 @@
 				<ul style="padding-left: unset !important;">
 			   	<li>   <!-- <li style="background-image: url(images/img_bg_1.jpg);"> -->
 			   		<div></div>
-			   		<div class="container-fluid">
+			   		<div class="container-fluid layout-fluid">
 			   			<div class="row">
 				   			<div class="col-md-12 col-xs-12 slider-text">
 
 							<!-- ============ NEWS FEED PANEL ============ -->
-							<div id="news-feed-panel" style="display:none; margin-bottom:18px; padding:14px 18px; border:1px solid #2c3e50; border-radius:8px; background:#0d1117;">
+							<div id="news-feed-panel" style="display:none; margin-bottom:18px; padding:14px 18px; border:1px solid #d0d7de; border-radius:8px; background:#ffffff;">
 								<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-									<h4 style="margin:0; color:#e6edf3; font-size:15px;">
+									<h4 style="margin:0; color:#1f2328; font-size:15px;">
 										&#128240; Latest News Headlines
-										<span id="news-feed-count" style="font-size:12px; color:#8b949e; margin-left:8px;"></span>
+										<span id="news-feed-count" style="font-size:12px; color:#57606a; margin-left:8px;"></span>
 									</h4>
-									<button type="button" onclick="document.getElementById('news-feed-panel').style.display='none'" style="background:none;border:none;color:#8b949e;font-size:18px;cursor:pointer;">&times;</button>
+									<button type="button" onclick="document.getElementById('news-feed-panel').style.display='none'" style="background:none;border:none;color:#57606a;font-size:18px;cursor:pointer;">&times;</button>
 								</div>
 								<div id="news-feed-body" style="max-height:420px; overflow-y:auto;">
 									<!-- populated by JS -->
@@ -846,8 +865,28 @@
 							</div>
 							<!-- ============ END NEWS FEED PANEL ============ -->
 
+							<!-- ============ DATA CONTROL BAR ============ -->
+							<div id="data-control-bar">
+								<div class="ctrl-section">
+									<span class="ctrl-label">Columns:</span>
+									<div id="col-toggle-chips"></div>
+								</div>
+								<div class="ctrl-sep"></div>
+								<div class="ctrl-section">
+									<span class="ctrl-label">Jump to:</span>
+									<div id="col-group-nav"></div>
+								</div>
+								<div class="ctrl-sep"></div>
+								<div class="ctrl-section">
+									<button class="col-group-btn" onclick="toggleAllColumns(true)" title="Show all columns">Show All</button>
+									<button class="col-group-btn" onclick="toggleAllColumns(false)" title="Hide all except Ticker">Hide All</button>
+									<button class="col-group-btn" onclick="resetColumnOrder()" title="Reset column order to default">Reset Order</button>
+								</div>
+							</div>
+							<!-- ============ END CONTROL BAR ============ -->
+
 				   			<form>
-				   				<div id="add1" class="card-panel section-fade" style="overflow-x:auto;"></div>
+				   				<div id="add1" class="card-panel section-fade"></div>
 							</form>
 							<br><br><br>
                                 <div id = "createForm" style= "display: none;"></div>
@@ -1102,6 +1141,9 @@ function renderResultsFromBackend(response) {
     // reset UI area
     document.getElementById("add1").innerHTML = "";
     document.getElementById("validator").classList.remove("loader");
+    // Reset control bar
+    var ctrlBar = document.getElementById('data-control-bar');
+    if (ctrlBar) ctrlBar.classList.remove('active');
 
     var morca = response;
     var mydata = response.result;
@@ -1205,15 +1247,47 @@ function renderResultsFromBackend(response) {
                         for (const pp of pivotPointVariables) if (pp in dta.Pivot1) pivotSecondary.push(pp);
                     }
 
+                    // Build the ordered list of ALL columns (for control bar & reorder)
+                    const allColDefs = [];
+                    headerCols.forEach(c => allColDefs.push({ key: c.key, label: c.label, group: 'indicators' }));
+                    pivotPrimary.forEach(p => allColDefs.push({ key: 'pivot_' + p, label: p, group: 'pivot' }));
+                    allColDefs.push({ key: 'netPosition', label: 'Net Position', group: 'position' });
+                    if (pivotSecondary.length > 0) pivotSecondary.forEach(p => allColDefs.push({ key: 'pivot1_' + p, label: p, group: 'pivot' }));
+                    allColDefs.push({ key: '_change', label: 'Change', group: 'position' });
+                    allColDefs.push({ key: '_placeOrder', label: 'Place Order', group: 'actions' });
+                    allColDefs.push({ key: '_news', label: 'News', group: 'actions' });
+
+                    // Apply saved column order if available
+                    const savedOrder = _loadColOrder();
+                    if (savedOrder && savedOrder.length > 0) {
+                        const orderMap = {};
+                        savedOrder.forEach((k, i) => orderMap[k] = i);
+                        allColDefs.sort((a, b) => {
+                            const ia = (a.key in orderMap) ? orderMap[a.key] : 9999;
+                            const ib = (b.key in orderMap) ? orderMap[b.key] : 9999;
+                            return ia - ib;
+                        });
+                    }
+
+                    // Store globally for control bar
+                    window._currentColDefs = allColDefs;
+                    window._currentTableId = tableId;
+
+                    // Check hidden columns from localStorage
+                    const hiddenCols = _loadHiddenCols();
+
                     // build header HTML
-                    let headerHtml = `<table id='responsive-data-table' class='table dt-responsive nowrap rsult${tableId}'>`;
+                    let headerHtml = `<div class='data-table-wrapper'><table id='responsive-data-table-${tableId}' class='table dt-responsive nowrap rsult${tableId}'>`;
                     headerHtml += "<thead><tr>";
-                    headerHtml += headerCols.map(c => `<th>${c.label}</th>`).join("");
-                    headerHtml += pivotPrimary.map(p => `<th>${p}</th>`).join("");
-                    headerHtml += "<th>netPosition</th>";
-                    if (pivotSecondary.length > 0) headerHtml += pivotSecondary.map(p => `<th>${p}</th>`).join("");
-                    headerHtml += `<th id="SortingTable${tableId}">Change</th><th>Place Order</th>`;
-                    headerHtml += `<th>News</th>`;
+                    let colIdx = 0;
+                    for (const cd of allColDefs) {
+                        const stickyClass = (cd.key === 'symbol') ? ' sticky-col' : '';
+                        const hiddenClass = hiddenCols[cd.key] ? ' col-hidden' : '';
+                        let label = cd.label;
+                        if (cd.key === '_change') label = `<span id="SortingTable${tableId}">Change</span>`;
+                        headerHtml += `<th class='${stickyClass}${hiddenClass}' data-col='${cd.key}' data-col-idx='${colIdx}' draggable='true'>${label}</th>`;
+                        colIdx++;
+                    }
                     headerHtml += "</tr></thead><tbody>";
                     txt1 += headerHtml;
 
@@ -1221,13 +1295,14 @@ function renderResultsFromBackend(response) {
                     var groupHeaderCols = headerCols;
                     var groupPivotPrimary = pivotPrimary;
                     var groupPivotSecondary = pivotSecondary;
+                    var groupAllColDefs = allColDefs;
                 }
 
                 // helper formatter
-                function fmt(x, maxDigits = 4) {
-                    if (x === null || x === undefined || x === "") return "n.d";
+                function fmt(x, maxDigits = 2) {
+                    if (x === null || x === undefined || x === "") return "-";
                     const n = Number(x);
-                    if (!Number.isFinite(n)) return "n.d";
+                    if (!Number.isFinite(n)) return "-";
                     return n.toFixed(maxDigits).replace(/\.?0+$/, "");
                 }
 
@@ -1241,6 +1316,7 @@ function renderResultsFromBackend(response) {
                 const headerCols = groupHeaderCols || [];
                 const pivotPrimary = groupPivotPrimary || [];
                 const pivotSecondary = groupPivotSecondary || [];
+                const allColDefs = groupAllColDefs || [];
 
                 const symbolCusipMap = {};
                 for (const key in _bg_results) {
@@ -1265,78 +1341,70 @@ function renderResultsFromBackend(response) {
                 const _newsCount = _newsItems.length;
                 const _newsArrowColor = _newsCount > 0 ? '#58a6ff' : '#555';
 
-                // standard columns
+                // Build cell content map for this row, keyed by column key
+                const cellMap = {};
+
+                // --- Indicator columns ---
                 for (const col of headerCols) {
                     let v = dta[col.key];
-                    if (
-                        col.key === "cusip" &&
-                        (!v || v === "custom" || v === "None")
-                    ) {
-                        if (symbolCusipMap[dta.symbol]) {
-                            v = symbolCusipMap[dta.symbol];
-                            // optional: persist fix
-                            dta.cusip = v;
-                        }
+                    if (col.key === "cusip" && (!v || v === "custom" || v === "None")) {
+                        if (symbolCusipMap[dta.symbol]) { v = symbolCusipMap[dta.symbol]; dta.cusip = v; }
                     }
-
-                    // determine cell background from variableResults
                     let cellStyle = "";
                     const vrLookup = col.vrKey || col.key;
                     if (vrLookup in vr) {
                         cellStyle = vr[vrLookup] ? " style='background:#4caf50;color:#fff'" : " style='background:#f44336;color:#fff'";
                     }
-
-                    // For the symbol column, append an inline news toggle arrow
+                    const stickyClass = (col.key === 'symbol') ? ' sticky-col' : '';
                     if (col.key === "symbol") {
                         const displayVal = (v === null || v === undefined || v === "") ? "n.d" : v;
-                        txt1 += `<td${cellStyle} style='white-space:nowrap'>${displayVal} <span class='news-arrow-sym' title='Toggle news (${_newsCount})' style='cursor:pointer;color:${_newsArrowColor};font-size:11px;margin-left:4px' onclick="event.stopPropagation();var el=document.getElementById('${_newsRowId}');var arrows=el.parentNode.querySelectorAll('.news-arrow');if(el.style.display==='none'){el.style.display='table-row';this.innerHTML='&#9650;';arrows.forEach(function(a){a.innerHTML='&#9650;'})}else{el.style.display='none';this.innerHTML='&#9660;';arrows.forEach(function(a){a.innerHTML='&#9660;'})}">&#9660;</span></td>`;
+                        cellMap[col.key] = `<td class='${stickyClass}' data-col='${col.key}'${cellStyle} style='white-space:nowrap'>${displayVal} <span class='news-arrow-sym' title='Toggle news (${_newsCount})' style='cursor:pointer;color:${_newsArrowColor};font-size:8px;margin-left:2px' onclick="event.stopPropagation();var el=document.getElementById('${_newsRowId}');var arrows=el.parentNode.querySelectorAll('.news-arrow');if(el.style.display==='none'){el.style.display='table-row';this.innerHTML='&#9650;';arrows.forEach(function(a){a.innerHTML='&#9650;'})}else{el.style.display='none';this.innerHTML='&#9660;';arrows.forEach(function(a){a.innerHTML='&#9660;'})}">&#9660;</span></td>`;
                     } else if (col.raw) {
-                        txt1 += `<td${cellStyle}>${(v === null || v === undefined || v === "") ? "n.d" : v}</td>`;
+                        cellMap[col.key] = `<td class='${stickyClass}' data-col='${col.key}'${cellStyle}>${(v === null || v === undefined || v === "") ? "n.d" : v}</td>`;
                     } else {
-                        txt1 += `<td${cellStyle}>${fmt(v)}</td>`;
+                        cellMap[col.key] = `<td class='${stickyClass}' data-col='${col.key}'${cellStyle}>${fmt(v)}</td>`;
                     }
                 }
 
-                // primary pivots
-                if (dta.Pivot && typeof dta.Pivot === "object") {
-                    let pivotStyle = "";
-                    if ("Pivot" in vr) {
-                        pivotStyle = vr["Pivot"] ? " style='background:#4caf50;color:#fff'" : " style='background:#f44336;color:#fff'";
+                // --- Primary pivots ---
+                let pivotStyle = "";
+                if ("Pivot" in vr) {
+                    pivotStyle = vr["Pivot"] ? " style='background:#4caf50;color:#fff'" : " style='background:#f44336;color:#fff'";
+                }
+                for (const pp of pivotPrimary) {
+                    const pKey = 'pivot_' + pp;
+                    if (pp === "Pivot Point") {
+                        cellMap[pKey] = `<td data-col='${pKey}'${pivotStyle}>n.d</td>`;
+                    } else if (dta.Pivot && typeof dta.Pivot === "object") {
+                        cellMap[pKey] = `<td data-col='${pKey}'${pivotStyle}>${fmt(dta.Pivot[pp])}</td>`;
+                    } else {
+                        cellMap[pKey] = `<td data-col='${pKey}'>n.d</td>`;
                     }
-                    for (const pp of pivotPrimary) {
-                        if (pp === "Pivot Point") {
-                            txt1 += `<td${pivotStyle}>n.d</td>`;
-                        } else {
-                            txt1 += `<td${pivotStyle}>${fmt(dta.Pivot[pp])}</td>`;
-                        }
-                    }
-                } else {
-                    txt1 += `<td>n.d</td>`;
                 }
 
-                // netPosition
-                txt1 += `<td>${(dta.netPosition === null || dta.netPosition === undefined || dta.netPosition === "") ? "n.d" : dta.netPosition}</td>`;
+                // --- netPosition ---
+                cellMap['netPosition'] = `<td data-col='netPosition'>${(dta.netPosition === null || dta.netPosition === undefined || dta.netPosition === "") ? "n.d" : dta.netPosition}</td>`;
 
-                // secondary pivots
-                if (pivotSecondary.length > 0) {
+                // --- Secondary pivots ---
+                for (const pp of pivotSecondary) {
+                    const pKey = 'pivot1_' + pp;
                     if (dta.Pivot1 && typeof dta.Pivot1 === "object") {
-                        for (const pp of pivotSecondary) txt1 += `<td>${fmt(dta.Pivot1[pp])}</td>`;
+                        cellMap[pKey] = `<td data-col='${pKey}'>${fmt(dta.Pivot1[pp])}</td>`;
                     } else {
-                        for (let i = 0; i < pivotSecondary.length; i++) txt1 += `<td>n.d</td>`;
+                        cellMap[pKey] = `<td data-col='${pKey}'>n.d</td>`;
                     }
                 }
 
-                // change color cell
-                const tdAddColor = decision === "UP" ? "<td style='background: #4caf50'>" :
-                                   decision === "DOWN" ? "<td style='background: #f44336'>" :
-                                   "<td>";
-                txt1 += `${tdAddColor}${decision}</td>`;
+                // --- Change ---
+                const tdAddColor = decision === "UP" ? " style='background:#4caf50'" :
+                                   decision === "DOWN" ? " style='background:#f44336'" : "";
+                cellMap['_change'] = `<td data-col='_change'${tdAddColor}>${decision}</td>`;
 
-                // place order button
+                // --- Place order ---
                 const totalIdBuySell = idBuySell + secondIdBuySell;
-                txt1 += `<td><button type='button' id='${totalIdBuySell}' data-toggle='modal' data-target='#exampleModalCenter' class='buttonbuysell' onclick='addButtonBuy(${idPlaceOrder}, "${totalIdBuySell}")'>click</button></td>`;
+                cellMap['_placeOrder'] = `<td data-col='_placeOrder'><button type='button' id='${totalIdBuySell}' data-toggle='modal' data-target='#exampleModalCenter' class='buttonbuysell' onclick='addButtonBuy(${idPlaceOrder}, "${totalIdBuySell}")'>click</button></td>`;
 
-                // news toggle cell (right side) — reuse pre-computed _newsItems / _newsRowId
+                // --- News toggle cell ---
                 const newsItems = _newsItems;
                 const newsRowId = _newsRowId;
                 {
@@ -1352,7 +1420,17 @@ function renderResultsFromBackend(response) {
                         newsStyle = " style='cursor:pointer;color:#666'";
                     }
                     const newsLabel = newsItems.length > 0 ? newsItems.length : '0';
-                    txt1 += `<td${newsStyle} onclick="event.stopPropagation();var el=document.getElementById('${newsRowId}');var arrows=el.parentNode.querySelectorAll('.news-arrow-sym');var arrow=this.querySelector('.news-arrow');if(el.style.display==='none'){el.style.display='table-row';arrow.innerHTML='&#9650;';arrows.forEach(function(a){a.innerHTML='&#9650;'})}else{el.style.display='none';arrow.innerHTML='&#9660;';arrows.forEach(function(a){a.innerHTML='&#9660;'})}"><span class='news-arrow'>&#9660;</span> ${newsLabel}</td>`;
+                    cellMap['_news'] = `<td data-col='_news'${newsStyle} onclick="event.stopPropagation();var el=document.getElementById('${newsRowId}');var arrows=el.parentNode.querySelectorAll('.news-arrow-sym');var arrow=this.querySelector('.news-arrow');if(el.style.display==='none'){el.style.display='table-row';arrow.innerHTML='&#9650;';arrows.forEach(function(a){a.innerHTML='&#9650;'})}else{el.style.display='none';arrow.innerHTML='&#9660;';arrows.forEach(function(a){a.innerHTML='&#9660;'})}"><span class='news-arrow'>&#9660;</span> ${newsLabel}</td>`;
+                }
+
+                // Emit cells in column order (respecting allColDefs order)
+                const hiddenCols = _loadHiddenCols();
+                for (const cd of allColDefs) {
+                    let cell = cellMap[cd.key] || `<td data-col='${cd.key}'>n.d</td>`;
+                    if (hiddenCols[cd.key]) {
+                        cell = cell.replace('<td', '<td class="col-hidden"');
+                    }
+                    txt1 += cell;
                 }
 
                 txt1 += "</tr>";
@@ -1365,12 +1443,12 @@ function renderResultsFromBackend(response) {
                         + (groupPivotSecondary || []).length
                         + 2 /* change + place order */
                         + 1 /* news col */;
-                    txt1 += `<tr id='${newsRowId}' style='display:none;background:#101828'>`;
+                    txt1 += `<tr id='${newsRowId}' style='display:none;background:#f6f8fa'>`;
                     txt1 += `<td colspan='${totalCols}' style='padding:10px 18px'>`;
-                    txt1 += `<div style='font-size:12px;font-weight:600;color:#58a6ff;margin-bottom:6px'>&#128240; News for ${(dta.symbol||'').replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>`;
+                    txt1 += `<div style='font-size:12px;font-weight:600;color:#0969da;margin-bottom:6px'>&#128240; News for ${(dta.symbol||'').replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>`;
                     if (newsItems.length > 0) {
                         txt1 += `<table style='width:100%;border-collapse:collapse;font-size:12px'>`;
-                        txt1 += `<tr style='border-bottom:1px solid #30363d'><th style='padding:5px 6px;text-align:left;color:#8b949e'>Date/Time</th><th style='padding:5px 6px;text-align:left;color:#8b949e'>Source</th><th style='padding:5px 6px;text-align:left;color:#8b949e'>Headline</th></tr>`;
+                        txt1 += `<tr style='border-bottom:1px solid #d0d7de'><th style='padding:5px 6px;text-align:left;color:#57606a'>Date/Time</th><th style='padding:5px 6px;text-align:left;color:#57606a'>Source</th><th style='padding:5px 6px;text-align:left;color:#57606a'>Headline</th></tr>`;
                         for (const ni of newsItems) {
                             let displayTime = ni.parsedTime || ni.time || "";
                             try {
@@ -1382,13 +1460,12 @@ function renderResultsFromBackend(response) {
                             const escHl = (ni.headline || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
                             const escProv = (ni.provider || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
                             const escTime = displayTime.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-                            const searchQuery = encodeURIComponent((ni.headline || '') + ' ' + (dta.symbol || ''));
-                            const articleLink = `<a href='https://www.google.com/search?q=${searchQuery}&tbm=nws' target='_blank' rel='noopener noreferrer' style='color:#58a6ff;text-decoration:underline'>${escHl || "link"}</a>`;
-                            txt1 += `<tr style='border-bottom:1px solid #21262d'><td style='padding:4px 6px;white-space:nowrap;color:#8b949e'>${escTime}</td><td style='padding:4px 6px;color:#c9d1d9'>${escProv}</td><td style='padding:4px 6px;color:#e6edf3'>${articleLink}</td></tr>`;
+                            const articleLink = `<a href='javascript:void(0)' onclick='focusIBKR()' style='color:#0969da;text-decoration:underline;cursor:pointer'>${escHl || "link"}</a>`;
+                            txt1 += `<tr style='border-bottom:1px solid #d0d7de'><td style='padding:4px 6px;white-space:nowrap;color:#57606a'>${escTime}</td><td style='padding:4px 6px;color:#1f2328'>${escProv}</td><td style='padding:4px 6px;color:#1f2328'>${articleLink}</td></tr>`;
                         }
                         txt1 += `</table>`;
                     } else {
-                        txt1 += `<div style='color:#8b949e;font-size:12px;padding:6px 0;'>No news available</div>`;
+                        txt1 += `<div style='color:#57606a;font-size:12px;padding:6px 0;'>No news available</div>`;
                     }
                     txt1 += `</td></tr>`;
                 }
@@ -1398,7 +1475,7 @@ function renderResultsFromBackend(response) {
             } // end inner for
 
             if (rows && rows.length > 0) {
-                txt1 += "</tbody></table>";
+                txt1 += "</tbody></table></div>"; /* close data-table-wrapper */
             }
         } // end outer for
 
@@ -1473,12 +1550,16 @@ function renderResultsFromBackend(response) {
         try {
             var el = document.getElementsByClassName("rsult" + tableId)[0];
             if (el) {
-                var numberofcolumns = el.children[0].children[0].children.length;
+                var numberofcolumns = el.querySelectorAll('thead th:not(.col-hidden)').length;
                 el.style.fontSize = (numberofcolumns <= 17) ? "11px" : "9.2px";
             }
         } catch (e) {
             // ignore
         }
+
+        // Initialize control bar & drag-drop for this table
+        _buildControlBar();
+        _initDragReorder(tableId);
 
         tableId += 1;
     } // end for each etf
@@ -1559,13 +1640,13 @@ function populateNewsFeedPanel(response) {
 
         html += `<div style="margin-bottom:6px;">`;
         html += `<div onclick="var el=document.getElementById('${panelId}');el.style.display=el.style.display==='none'?'block':'none'" `;
-        html += `style="cursor:pointer;padding:7px 10px;background:#161b22;border:1px solid #30363d;border-radius:5px;display:flex;align-items:center;justify-content:space-between;">`;
-        html += `<span style="color:#58a6ff;font-weight:600;font-size:13px;">`;
+        html += `style="cursor:pointer;padding:7px 10px;background:#f6f8fa;border:1px solid #d0d7de;border-radius:5px;display:flex;align-items:center;justify-content:space-between;">`;
+        html += `<span style="color:#0969da;font-weight:600;font-size:13px;">`;
         html += `<span class="nfp-arrow" style="display:inline-block;transition:transform .2s;margin-right:6px;">&#9654;</span>`;
-        html += `${esc(sym)} <span style="color:#8b949e;font-weight:400;margin-left:8px;">${items.length} headline${items.length > 1 ? 's' : ''}</span></span>`;
-        html += `<span style="color:#8b949e;font-size:11px;">${esc(dispTime)}</span>`;
+        html += `${esc(sym)} <span style="color:#57606a;font-weight:400;margin-left:8px;">${items.length} headline${items.length > 1 ? 's' : ''}</span></span>`;
+        html += `<span style="color:#57606a;font-size:11px;">${esc(dispTime)}</span>`;
         html += `</div>`;
-        html += `<div id="${panelId}" style="display:none;padding:6px 12px 8px 24px;background:#0d1117;border-left:2px solid #30363d;">`;
+        html += `<div id="${panelId}" style="display:none;padding:6px 12px 8px 24px;background:#ffffff;border-left:2px solid #d0d7de;">`;
         html += `<table style="width:100%;border-collapse:collapse;font-size:12px;">`;
         for (const ni of items) {
             let t = ni.parsedTime || ni.time || "";
@@ -1573,12 +1654,11 @@ function populateNewsFeedPanel(response) {
             const escHl = esc(ni.headline);
             const escProv = esc(ni.provider);
             const escT = esc(t);
-            const searchQ = encodeURIComponent((ni.headline || '') + ' ' + (ni.symbol || sym));
-            const link = `<a href="https://www.google.com/search?q=${searchQ}&tbm=nws" target="_blank" rel="noopener noreferrer" style="color:#58a6ff;text-decoration:underline">${escHl || 'link'}</a>`;
-            html += `<tr style="border-bottom:1px solid #21262d;">`;
-            html += `<td style="padding:4px 6px;white-space:nowrap;color:#8b949e;width:150px;">${escT}</td>`;
-            html += `<td style="padding:4px 6px;color:#c9d1d9;width:45px;">${escProv}</td>`;
-            html += `<td style="padding:4px 6px;color:#e6edf3;">${link}</td>`;
+            const link = `<a href="javascript:void(0)" onclick="focusIBKR()" style="color:#0969da;text-decoration:underline;cursor:pointer">${escHl || 'link'}</a>`;
+            html += `<tr style="border-bottom:1px solid #d0d7de;">`;
+            html += `<td style="padding:4px 6px;white-space:nowrap;color:#57606a;width:150px;">${escT}</td>`;
+            html += `<td style="padding:4px 6px;color:#1f2328;width:45px;">${escProv}</td>`;
+            html += `<td style="padding:4px 6px;color:#1f2328;">${link}</td>`;
             html += `</tr>`;
         }
         html += `</table></div></div>`;
@@ -1589,6 +1669,254 @@ function populateNewsFeedPanel(response) {
     panel.style.display = "block";
 }
 </script>
+
+<!-- ============ COLUMN MANAGEMENT JS ============ -->
+<script>
+/* ----------------------------------------------------------------
+   localStorage helpers for column visibility and order
+   ---------------------------------------------------------------- */
+var _COL_HIDDEN_KEY = 'ibkr_hidden_cols';
+var _COL_ORDER_KEY  = 'ibkr_col_order';
+
+function _loadHiddenCols() {
+    try { return JSON.parse(localStorage.getItem(_COL_HIDDEN_KEY)) || {}; } catch(e) { return {}; }
+}
+function _saveHiddenCols(obj) {
+    try { localStorage.setItem(_COL_HIDDEN_KEY, JSON.stringify(obj)); } catch(e) {}
+}
+function _loadColOrder() {
+    try { return JSON.parse(localStorage.getItem(_COL_ORDER_KEY)) || null; } catch(e) { return null; }
+}
+function _saveColOrder(arr) {
+    try { localStorage.setItem(_COL_ORDER_KEY, JSON.stringify(arr)); } catch(e) {}
+}
+
+/* ----------------------------------------------------------------
+   Build the control bar chips and group navigation
+   ---------------------------------------------------------------- */
+function _buildControlBar() {
+    var colDefs = window._currentColDefs;
+    if (!colDefs || colDefs.length === 0) return;
+
+    var bar = document.getElementById('data-control-bar');
+    if (!bar) return;
+    bar.classList.add('active');
+
+    var chipsEl = document.getElementById('col-toggle-chips');
+    var groupNav = document.getElementById('col-group-nav');
+    if (!chipsEl || !groupNav) return;
+
+    var hidden = _loadHiddenCols();
+
+    // Column groups for navigation
+    var groups = {
+        'indicators': 'Indicators',
+        'pivot': 'Pivots',
+        'position': 'Position',
+        'actions': 'Actions'
+    };
+
+    // Build chips
+    var chipsHtml = '';
+    for (var i = 0; i < colDefs.length; i++) {
+        var cd = colDefs[i];
+        if (cd.key === 'symbol') continue; // never hide ticker
+        var offClass = hidden[cd.key] ? ' chip-off' : '';
+        chipsHtml += '<span class="col-chip' + offClass + '" data-col-key="' + cd.key + '" onclick="_toggleColVisibility(\'' + cd.key + '\', this)">' + cd.label + '</span>';
+    }
+    chipsEl.innerHTML = chipsHtml;
+
+    // Build group nav
+    var groupHtml = '';
+    var seen = {};
+    for (var j = 0; j < colDefs.length; j++) {
+        var g = colDefs[j].group;
+        if (g && !seen[g] && groups[g]) {
+            seen[g] = true;
+            groupHtml += '<button class="col-group-btn" onclick="_scrollToGroup(\'' + g + '\')">' + groups[g] + '</button>';
+        }
+    }
+    groupNav.innerHTML = groupHtml;
+}
+
+/* ----------------------------------------------------------------
+   Toggle column visibility
+   ---------------------------------------------------------------- */
+function _toggleColVisibility(colKey, chipEl) {
+    var hidden = _loadHiddenCols();
+    if (hidden[colKey]) {
+        delete hidden[colKey];
+        chipEl.classList.remove('chip-off');
+    } else {
+        hidden[colKey] = true;
+        chipEl.classList.add('chip-off');
+    }
+    _saveHiddenCols(hidden);
+
+    // Apply to DOM — toggle col-hidden on all th/td with data-col matching
+    var cells = document.querySelectorAll('[data-col="' + colKey + '"]');
+    for (var i = 0; i < cells.length; i++) {
+        if (hidden[colKey]) {
+            cells[i].classList.add('col-hidden');
+        } else {
+            cells[i].classList.remove('col-hidden');
+        }
+    }
+}
+
+/* Show All / Hide All */
+function toggleAllColumns(show) {
+    var colDefs = window._currentColDefs;
+    if (!colDefs) return;
+    var hidden = {};
+    if (!show) {
+        for (var i = 0; i < colDefs.length; i++) {
+            if (colDefs[i].key !== 'symbol') hidden[colDefs[i].key] = true;
+        }
+    }
+    _saveHiddenCols(hidden);
+    // Re-apply to all chips and cells
+    var chips = document.querySelectorAll('.col-chip');
+    for (var j = 0; j < chips.length; j++) {
+        var key = chips[j].getAttribute('data-col-key');
+        if (show) {
+            chips[j].classList.remove('chip-off');
+        } else {
+            chips[j].classList.add('chip-off');
+        }
+    }
+    for (var k = 0; k < colDefs.length; k++) {
+        var cells = document.querySelectorAll('[data-col="' + colDefs[k].key + '"]');
+        for (var c = 0; c < cells.length; c++) {
+            if (show || colDefs[k].key === 'symbol') {
+                cells[c].classList.remove('col-hidden');
+            } else {
+                cells[c].classList.add('col-hidden');
+            }
+        }
+    }
+}
+
+/* ----------------------------------------------------------------
+   Scroll to column group
+   ---------------------------------------------------------------- */
+function _scrollToGroup(groupName) {
+    var colDefs = window._currentColDefs;
+    if (!colDefs) return;
+    // Find first visible column in this group
+    var hidden = _loadHiddenCols();
+    for (var i = 0; i < colDefs.length; i++) {
+        if (colDefs[i].group === groupName && !hidden[colDefs[i].key]) {
+            var th = document.querySelector('th[data-col="' + colDefs[i].key + '"]');
+            if (th) {
+                th.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                // Flash highlight
+                th.style.transition = 'background 0.3s';
+                th.style.background = '#ddf4ff';
+                setTimeout(function(el) { el.style.background = ''; }, 600, th);
+            }
+            break;
+        }
+    }
+}
+
+/* ----------------------------------------------------------------
+   Reset column order
+   ---------------------------------------------------------------- */
+function resetColumnOrder() {
+    localStorage.removeItem(_COL_ORDER_KEY);
+    localStorage.removeItem(_COL_HIDDEN_KEY);
+    // If there's data on screen, just alert — next render will use defaults
+    alert('Column order and visibility reset. Changes will apply on next scan.');
+}
+
+/* ----------------------------------------------------------------
+   Drag-and-drop column reordering
+   ---------------------------------------------------------------- */
+function _initDragReorder(tableId) {
+    var table = document.getElementById('responsive-data-table-' + tableId);
+    if (!table) return;
+    var thead = table.querySelector('thead tr');
+    if (!thead) return;
+
+    var ths = thead.querySelectorAll('th');
+    var dragSrcIdx = null;
+
+    function getColIdx(el) {
+        return parseInt(el.getAttribute('data-col-idx'), 10);
+    }
+
+    function swapColumns(fromIdx, toIdx) {
+        // Swap in every row (thead + tbody)
+        var rows = table.querySelectorAll('tr');
+        for (var r = 0; r < rows.length; r++) {
+            var cells = rows[r].children;
+            // Skip news sub-rows (they have colspan)
+            if (cells.length <= 1) continue;
+            if (fromIdx >= cells.length || toIdx >= cells.length) continue;
+            var fromCell = cells[fromIdx];
+            var toCell = cells[toIdx];
+            if (fromIdx < toIdx) {
+                rows[r].insertBefore(fromCell, toCell.nextSibling);
+            } else {
+                rows[r].insertBefore(fromCell, toCell);
+            }
+        }
+        // Save new order
+        var newThs = thead.querySelectorAll('th');
+        var order = [];
+        for (var i = 0; i < newThs.length; i++) {
+            order.push(newThs[i].getAttribute('data-col'));
+            newThs[i].setAttribute('data-col-idx', i);
+        }
+        _saveColOrder(order);
+    }
+
+    for (var i = 0; i < ths.length; i++) {
+        (function(th, idx) {
+            th.addEventListener('dragstart', function(e) {
+                dragSrcIdx = idx;
+                th.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', idx);
+            });
+            th.addEventListener('dragend', function() {
+                th.classList.remove('dragging');
+                var allTh = thead.querySelectorAll('th');
+                for (var j = 0; j < allTh.length; j++) allTh[j].classList.remove('drag-over');
+            });
+            th.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                th.classList.add('drag-over');
+            });
+            th.addEventListener('dragleave', function() {
+                th.classList.remove('drag-over');
+            });
+            th.addEventListener('drop', function(e) {
+                e.preventDefault();
+                th.classList.remove('drag-over');
+                var fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                var toIdx = getColIdx(th);
+                if (fromIdx !== toIdx) {
+                    swapColumns(fromIdx, toIdx);
+                    // Rebuild control bar chips to reflect new order
+                    var newThs = thead.querySelectorAll('th');
+                    var newColDefs = [];
+                    for (var k = 0; k < newThs.length; k++) {
+                        var key = newThs[k].getAttribute('data-col');
+                        var old = window._currentColDefs.find(function(c) { return c.key === key; });
+                        newColDefs.push(old || { key: key, label: newThs[k].textContent, group: 'indicators' });
+                    }
+                    window._currentColDefs = newColDefs;
+                    _buildControlBar();
+                }
+            });
+        })(ths[i], i);
+    }
+}
+</script>
+<!-- ============ END COLUMN MANAGEMENT JS ============ -->
 
 
 
