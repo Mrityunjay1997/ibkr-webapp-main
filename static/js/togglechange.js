@@ -102,6 +102,7 @@ document.getElementById("ComparisonSlowSMA").addEventListener("change", changeIn
 document.getElementById("ComparisonVWAP").addEventListener("change", changeInput);
 document.getElementById("ComparisonRSI").addEventListener("change", changeInput);
 document.getElementById("ComparisonAverageVolume").addEventListener("change", changeInput);
+document.getElementById("ComparisonVolume").addEventListener("change", changeInput);
 document.getElementById("ComparisonRelativeVolume").addEventListener("change", changeInput);
 
 document.getElementById("ComparisonEMA").addEventListener("change", changeInput);
@@ -111,6 +112,9 @@ document.getElementById("ComparisonATR").addEventListener("change", changeInput)
 document.getElementById("ComparisonPrevClose").addEventListener("change", changeInput);
 document.getElementById("ComparisonLowOfDay").addEventListener("change", changeInput);
 document.getElementById("ComparisonHighOfDay").addEventListener("change", changeInput);
+document.getElementById("ComparisonPullbackPct2").addEventListener("change", changeInput);
+document.getElementById("ComparisonFibGap").addEventListener("change", changeInput);
+document.getElementById("ComparisonMarketCap").addEventListener("change", changeInput);
 //document.getElementById("ComparisonPrice").addEventListener("change", changeInput);
 
 function changeInput() {
@@ -123,6 +127,7 @@ function changeInput() {
     if (this.id == "ComparisonVWAP") {var id1 = "PercentageVWAP"; var id2 = "PercentageVWAP1"; var id3 = "changeinput3"; var val1 = 0; var val2 = 100;}
     if (this.id == "ComparisonRSI") {var id1 = "PercentageRSI"; var id2 = "PercentageRSI1"; var id3 = "changeinput4"; var val1 = 30; var val2 = 70;}
     if (this.id == "ComparisonAverageVolume") {var id1 = "PercentageAverageVolume"; var id2 = "PercentageAverageVolume1"; var id3 = "changeinput5"; var val1 = 0; var val2 = 10000;}
+    if (this.id == "ComparisonVolume") {var id1 = "PercentageVolume"; var id2 = "PercentageVolume1"; var id3 = "changeinput13"; var val1 = 0; var val2 = 10000;}
     if (this.id == "ComparisonRelativeVolume") {var id1 = "PercentageRelativeVolume"; var id2 = "PercentageRelativeVolume1"; var id3 = "changeinput6"; var val1 = 0; var val2 = 2;}
 
     if (this.id == "ComparisonEMA") {var id1 = "PercentageEMA"; var id2 = "PercentageEMA1"; var id3 = "changeinput7"; var val1 = 0; var val2 = 100;}
@@ -132,6 +137,10 @@ function changeInput() {
     if (this.id == "ComparisonPrevClose") {var id1 = "PercentagePrevClose"; var id2 = "PercentagePrevClose1"; var id3 = "changeinput10"; var val1 = 0; var val2 = 100;}
     if (this.id == "ComparisonLowOfDay") {var id1 = "PercentageLowOfDay"; var id2 = "PercentageLowOfDay1"; var id3 = "changeinput11"; var val1 = 0; var val2 = 100;}
     if (this.id == "ComparisonHighOfDay") {var id1 = "PercentageHighOfDay"; var id2 = "PercentageHighOfDay1"; var id3 = "changeinput12"; var val1 = 0; var val2 = 100;}
+
+    if (this.id == "ComparisonPullbackPct2") {var id1 = "PercentagePullbackPct2"; var id2 = "PercentagePullbackPct2_1"; var id3 = "changeinput14"; var val1 = 0; var val2 = 100;}
+    if (this.id == "ComparisonFibGap") {var id1 = "PercentageFibGap"; var id2 = "PercentageFibGap1"; var id3 = "changeinput15"; var val1 = 0; var val2 = 10;}
+    if (this.id == "ComparisonMarketCap") {var id1 = "PercentageMarketCap"; var id2 = "PercentageMarketCap1"; var id3 = "changeinput16"; var val1 = 0; var val2 = 100000;}
 
     if (this.id == "ComparisonPrice") {var id1 = "PercentagePrice"; var id2 = "PercentagePrice1"; var id3 = "changeinputa2";  var val1 = 0; var val2 = 100;}
 
@@ -149,6 +158,7 @@ function changeInput() {
     if (this.id == "ComparisonVWAP") {var nd1 = "VWAP"; var nd2 = "VWAP1"; var nd3 = "nchangeinput3"; var nval1 = 5; var nval2 = 10;}
     if (this.id == "ComparisonRSI") {var nd1 = "RSI"; var nd2 = "RSI1"; nd3 = "nchangeinput4"; var nval1 = 14; var nval2 = 20;}
     if (this.id == "ComparisonAverageVolume") {var nd1 = "AverageVolume"; var nd2 = "AverageVolume1"; var nd3 = "nchangeinput5"; var nval1 = 5; var nval2 = 10;}
+    if (this.id == "ComparisonVolume") {var nd1 = "Volume"; var nd2 = "Volume1"; var nd3 = "nchangeinput13"; var nval1 = 1; var nval2 = 5;}
     if (this.id == "ComparisonRelativeVolume") {var nd1 = "RelativeVolume"; var nd2 = "RelativeVolume1"; var nd3 = "nchangeinput6"; var nval1 = 5; var nval2 = 10;}
 
     if (this.id == "ComparisonEMA") {var nd1 = "EMA"; var nd2 = "EMA1"; var nd3 = "nchangeinput7"; var nval1 = 10; var nval2 = 20;}
@@ -158,6 +168,10 @@ function changeInput() {
     if (this.id == "ComparisonPrevClose") {var nd1 = "PrevClose"; var nd2 = "PrevClose1"; var nd3 = "nchangeinput10"; var nval1 = 0; var nval2 = 1000;}
     if (this.id == "ComparisonLowOfDay") {var nd1 = "LowOfDay"; var nd2 = "LowOfDay1"; var nd3 = "nchangeinput11"; var nval1 = 0; var nval2 = 1000;}
     if (this.id == "ComparisonHighOfDay") {var nd1 = "HighOfDay"; var nd2 = "HighOfDay1"; var nd3 = "nchangeinput12"; var nval1 = 0; var nval2 = 1000;}
+
+    if (this.id == "ComparisonPullbackPct2") {var nd1 = "PullbackPct2"; var nd2 = "PullbackPct2_1"; var nd3 = "nchangeinput14"; var nval1 = 0; var nval2 = 100;}
+    if (this.id == "ComparisonFibGap") {var nd1 = "FibGap"; var nd2 = "FibGap1"; var nd3 = "nchangeinput15"; var nval1 = 0; var nval2 = 10;}
+    if (this.id == "ComparisonMarketCap") {var nd1 = "MarketCap"; var nd2 = "MarketCap1"; var nd3 = "nchangeinput16"; var nval1 = 0; var nval2 = 100000;}
 
     if (this.id == "ComparisonPrice") {var nd1 = "Pricelevel"; var nd2 = "Pricelevel1"; nd3 = "nchangeinputa2"; var nval1 = 0; var nval2 = 1000;}
 
@@ -177,6 +191,7 @@ function changeInput() {
     if (this.id == "ComparisonVWAP") {var id1 = "PercentageVWAP"; var id2 = "PercentageVWAP1"; var id3 = "changeinput3";}
     if (this.id == "ComparisonRSI") {var id1 = "PercentageRSI"; var id2 = "PercentageRSI1"; var id3 = "changeinput4";}
     if (this.id == "ComparisonAverageVolume") {var id1 = "PercentageAverageVolume"; var id2 = "PercentageAverageVolume1"; var id3 = "changeinput5";}
+    if (this.id == "ComparisonVolume") {var id1 = "PercentageVolume"; var id2 = "PercentageVolume1"; var id3 = "changeinput13";}
     if (this.id == "ComparisonRelativeVolume") {var id1 = "PercentageRelativeVolume"; var id2 = "PercentageRelativeVolume1"; id3 = "changeinput6";}
 
     if (this.id == "ComparisonEMA") {var id1 = "PercentageEMA"; var id2 = "PercentageEMA1"; var id3 = "changeinput7";}
@@ -186,6 +201,10 @@ function changeInput() {
     if (this.id == "ComparisonPrevClose") {var id1 = "PercentagePrevClose"; var id2 = "PercentagePrevClose1"; var id3 = "changeinput10";}
     if (this.id == "ComparisonLowOfDay") {var id1 = "PercentageLowOfDay"; var id2 = "PercentageLowOfDay1"; var id3 = "changeinput11";}
     if (this.id == "ComparisonHighOfDay") {var id1 = "PercentageHighOfDay"; var id2 = "PercentageHighOfDay1"; var id3 = "changeinput12";}
+
+    if (this.id == "ComparisonPullbackPct2") {var id1 = "PercentagePullbackPct2"; var id2 = "PercentagePullbackPct2_1"; var id3 = "changeinput14";}
+    if (this.id == "ComparisonFibGap") {var id1 = "PercentageFibGap"; var id2 = "PercentageFibGap1"; var id3 = "changeinput15";}
+    if (this.id == "ComparisonMarketCap") {var id1 = "PercentageMarketCap"; var id2 = "PercentageMarketCap1"; var id3 = "changeinput16";}
 
     if (this.id == "ComparisonPrice") {var id1 = "PercentagePrice"; var id2 = "PercentagePrice1"; id3 = "changeinputa2";}
 
@@ -199,6 +218,7 @@ function changeInput() {
       if (this.id == "ComparisonVWAP") {var nd1 = "VWAP"; nd3 = "nchangeinput3";}
       if (this.id == "ComparisonRSI") {var nd1 = "RSI"; nd3 = "nchangeinput4";}
       if (this.id == "ComparisonAverageVolume") {var nd1 = "AverageVolume"; nd3 = "nchangeinput5";}
+      if (this.id == "ComparisonVolume") {var nd1 = "Volume"; nd3 = "nchangeinput13";}
       if (this.id == "ComparisonRelativeVolume") {var nd1 = "RelativeVolume"; nd3 = "nchangeinput6";}
 
       if (this.id == "ComparisonEMA") {var nd1 = "EMA"; nd3 = "nchangeinput7";}
@@ -208,6 +228,10 @@ function changeInput() {
       if (this.id == "ComparisonPrevClose") {var nd1 = "PrevClose"; nd3 = "nchangeinput10";}
       if (this.id == "ComparisonLowOfDay") {var nd1 = "LowOfDay"; nd3 = "nchangeinput11";}
       if (this.id == "ComparisonHighOfDay") {var nd1 = "HighOfDay"; nd3 = "nchangeinput12";}
+
+      if (this.id == "ComparisonPullbackPct2") {var nd1 = "PullbackPct2"; nd3 = "nchangeinput14";}
+      if (this.id == "ComparisonFibGap") {var nd1 = "FibGap"; nd3 = "nchangeinput15";}
+      if (this.id == "ComparisonMarketCap") {var nd1 = "MarketCap"; nd3 = "nchangeinput16";}
 
       if (this.id == "ComparisonPrice") {var nd1 = "Pricelevel"; nd3 = "nchangeinputa2";}
 
@@ -221,6 +245,7 @@ function changeInput() {
     if (this.id == "ComparisonVWAP") {var nd1 = "VWAP"; var id1 = "PercentageVWAP";}
     if (this.id == "ComparisonRSI") {var nd1 = "RSI"; id1 = "PercentageRSI";}
     if (this.id == "ComparisonAverageVolume") {var nd1 = "AverageVolume"; var id1 = "PercentageAverageVolume";}
+    if (this.id == "ComparisonVolume") {var nd1 = "Volume"; var id1 = "PercentageVolume";}
     if (this.id == "ComparisonRelativeVolume") {var nd1 = "RelativeVolume"; var id1 = "PercentageRelativeVolume";}
 
     if (this.id == "ComparisonEMA") {var nd1 = "EMA"; var id1 = "PercentageEMA";}
@@ -230,6 +255,10 @@ function changeInput() {
     if (this.id == "ComparisonPrevClose") {var nd1 = "PrevClose"; var id1 = "PercentagePrevClose";}
     if (this.id == "ComparisonLowOfDay") {var nd1 = "LowOfDay"; var id1 = "PercentageLowOfDay";}
     if (this.id == "ComparisonHighOfDay") {var nd1 = "HighOfDay"; var id1 = "PercentageHighOfDay";}
+
+    if (this.id == "ComparisonPullbackPct2") {var nd1 = "PullbackPct2"; var id1 = "PercentagePullbackPct2";}
+    if (this.id == "ComparisonFibGap") {var nd1 = "FibGap"; var id1 = "PercentageFibGap";}
+    if (this.id == "ComparisonMarketCap") {var nd1 = "MarketCap"; var id1 = "PercentageMarketCap";}
 
     if (this.id == "ComparisonPrice") {var nd1 = "Pricelevel";}
 

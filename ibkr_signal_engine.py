@@ -245,6 +245,13 @@ class IBapi(EWrapper, EClient):
         # reqId -> bool (newsArticle callback received)
         self._article_done = {}
 
+        # ---------------------------
+        # Fundamental data (market cap via tick type 258)
+        # ---------------------------
+        self._fundamental_data = {}   # reqId -> {"MKTCAP": float, ...}
+        self._fundamental_done = {}   # reqId -> bool
+        self._fundamental_lock = threading.Lock()
+
     def _to_dict(self, obj):
         if obj is None:
             return None
@@ -452,6 +459,27 @@ class IBapi(EWrapper, EClient):
                 self.indicateNotCondition = True
                 break
 
+    def tickString(self, req_id, tick_type, value):
+        """
+        Callback for string-based tick data.
+
+        tickType 47 = FUNDAMENTAL_RATIOS — semicolon-delimited key=value pairs
+        containing MKTCAP (market cap in millions), among other fields.
+        """
+        if tick_type == 47 and value:
+            try:
+                ratios = {}
+                for pair in value.split(";"):
+                    if "=" in pair:
+                        k, v = pair.split("=", 1)
+                        ratios[k.strip()] = v.strip()
+                with self._fundamental_lock:
+                    self._fundamental_data[req_id] = ratios
+                    self._fundamental_done[req_id] = True
+            except Exception:
+                with self._fundamental_lock:
+                    self._fundamental_done[req_id] = True
+
     def tickSize(self, req_id, tick_type, size):
 
         # tickType 8 = VOLUME
@@ -645,6 +673,14 @@ class IBapi(EWrapper, EClient):
         if any(m.lower() in msg for m in self.config.muted_ibapi_errors):
             return
 
+        # Silently handle news-request errors (e.g. "Rejected - Invalid
+        # value in field # 48" when a provider code isn't subscribed).
+        # Unblock the wait loop but do NOT store in warningTicker.
+        if req_id in self._news_done and not self._news_done[req_id]:
+            logger.info("News request %s got error %s: %s — unblocking (suppressed)", req_id, error_code, error_string)
+            self._news_done[req_id] = True
+            return
+
         # store but don't print
         self.errorCodeToShow[error_code] = error_string
 
@@ -679,12 +715,6 @@ class IBapi(EWrapper, EClient):
         # timeout.  Signal completion here so it can proceed immediately.
         if req_id in self.requestInformation and not self.requestInformation[req_id]:
             self.requestInformation[req_id] = True
-
-        # Unblock the news waiting loop in fetchNews().
-        # If IB rejects the news request, historicalNewsEnd never fires.
-        if req_id in self._news_done and not self._news_done[req_id]:
-            logger.info("News request %s got error %s: %s — unblocking", req_id, error_code, error_string)
-            self._news_done[req_id] = True
 
         # Unblock the article-body waiting loop in fetchNewsArticle().
         if req_id in self._article_done and not self._article_done[req_id]:
@@ -1115,6 +1145,8 @@ class IBapi(EWrapper, EClient):
         "atr1": "ATR1_tf",
         "averageVolume": "averageVolume_tf",
         "averageVolume1": "averageVolume1_tf",
+        "volumeIndicator": "Volume_tf",
+        "volumeIndicator1": "Volume1_tf",
         "relativeVolume": "relativeVolume_tf",
         "relativeVolume1": "relativeVolume1_tf",
         "prevClose": "PrevClose_tf",
@@ -1176,6 +1208,8 @@ class IBapi(EWrapper, EClient):
             ("ATR1", "ATR1_tf", 14),
             ("AverageVolume", "averageVolume_tf", 14),
             ("AverageVolume1", "averageVolume1_tf", 14),
+            ("Volume", "Volume_tf", 1),
+            ("Volume1", "Volume1_tf", 1),
             ("RelativeVolume", "relativeVolume_tf", 5),
             ("RelativeVolume1", "relativeVolume1_tf", 5),
             ("Cross50SMA", "Cross50SMA_tf", 50),
@@ -1224,7 +1258,7 @@ class IBapi(EWrapper, EClient):
         return default_tf, tf_plan
 
     @staticmethod
-    def getIndicators(data, cusip, contract, form, net_position, symbol):
+    def getIndicators(data, cusip, contract, form, net_position, symbol, market_cap=None):
         """
         Build and compute all configured indicators for one symbol.
 
@@ -1892,6 +1926,83 @@ class IBapi(EWrapper, EClient):
             except Exception:
                 indicators["pullbackPct"] = None
 
+        # --- 2nd Pullback Retracement (same logic, independent threshold) ---
+        if form.get("ComparisonPullbackPct2", "Not used") != "Not used":
+            try:
+                if not result_session.empty:
+                    hod2 = float(result_session["high"].max())
+                else:
+                    hod2 = float(result_full["high"].iloc[-1])
+
+                if len(unique_dates) >= 2:
+                    prev_date2 = unique_dates[-2]
+                    prev_mask2 = result_full.index.normalize() == prev_date2
+                    pc2 = float(result_full.loc[prev_mask2]["close"].iloc[-1])
+                else:
+                    pc2 = float(result_full["close"].iloc[-2]) if len(result_full) >= 2 else float(
+                        result_full["close"].iloc[-1])
+
+                close_price2 = float(result_full["close"].iloc[-1])
+                move2 = hod2 - pc2
+
+                if move2 > 0:
+                    pullback_pct2 = ((hod2 - close_price2) / move2) * 100.0
+                    indicators["pullbackPct2"] = pullback_pct2
+                else:
+                    indicators["pullbackPct2"] = None
+
+                if form.get("ComparisonPullbackPct2") == "between":
+                    indicators["pullbackPct2_1"] = indicators.get("pullbackPct2")
+            except Exception:
+                indicators["pullbackPct2"] = None
+
+        # --- Fibonacci Gap (daily gap vs Fib retracement levels) ---
+        if form.get("ComparisonFibGap", "Not used") != "Not used":
+            try:
+                close_price_fg = float(result_full["close"].iloc[-1])
+                open_price_fg = float(result_full["open"].iloc[-1])
+
+                if len(unique_dates) >= 2:
+                    prev_date_fg = unique_dates[-2]
+                    prev_mask_fg = result_full.index.normalize() == prev_date_fg
+                    prev_close_fg = float(result_full.loc[prev_mask_fg]["close"].iloc[-1])
+                    prev_high_fg = float(result_full.loc[prev_mask_fg]["high"].max())
+                    prev_low_fg = float(result_full.loc[prev_mask_fg]["low"].min())
+                else:
+                    prev_close_fg = float(result_full["close"].iloc[-2]) if len(result_full) >= 2 else close_price_fg
+                    prev_high_fg = float(result_full["high"].iloc[-2]) if len(result_full) >= 2 else float(result_full["high"].iloc[-1])
+                    prev_low_fg = float(result_full["low"].iloc[-2]) if len(result_full) >= 2 else float(result_full["low"].iloc[-1])
+
+                gap = open_price_fg - prev_close_fg
+                gap_range = prev_high_fg - prev_low_fg if prev_high_fg != prev_low_fg else 1.0
+
+                # Fib retracement levels of the gap
+                fib_levels = {
+                    "38.2": prev_close_fg + gap * 0.382,
+                    "50.0": prev_close_fg + gap * 0.500,
+                    "61.8": prev_close_fg + gap * 0.618,
+                }
+
+                # Find nearest fib level and compute distance as % of gap range
+                best_dist = None
+                best_level = None
+                for lbl, lvl in fib_levels.items():
+                    dist = abs(close_price_fg - lvl)
+                    if best_dist is None or dist < best_dist:
+                        best_dist = dist
+                        best_level = lbl
+
+                # fibGap = distance from nearest fib level as % of gap range
+                fib_gap_pct = (best_dist / abs(gap_range)) * 100.0 if gap_range != 0 else None
+                indicators["fibGap"] = fib_gap_pct
+                indicators["fibGapLevel"] = best_level
+                indicators["fibGapDir"] = "up" if gap > 0 else ("down" if gap < 0 else "flat")
+
+                if form.get("ComparisonFibGap") == "between":
+                    indicators["fibGap1"] = indicators.get("fibGap")
+            except Exception:
+                indicators["fibGap"] = None
+
         # --- final housekeeping ---
         # ensure volume metadata (integer — no decimals)
         try:
@@ -1899,6 +2010,40 @@ class IBapi(EWrapper, EClient):
             indicators["volume"] = int(round(float(raw_vol)))
         except Exception:
             indicators["volume"] = None
+
+        # --- Volume indicator (cumulative session volume over lookback bars) ---
+        if form.get("ComparisonVolume") != "Not used":
+            try:
+                vol_lookback = int(form.get("Volume", 1))
+            except Exception:
+                vol_lookback = 1
+
+            # Use intraday session volume if multiple bars per day, else use bar volume
+            if result_full.shape[0] > 1 and len(unique_dates) > 1 and result_full.shape[0] / max(1, len(unique_dates)) > 1.5:
+                # intraday: sum the last vol_lookback bars' volume
+                vol_val = float(result_full["volume"].iloc[-vol_lookback:].sum()) if result_full.shape[0] >= 1 else float(np.nan)
+            else:
+                # daily bars: sum the last vol_lookback bars' volume
+                vol_val = float(result_full["volume"].iloc[-vol_lookback:].sum()) if result_full.shape[0] >= 1 else float(np.nan)
+
+            indicators["volumeIndicator"] = int(round(vol_val)) if not np.isnan(vol_val) else None
+
+            if form.get("ComparisonVolume") == "between":
+                try:
+                    vol_lookback1 = int(form.get("Volume1", vol_lookback))
+                except Exception:
+                    vol_lookback1 = vol_lookback
+                if result_full.shape[0] > 1 and len(unique_dates) > 1 and result_full.shape[0] / max(1, len(unique_dates)) > 1.5:
+                    vol_val1 = float(result_full["volume"].iloc[-vol_lookback1:].sum()) if result_full.shape[0] >= 1 else float(np.nan)
+                else:
+                    vol_val1 = float(result_full["volume"].iloc[-vol_lookback1:].sum()) if result_full.shape[0] >= 1 else float(np.nan)
+                indicators["volumeIndicator1"] = int(round(vol_val1)) if not np.isnan(vol_val1) else None
+
+        # --- Market Cap (passed in from getDataResult via reqMktData tick 258) ---
+        if market_cap is not None:
+            indicators["marketCap"] = market_cap
+            if form.get("ComparisonMarketCap") == "between":
+                indicators["marketCap1"] = market_cap
 
         return indicators
 
@@ -1991,6 +2136,127 @@ class IBapi(EWrapper, EClient):
             condition = condition and zero_condition
             counting_ += 1
             variable_results["averageVolume"] = bool(zero_condition)
+
+        # -------------------------
+        # VOLUME
+        # -------------------------
+        volume_condition = None
+
+        if (
+                form.get("ComparisonVolume", "Not used") not in _NON_SIMPLE_MODES
+                and form.get("VolumeBool", "value") == "value"
+        ):
+            if form["ComparisonVolume"] == "greater":
+                volume_condition = _safe_compare(data.get("volumeIndicator"), ">", float(
+                    form["PercentageVolume"]
+                ))
+            elif form["ComparisonVolume"] == "greaterEqual":
+                volume_condition = _safe_compare(data.get("volumeIndicator"), ">=", float(
+                    form["PercentageVolume"]
+                ))
+            elif form["ComparisonVolume"] == "lower":
+                volume_condition = _safe_compare(data.get("volumeIndicator"), "<", float(
+                    form["PercentageVolume"]
+                ))
+            elif form["ComparisonVolume"] == "lowerEqual":
+                volume_condition = _safe_compare(data.get("volumeIndicator"), "<=", float(
+                    form["PercentageVolume"]
+                ))
+
+        elif (
+                form.get("ComparisonVolume", "Not used") == "between"
+                and form.get("VolumeBool", "value") == "value"
+        ):
+            volume_condition = (
+                    _safe_compare(data.get("volumeIndicator"), ">=", float(form["PercentageVolume"]))
+                    and _safe_compare(data.get("volumeIndicator1"), "<=", float(form.get("PercentageVolume1", "0")))
+            )
+
+        elif (
+                form.get("ComparisonVolume", "Not used") not in _NON_SIMPLE_MODES
+                and form.get("VolumeBool", "value") == "percentage"
+        ):
+            vol = data.get("volumeIndicator")
+            if vol is None:
+                volume_condition = False
+            else:
+                base = vol * (1.0 + float(form["PercentageVolume"]) / 100.0)
+
+                if form["ComparisonVolume"] == "greater":
+                    volume_condition = _safe_compare(data.get("volume"), ">", base)
+                elif form["ComparisonVolume"] == "greaterEqual":
+                    volume_condition = _safe_compare(data.get("volume"), ">=", base)
+                elif form["ComparisonVolume"] == "lower":
+                    volume_condition = _safe_compare(data.get("volume"), "<", base)
+                elif form["ComparisonVolume"] == "lowerEqual":
+                    volume_condition = _safe_compare(data.get("volume"), "<=", base)
+
+        elif (
+                form.get("ComparisonVolume", "Not used") == "between"
+                and form.get("VolumeBool", "value") == "percentage"
+        ):
+            vol = data.get("volumeIndicator")
+            vol1 = data.get("volumeIndicator1")
+            if vol is None or vol1 is None:
+                volume_condition = False
+            else:
+                base = vol * (1.0 + float(form["PercentageVolume"]) / 100.0)
+                base1 = vol1 * (1.0 + float(form.get("PercentageVolume1", "0")) / 100.0)
+                volume_condition = (
+                        _safe_compare(data.get("volume"), ">=", base)
+                        and _safe_compare(data.get("volume"), "<=", base1)
+                )
+
+        elif form.get("ComparisonVolume", "Not used") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form["PercentageVolume"])
+            except Exception:
+                threshold = 5.0
+            volume_condition = _within_percent_check(
+                data.get("volumeIndicator"), data.get("volume"),
+                form["ComparisonVolume"], threshold
+            )
+
+        if volume_condition is not None:
+            condition = condition and volume_condition
+            counting_ += 1
+            variable_results["volumeIndicator"] = bool(volume_condition)
+
+        # -------------------------
+        # MARKET CAP (in millions)
+        # -------------------------
+        mktcap_condition = None
+
+        if form.get("ComparisonMarketCap", "Not used") not in _NON_SIMPLE_MODES:
+            if form.get("ComparisonMarketCap") == "greater":
+                mktcap_condition = _safe_compare(data.get("marketCap"), ">", float(form.get("PercentageMarketCap", 0)))
+            elif form.get("ComparisonMarketCap") == "greaterEqual":
+                mktcap_condition = _safe_compare(data.get("marketCap"), ">=", float(form.get("PercentageMarketCap", 0)))
+            elif form.get("ComparisonMarketCap") == "lower":
+                mktcap_condition = _safe_compare(data.get("marketCap"), "<", float(form.get("PercentageMarketCap", 0)))
+            elif form.get("ComparisonMarketCap") == "lowerEqual":
+                mktcap_condition = _safe_compare(data.get("marketCap"), "<=", float(form.get("PercentageMarketCap", 0)))
+
+        elif form.get("ComparisonMarketCap") == "between":
+            mktcap_condition = (
+                    _safe_compare(data.get("marketCap"), ">=", float(form.get("PercentageMarketCap", 0)))
+                    and _safe_compare(data.get("marketCap1"), "<=", float(form.get("PercentageMarketCap1", 0)))
+            )
+
+        elif form.get("ComparisonMarketCap") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form.get("PercentageMarketCap", 5))
+            except Exception:
+                threshold = 5.0
+            mktcap_condition = _within_percent_check(
+                data.get("marketCap"), data.get("close"),
+                form.get("ComparisonMarketCap"), threshold
+            )
+
+        if mktcap_condition is not None:
+            condition = condition and mktcap_condition
+            counting_ += 1
+            variable_results["marketCap"] = bool(mktcap_condition)
 
         # -------------------------
         # PRICE LEVEL
@@ -3161,7 +3427,79 @@ class IBapi(EWrapper, EClient):
             variable_results["pullbackPct"] = bool(pullback_condition)
 
         # -------------------------
-        # NEWS (within X minutes/hours)
+        # 2ND PULLBACK RETRACEMENT
+        # -------------------------
+        pullback2_condition = None
+
+        if form.get("ComparisonPullbackPct2", "Not used") not in _NON_SIMPLE_MODES:
+            if form.get("ComparisonPullbackPct2") == "greater":
+                pullback2_condition = _safe_compare(data.get("pullbackPct2"), ">", float(form.get("PercentagePullbackPct2", 0)))
+            elif form.get("ComparisonPullbackPct2") == "greaterEqual":
+                pullback2_condition = _safe_compare(data.get("pullbackPct2"), ">=", float(form.get("PercentagePullbackPct2", 0)))
+            elif form.get("ComparisonPullbackPct2") == "lower":
+                pullback2_condition = _safe_compare(data.get("pullbackPct2"), "<", float(form.get("PercentagePullbackPct2", 0)))
+            elif form.get("ComparisonPullbackPct2") == "lowerEqual":
+                pullback2_condition = _safe_compare(data.get("pullbackPct2"), "<=", float(form.get("PercentagePullbackPct2", 0)))
+
+        elif form.get("ComparisonPullbackPct2") == "between":
+            pullback2_condition = (
+                    _safe_compare(data.get("pullbackPct2"), ">=", float(form.get("PercentagePullbackPct2", 0)))
+                    and _safe_compare(data.get("pullbackPct2_1"), "<=", float(form.get("PercentagePullbackPct2_1", 0)))
+            )
+
+        elif form.get("ComparisonPullbackPct2") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form.get("PercentagePullbackPct2", 5))
+            except Exception:
+                threshold = 5.0
+            pullback2_condition = _within_percent_check(
+                data.get("pullbackPct2"), data.get("close"),
+                form.get("ComparisonPullbackPct2"), threshold
+            )
+
+        if pullback2_condition is not None:
+            condition = condition and pullback2_condition
+            counting_ += 1
+            variable_results["pullbackPct2"] = bool(pullback2_condition)
+
+        # -------------------------
+        # FIBONACCI GAP
+        # -------------------------
+        fib_gap_condition = None
+
+        if form.get("ComparisonFibGap", "Not used") not in _NON_SIMPLE_MODES:
+            if form.get("ComparisonFibGap") == "greater":
+                fib_gap_condition = _safe_compare(data.get("fibGap"), ">", float(form.get("PercentageFibGap", 0)))
+            elif form.get("ComparisonFibGap") == "greaterEqual":
+                fib_gap_condition = _safe_compare(data.get("fibGap"), ">=", float(form.get("PercentageFibGap", 0)))
+            elif form.get("ComparisonFibGap") == "lower":
+                fib_gap_condition = _safe_compare(data.get("fibGap"), "<", float(form.get("PercentageFibGap", 0)))
+            elif form.get("ComparisonFibGap") == "lowerEqual":
+                fib_gap_condition = _safe_compare(data.get("fibGap"), "<=", float(form.get("PercentageFibGap", 0)))
+
+        elif form.get("ComparisonFibGap") == "between":
+            fib_gap_condition = (
+                    _safe_compare(data.get("fibGap"), ">=", float(form.get("PercentageFibGap", 0)))
+                    and _safe_compare(data.get("fibGap1"), "<=", float(form.get("PercentageFibGap1", 0)))
+            )
+
+        elif form.get("ComparisonFibGap") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form.get("PercentageFibGap", 5))
+            except Exception:
+                threshold = 5.0
+            fib_gap_condition = _within_percent_check(
+                data.get("fibGap"), data.get("close"),
+                form.get("ComparisonFibGap"), threshold
+            )
+
+        if fib_gap_condition is not None:
+            condition = condition and fib_gap_condition
+            counting_ += 1
+            variable_results["fibGap"] = bool(fib_gap_condition)
+
+        # -------------------------
+        # NEWS (within X minutes/hours/days)
         # -------------------------
         news_condition = None
 
@@ -3175,6 +3513,8 @@ class IBapi(EWrapper, EClient):
                 if within_value > 0:
                     if time_unit == "hours":
                         news_within_minutes = within_value * 60
+                    elif time_unit == "days":
+                        news_within_minutes = within_value * 1440
                     else:  # minutes
                         news_within_minutes = within_value
                 else:
@@ -3209,6 +3549,32 @@ class IBapi(EWrapper, EClient):
             condition = condition and news_condition
             counting_ += 1
             variable_results["news"] = bool(news_condition)
+
+        # -------------------------
+        # NEWS KEYWORD SCAN
+        # -------------------------
+        news_keyword_match = None
+        matched_keyword_headlines = []
+
+        keywords_raw = form.get("NewsKeywords", "").strip()
+        if keywords_raw and form.get("ComparisonNews", "Not used") != "Not used":
+            keywords = [k.strip().lower() for k in keywords_raw.split(",") if k.strip()]
+            if keywords:
+                headlines = data.get("newsHeadlines", [])
+                for h in headlines:
+                    headline_text = (h.get("headline") or "").lower()
+                    for kw in keywords:
+                        if kw in headline_text:
+                            matched_keyword_headlines.append(h.get("headline", ""))
+                            break
+
+                news_keyword_match = len(matched_keyword_headlines) > 0
+
+        if news_keyword_match is not None:
+            variable_results["newsKeyword"] = bool(news_keyword_match)
+
+        data["newsKeywordMatch"] = bool(news_keyword_match) if news_keyword_match else False
+        data["matchedKeywordHeadlines"] = matched_keyword_headlines
 
         # -------------------------
         # FINAL
@@ -3636,6 +4002,48 @@ class IBapi(EWrapper, EClient):
         time.sleep(0.1)
 
         # -------------------------
+        # Fetch market cap via fundamental ratios (tick type 258)
+        # -------------------------
+        _mktcap_value = None
+        if form.get("ComparisonMarketCap", "Not used") != "Not used":
+            with self.Locking:
+                self.idInc += 1
+                mktcap_req_id = self.idInc
+
+            with self._fundamental_lock:
+                self._fundamental_data[mktcap_req_id] = {}
+                self._fundamental_done[mktcap_req_id] = False
+
+            try:
+                self.reqMktData(mktcap_req_id, contract, "258", False, False, [])
+            except Exception:
+                logger.debug("reqMktData(258) failed for %s", m, exc_info=True)
+
+            # wait for tickString callback (up to 3 seconds)
+            _waited = 0.0
+            while _waited < 3.0:
+                with self._fundamental_lock:
+                    if self._fundamental_done.get(mktcap_req_id, False):
+                        break
+                time.sleep(0.15)
+                _waited += 0.15
+
+            try:
+                self.cancelMktData(mktcap_req_id)
+            except Exception:
+                pass
+
+            with self._fundamental_lock:
+                ratios = self._fundamental_data.pop(mktcap_req_id, {})
+                self._fundamental_done.pop(mktcap_req_id, None)
+
+            if "MKTCAP" in ratios:
+                try:
+                    _mktcap_value = float(ratios["MKTCAP"])
+                except (ValueError, TypeError):
+                    pass
+
+        # -------------------------
         # Determine the per-indicator timeframe plan
         # -------------------------
         default_tf, tf_plan = self._build_tf_plan(form)
@@ -3733,6 +4141,7 @@ class IBapi(EWrapper, EClient):
                     indic = self.getIndicators(
                         history, i, contract, form,
                         net_position.get(i, 0), m,
+                        market_cap=_mktcap_value,
                     )
                 else:
                     # Multiple timeframes: compute indicators per TF, then merge
@@ -3743,6 +4152,7 @@ class IBapi(EWrapper, EClient):
                                 tf_indicators[tf_str] = self.getIndicators(
                                     tf_bars, i, contract, form,
                                     net_position.get(i, 0), m,
+                                    market_cap=_mktcap_value,
                                 )
                             except Exception:
                                 pass
@@ -3908,12 +4318,23 @@ class IBapi(EWrapper, EClient):
             limit_price: float,
             take_profit_limit_price: float | None,
             stop_loss_price: float | None,
+            tif: str = "DAY",
+            outside_rth: bool = False,
+            use_trailing_stop: bool = False,
+            trailing_amount: float | None = None,
+            trailing_percent: bool = False,
     ):
         """
         Create a standard IB bracket order:
-        - parent order
-        - optional take-profit order
-        - optional stop-loss order
+        - parent order (limit order)
+        - optional take-profit order (opposite action, limit)
+        - optional stop-loss order (opposite action, stop or trailing stop)
+
+        tif: "DAY" or "GTC"
+        outside_rth: allow execution outside regular trading hours
+        use_trailing_stop: use TRAIL instead of STP for the stop-loss leg
+        trailing_amount: trailing amount (absolute or percent)
+        trailing_percent: if True, trailing_amount is treated as a percentage
         """
 
         bracketOrder = []
@@ -3926,6 +4347,8 @@ class IBapi(EWrapper, EClient):
         parent.orderType = "LMT"
         parent.totalQuantity = quantity
         parent.lmtPrice = limit_price
+        parent.tif = tif
+        parent.outsideRth = outside_rth
         parent.transmit = False
 
         bracketOrder.append(parent)
@@ -3940,21 +4363,33 @@ class IBapi(EWrapper, EClient):
             takeProfit.totalQuantity = quantity
             takeProfit.lmtPrice = take_profit_limit_price
             takeProfit.parentId = parent_order_id
+            takeProfit.tif = tif
+            takeProfit.outsideRth = outside_rth
             takeProfit.transmit = False
 
             bracketOrder.append(takeProfit)
 
-        if stop_loss_price is not None:
+        if stop_loss_price is not None or (use_trailing_stop and trailing_amount is not None):
             stopLoss = Order()
             stopLoss.eTradeOnly = False
             stopLoss.firmQuoteOnly = False
             stopLoss.orderId = parent.orderId + 2
             stopLoss.action = "SELL" if action == "BUY" else "BUY"
-            stopLoss.orderType = "STP"
-            stopLoss.auxPrice = stop_loss_price
             stopLoss.totalQuantity = quantity
             stopLoss.parentId = parent_order_id
+            stopLoss.tif = tif
+            stopLoss.outsideRth = outside_rth
             stopLoss.transmit = False
+
+            if use_trailing_stop and trailing_amount is not None:
+                stopLoss.orderType = "TRAIL"
+                if trailing_percent:
+                    stopLoss.trailingPercent = trailing_amount
+                else:
+                    stopLoss.auxPrice = trailing_amount
+            else:
+                stopLoss.orderType = "STP"
+                stopLoss.auxPrice = stop_loss_price
 
             bracketOrder.append(stopLoss)
 

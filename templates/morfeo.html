@@ -573,6 +573,26 @@
 												{% endfor %}
 											</td>
 										</tr>
+										<tr>
+											<td>{{ Param.Volume.label(class_="LabelHead") }}</td>
+											<td>
+												<div id="tf_volume">{{ Param.Volume_tf(class_="Volume_tf") }}</div>
+											</td>
+											<td>
+												<div id="nchangeinput13"> {{ Param.Volume(class_="Volume", value = 1) }} </div>
+											</td>
+											<th>{{ Param.ComparisonVolume(class_="ComparisonVolume") }}</th>
+											<td>
+												<div id="changeinput13"> {{ Param.PercentageVolume(class_="PercentageVolume", value = 0) }} </div>
+											</td>
+											<td>
+												{% for subfield in Param.VolumeBool %}
+													<div class="formatingyesno">
+														<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} <div>
+													</div>
+												{% endfor %}
+											</td>
+										</tr>
 										<!-- tr>
 											<th>Frequency</th>
 {#											<th>{{ Param.addFrequency(class_="SelectField") }} </th>#}
@@ -648,6 +668,30 @@
 											<td>&nbsp;</td>
 										</tr>
 										<tr>
+											<th style="padding:10px">2nd Pullback</th>
+											<td>&nbsp;</td>
+											<td style="padding:10px"><div id="changePullbackPct2"><div id="nchangeinput14">{{ Param.PullbackPct2(class_="PullbackPct2", value='0') }}</div></div></td>
+											<td style="padding:10px">{{ Param.ComparisonPullbackPct2(class_="ComparisonPullbackPct2") }}</td>
+											<td style="padding:10px"><div id="percentagePullbackPct2"><div id="changeinput14">{{ Param.PercentagePullbackPct2(class_="PercentagePullbackPct2", value='0') }}</div></div></td>
+											<td>&nbsp;</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Fibonacci Gap</th>
+											<td>&nbsp;</td>
+											<td style="padding:10px"><div id="changeFibGap"><div id="nchangeinput15">{{ Param.FibGap(class_="FibGap", value='0') }}</div></div></td>
+											<td style="padding:10px">{{ Param.ComparisonFibGap(class_="ComparisonFibGap") }}</td>
+											<td style="padding:10px"><div id="percentageFibGap"><div id="changeinput15">{{ Param.PercentageFibGap(class_="PercentageFibGap", value='5') }}</div></div></td>
+											<td>&nbsp;</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Market Cap (M)</th>
+											<td>&nbsp;</td>
+											<td style="padding:10px"><div id="changeMarketCap"><div id="nchangeinput16">{{ Param.MarketCap(class_="MarketCap", value='0') }}</div></div></td>
+											<td style="padding:10px">{{ Param.ComparisonMarketCap(class_="ComparisonMarketCap") }}</td>
+											<td style="padding:10px"><div id="percentageMarketCap"><div id="changeinput16">{{ Param.PercentageMarketCap(class_="PercentageMarketCap", value='0') }}</div></div></td>
+											<td>&nbsp;</td>
+										</tr>
+										<tr>
 											<th style="padding:10px">Pivot Point</th>
 											<td>&nbsp;</td>
 											<td style="padding:10px"> <div id = "changePP"> {{ Param.PivotPoint(class_="PivotPoint") }} </div></td>
@@ -717,6 +761,17 @@
 										<tr>
 											<th style="padding:10px">Exclude Publishers (comma-separated)</th>
 											<td style="padding:10px" colspan="4">{{ Param.NewsExcludePublishers(class_="NewsExcludePublishers", placeholder="e.g. BZ, MT", style="width:100%") }}</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Keywords (comma-separated)</th>
+											<td style="padding:10px" colspan="2">{{ Param.NewsKeywords(class_="NewsKeywords", placeholder="e.g. earnings, FDA, merger", style="width:100%") }}</td>
+											<td style="padding:10px" colspan="2">
+												<span style="font-size:11px;color:#888">Highlights row yellow &amp; plays sound when headline contains keyword</span>
+											</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Read Headlines Aloud</th>
+											<td style="padding:10px" colspan="4">{{ Param.NewsReadAloud(class_="NewsReadAloud") }}</td>
 										</tr>
 									</tbody>
 								</table>
@@ -791,27 +846,203 @@
 					<div id = "demotest">
 
 
-							<!-- Modal -->
+							<!-- Order Entry Modal -->
 							<div class="modal fade" id="exampleModalCenter" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
-							  <div class="modal-dialog modal-dialog-centered" role="document">
-							    <div class="modal-content">
-							      <div class="modal-header">
-							        <h5 class="modal-title" id="exampleModalLongTitle">Modal title</h5>
+							  <div class="modal-dialog modal-dialog-centered" role="document" style="max-width:780px;">
+							    <div class="modal-content" style="background:#fff;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
+							      <div class="modal-header" style="background:#fff;border-bottom:1px solid #e0e0e0;border-radius:10px 10px 0 0;padding:14px 20px;">
+							        <h5 class="modal-title" id="exampleModalLongTitle" style="font-size:16px;font-weight:700;color:#1f2328;">Order Entry</h5>
 							        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
 							          <span aria-hidden="true">&times;</span>
 							        </button>
 							      </div>
-									  <div class="modal-body">
-									      	<div id = "elementToAppendBuySell"></div>
+									  <div class="modal-body" style="background:#fff;padding:18px 20px 10px;">
+									      	<div id="elementToAppendBuySell"></div>
 									  </div>
-									  <div id = "notConnected"></div>
-								      <div class="modal-footer">
-								      	<button type="button" class="btn btn-primary" id = "sendOrderToFlask">Place Order</button>
-								        <button type="button" class="btn-secondary" data-dismiss="modal">Close</button>
+									  <div id="notConnected" style="padding:0 20px;"></div>
+								      <div class="modal-footer" style="background:#fff;border-top:1px solid #e0e0e0;border-radius:0 0 10px 10px;padding:12px 20px;">
+								      	<button type="button" class="btn btn-primary" id="sendOrderToFlask" style="font-weight:600;">Place Order</button>
+								        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
 								      </div>
 							    </div>
 							  </div>
 							</div>
+
+							<!-- ===== Auto-Order Panel ===== -->
+							<div class="ao-panel" id="ao_panel">
+								<div class="ao-panel-header">
+									<span class="ao-status-dot" id="ao_status_dot"></span>
+									<h6>Auto-Order</h6>
+									<label class="ao-toggle-label" style="margin-left:auto;">
+										<input type="checkbox" id="ao_enabled" onchange="_aoTogglePanel()"> Enable
+									</label>
+								</div>
+								<div class="ao-body" id="ao_body">
+									<!-- Preset bar -->
+									<div class="ao-preset-bar">
+										<label class="ao-label" style="margin:0;">Preset</label>
+										<select id="ao_preset_dropdown" class="ao-select" style="flex:1;min-width:130px;"><option value="">-- Select --</option></select>
+										<input type="text" id="ao_preset_name" class="ao-input" placeholder="Name..." style="flex:1;max-width:140px;">
+										<button type="button" class="oe-btn oe-btn-sm" onclick="_aoLoadPreset()">Load</button>
+										<button type="button" class="oe-btn oe-btn-sm oe-btn-primary" onclick="_aoSavePreset()">Save</button>
+										<button type="button" class="oe-btn oe-btn-sm oe-btn-danger" onclick="_aoDeletePreset()">Delete</button>
+										<label class="ao-chk-label" style="margin-left:6px;"><input type="checkbox" id="ao_preset_default"> Default</label>
+									</div>
+
+									<!-- Time window -->
+									<div class="ao-section-title">Time Window</div>
+									<div class="ao-row">
+										<div class="ao-field">
+											<label class="ao-label">Start Hour (0-23)</label>
+											<input type="number" id="ao_start_hour" class="ao-input" value="9" min="0" max="23" step="1">
+										</div>
+										<div class="ao-field">
+											<label class="ao-label">Start Minute</label>
+											<input type="number" id="ao_start_min" class="ao-input" value="30" min="0" max="59" step="1">
+										</div>
+										<div class="ao-field">
+											<label class="ao-label">Stop Hour (0-23)</label>
+											<input type="number" id="ao_stop_hour" class="ao-input" value="16" min="0" max="23" step="1">
+										</div>
+										<div class="ao-field">
+											<label class="ao-label">Stop Minute</label>
+											<input type="number" id="ao_stop_min" class="ao-input" value="0" min="0" max="59" step="1">
+										</div>
+									</div>
+
+									<!-- Stock filter -->
+									<div class="ao-section-title">Stock Filter</div>
+									<div class="ao-row">
+										<div class="ao-field" style="min-width:200px;">
+											<label class="ao-label">When signal met, send for</label>
+											<select id="ao_stock_filter" class="ao-select" onchange="_aoToggleStockList()">
+												<option value="all" selected>All matching stocks</option>
+												<option value="selected">Only selected stocks</option>
+												<option value="none">None (disabled)</option>
+											</select>
+										</div>
+									</div>
+									<div class="ao-row" id="ao_selected_stocks_row" style="display:none;">
+										<div class="ao-field" style="flex:1 1 100%;">
+											<label class="ao-label">Selected Tickers (comma separated)</label>
+											<textarea id="ao_selected_stocks" class="ao-stock-list" placeholder="AAPL, MSFT, TSLA"></textarea>
+										</div>
+									</div>
+
+									<!-- Order settings -->
+									<div class="ao-section-title">Order Settings</div>
+									<div class="ao-row">
+										<div class="ao-field">
+											<label class="ao-label">Side</label>
+											<select id="ao_side" class="ao-select">
+												<option value="long" selected>Long (Buy)</option>
+												<option value="short">Short (Sell)</option>
+											</select>
+										</div>
+										<div class="ao-field">
+											<label class="ao-label">Quantity</label>
+											<input type="number" id="ao_quantity" class="ao-input" value="1" min="1" step="1">
+										</div>
+										<div class="ao-field">
+											<label class="ao-label">Entry Type</label>
+											<select id="ao_entry_type" class="ao-select" onchange="_aoTogglePricing()">
+												<option value="limit" selected>Limit</option>
+												<option value="market">Market</option>
+											</select>
+										</div>
+									</div>
+
+									<!-- Dynamic pricing -->
+									<div class="ao-row" id="ao_pricing_row">
+										<div class="ao-field">
+											<label class="ao-label">Price Mode</label>
+											<select id="ao_price_mode" class="ao-select" onchange="_aoTogglePricePct()">
+												<option value="last" selected>Last Price</option>
+												<option value="bid_minus_pct">Bid - X%</option>
+												<option value="bid_plus_pct">Bid + X%</option>
+												<option value="ask_minus_pct">Ask - X%</option>
+												<option value="ask_plus_pct">Ask + X%</option>
+											</select>
+										</div>
+										<div class="ao-field" id="ao_price_pct_field">
+											<label class="ao-label">Price Offset %</label>
+											<input type="number" id="ao_price_pct" class="ao-input" value="0.5" min="0" step="0.1">
+										</div>
+									</div>
+
+									<!-- Bracket / Stop -->
+									<div class="ao-section-title">Bracket / Stop</div>
+									<div class="ao-row">
+										<div class="ao-field">
+											<label class="ao-label">Order Type</label>
+											<select id="ao_order_type" class="ao-select" onchange="_aoToggleBracket()">
+												<option value="bracket" selected>Bracket</option>
+												<option value="limit">Limit Only</option>
+											</select>
+										</div>
+										<div class="ao-field ao-bracket-field">
+											<label class="ao-label">Target %</label>
+											<input type="number" id="ao_target_pct" class="ao-input" value="2" min="0" step="0.1">
+										</div>
+										<div class="ao-field ao-bracket-field">
+											<label class="ao-label">Stop %</label>
+											<input type="number" id="ao_stop_pct" class="ao-input" value="1" min="0" step="0.1">
+										</div>
+									</div>
+
+									<!-- Trailing stop options -->
+									<div class="ao-row ao-bracket-field">
+										<div class="ao-field">
+											<label class="ao-chk-label"><input type="checkbox" id="ao_trailing_stop" onchange="_aoToggleTrailing()"> Trailing Stop</label>
+										</div>
+										<div class="ao-field ao-trailing-fields" style="display:none;">
+											<label class="ao-label">Trail Mode</label>
+											<select id="ao_trail_mode" class="ao-select">
+												<option value="amount" selected>$ Amount</option>
+												<option value="percent">% Percent</option>
+												<option value="candle_low">Low of Candle</option>
+											</select>
+										</div>
+										<div class="ao-field ao-trailing-fields" style="display:none;">
+											<label class="ao-label">Trail Value</label>
+											<input type="number" id="ao_trail_value" class="ao-input" value="1.00" min="0" step="0.01">
+										</div>
+									</div>
+
+									<!-- TIF / Session -->
+									<div class="ao-row">
+										<div class="ao-field">
+											<label class="ao-label">Time in Force</label>
+											<select id="ao_tif" class="ao-select">
+												<option value="DAY" selected>Day</option>
+												<option value="GTC">Good Till Cancel</option>
+											</select>
+										</div>
+										<div class="ao-field">
+											<label class="ao-label">Session</label>
+											<select id="ao_session" class="ao-select">
+												<option value="regular" selected>Regular Hours</option>
+												<option value="extended">Regular + Extended</option>
+												<option value="overnight">Regular + Ext + Overnight</option>
+											</select>
+										</div>
+									</div>
+
+									<!-- Max orders per symbol -->
+									<div class="ao-row">
+										<div class="ao-field" style="max-width:180px;">
+											<label class="ao-label">Max Orders per Symbol</label>
+											<input type="number" id="ao_max_per_sym" class="ao-input" value="1" min="1" step="1">
+										</div>
+									</div>
+
+									<!-- Log -->
+									<div class="ao-section-title">Auto-Order Log</div>
+									<div class="ao-log" id="ao_log"><em>No orders sent yet</em></div>
+								</div>
+							</div>
+							<!-- ===== End Auto-Order Panel ===== -->
+
 					</div>
 
 					<script>
@@ -865,29 +1096,10 @@
 							</div>
 							<!-- ============ END NEWS FEED PANEL ============ -->
 
-							<!-- ============ DATA CONTROL BAR ============ -->
-							<div id="data-control-bar">
-								<div class="ctrl-section">
-									<span class="ctrl-label">Columns:</span>
-									<div id="col-toggle-chips"></div>
-								</div>
-								<div class="ctrl-sep"></div>
-								<div class="ctrl-section">
-									<span class="ctrl-label">Jump to:</span>
-									<div id="col-group-nav"></div>
-								</div>
-								<div class="ctrl-sep"></div>
-								<div class="ctrl-section">
-									<button class="col-group-btn" onclick="toggleAllColumns(true)" title="Show all columns">Show All</button>
-									<button class="col-group-btn" onclick="toggleAllColumns(false)" title="Hide all except Ticker">Hide All</button>
-									<button class="col-group-btn" onclick="resetColumnOrder()" title="Reset column order to default">Reset Order</button>
-								</div>
-							</div>
-							<!-- ============ END CONTROL BAR ============ -->
-
 				   			<form>
 				   				<div id="add1" class="card-panel section-fade"></div>
 							</form>
+
 							<br><br><br>
                                 <div id = "createForm" style= "display: none;"></div>
                                 <br>
@@ -1016,6 +1228,57 @@
       console.warn("beep failed", e);
     }
   }
+
+  // Unique chime for Fibonacci level hit — ascending arpeggio at 523->659->784->1047Hz (C-E-G-C)
+  function playBeepFibLevel(){
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const freqs = [523, 659, 784, 1047];
+      const now = ctx.currentTime;
+      for (let i=0; i<freqs.length; i++){
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = freqs[i];
+        gain.gain.value = 0.15;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + i*0.12);
+        osc.stop(now + i*0.12 + 0.15);
+      }
+    } catch(e){ console.warn("fib beep failed", e); }
+  }
+
+  // News keyword alert — rapid descending two-tone alert (A5→E5)
+  function playBeepNewsKeyword(){
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = ctx.currentTime;
+      const tones = [880, 659, 880, 659];
+      for (let i=0; i<tones.length; i++){
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.value = tones[i];
+        gain.gain.value = 0.12;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + i*0.1);
+        osc.stop(now + i*0.1 + 0.08);
+      }
+    } catch(e){ console.warn("news keyword beep failed", e); }
+  }
+
+  // TTS: read headline text aloud
+  function readHeadlineAloud(text){
+    try {
+      if (!window.speechSynthesis) return;
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.rate = 1.0;
+      utter.pitch = 1.0;
+      utter.volume = 0.9;
+      window.speechSynthesis.speak(utter);
+    } catch(e){ console.warn("TTS failed", e); }
+  }
 </script>
 
 
@@ -1133,6 +1396,9 @@
 function renderResultsFromBackend(response) {
     if (!response || !response.result) return;
 
+    // Store scan stock data globally for multi-level order reference
+    window._scanStockData = {};
+
     // warnings
     if ("warning" in response && response.warning && Object.keys(response.warning).length > 0) {
         warningResult(response.warning);
@@ -1188,6 +1454,9 @@ function renderResultsFromBackend(response) {
             // iterate rows in this group
             for (const dta of rows) {
 
+                // Store data for multi-level order lookups
+                if (dta.symbol) window._scanStockData[dta.symbol] = dta;
+
                 // build header once per table (when secondIdBuySell === 0)
                 if (secondIdBuySell === 0) {
                     // columns before pivot
@@ -1221,6 +1490,8 @@ function renderResultsFromBackend(response) {
                     headerCols.push({ key: "highOfDay", label: "High of Day" });
                     if ("HighOfDay1" in dta) headerCols.push({ key: "HighOfDay1", label: "High of Day1" });
                     headerCols.push({ key: "volume", label: "Volume", raw: true });
+                    if ("volumeIndicator" in dta) headerCols.push({ key: "volumeIndicator", label: "Vol Ind", raw: true, vrKey: "volumeIndicator" });
+                    if ("volumeIndicator1" in dta) headerCols.push({ key: "volumeIndicator1", label: "Vol Ind1", raw: true });
                     headerCols.push({ key: "averageVolume", label: "Avg Vol", raw: true });
                     if ("averageVolume1" in dta) headerCols.push({ key: "averageVolume1", label: "Avg Vol1", raw: true });
                     headerCols.push({ key: "relativeVolume", label: "Relative Volume" });
@@ -1229,6 +1500,14 @@ function renderResultsFromBackend(response) {
                     if ("breakHigh1" in dta) headerCols.push({ key: "breakHigh1", label: "Break High1" });
                     if ("pullbackPct" in dta) headerCols.push({ key: "pullbackPct", label: "Pullback %" });
                     if ("pullbackPct1" in dta) headerCols.push({ key: "pullbackPct1", label: "Pullback %1" });
+                    if ("pullbackPct2" in dta) headerCols.push({ key: "pullbackPct2", label: "2nd Pullback %" });
+                    if ("pullbackPct2_1" in dta) headerCols.push({ key: "pullbackPct2_1", label: "2nd Pullback %1" });
+                    if ("fibGap" in dta) headerCols.push({ key: "fibGap", label: "Fib Gap %", vrKey: "fibGap" });
+                    if ("fibGap1" in dta) headerCols.push({ key: "fibGap1", label: "Fib Gap %1" });
+                    if ("fibGapLevel" in dta) headerCols.push({ key: "fibGapLevel", label: "Fib Level" });
+                    if ("fibGapDir" in dta) headerCols.push({ key: "fibGapDir", label: "Gap Dir" });
+                    if ("marketCap" in dta) headerCols.push({ key: "marketCap", label: "Mkt Cap (M)", raw: true, vrKey: "marketCap" });
+                    if ("marketCap1" in dta) headerCols.push({ key: "marketCap1", label: "Mkt Cap1 (M)", raw: true });
                     if ("cross50SMA_value" in dta) headerCols.push({ key: "cross50SMA_value", label: "50 SMA", vrKey: "cross50SMA_val" });
                     if ("cross50SMA_pctFromSMA" in dta) headerCols.push({ key: "cross50SMA_pctFromSMA", label: "% from 50", vrKey: "cross50SMA" });
                     if ("cross200SMA_value" in dta) headerCols.push({ key: "cross200SMA_value", label: "200 SMA", vrKey: "cross200SMA_val" });
@@ -1253,7 +1532,6 @@ function renderResultsFromBackend(response) {
                     pivotPrimary.forEach(p => allColDefs.push({ key: 'pivot_' + p, label: p, group: 'pivot' }));
                     allColDefs.push({ key: 'netPosition', label: 'Net Position', group: 'position' });
                     if (pivotSecondary.length > 0) pivotSecondary.forEach(p => allColDefs.push({ key: 'pivot1_' + p, label: p, group: 'pivot' }));
-                    allColDefs.push({ key: '_change', label: 'Change', group: 'position' });
                     allColDefs.push({ key: '_placeOrder', label: 'Place Order', group: 'actions' });
                     allColDefs.push({ key: '_news', label: 'News', group: 'actions' });
 
@@ -1284,7 +1562,6 @@ function renderResultsFromBackend(response) {
                         const stickyClass = (cd.key === 'symbol') ? ' sticky-col' : '';
                         const hiddenClass = hiddenCols[cd.key] ? ' col-hidden' : '';
                         let label = cd.label;
-                        if (cd.key === '_change') label = `<span id="SortingTable${tableId}">Change</span>`;
                         headerHtml += `<th class='${stickyClass}${hiddenClass}' data-col='${cd.key}' data-col-idx='${colIdx}' draggable='true'>${label}</th>`;
                         colIdx++;
                     }
@@ -1310,8 +1587,9 @@ function renderResultsFromBackend(response) {
                 const np = Number(dta.netPosition);
                 const decision = Number.isFinite(np) ? (np > 0 ? "UP" : np < 0 ? "DOWN" : "UNCHANGE") : "UNCHANGE";
                 const rowClass = dta.signal === "yes" ? `content${tableId} yescondition` : `content${tableId}`;
+                const _keywordRowStyle = dta.newsKeywordMatch ? " style='background:#fef9e7'" : "";
 
-                txt1 += `<tr class='${rowClass}'>`;
+                txt1 += `<tr class='${rowClass}'${_keywordRowStyle}>`;
 
                 const headerCols = groupHeaderCols || [];
                 const pivotPrimary = groupPivotPrimary || [];
@@ -1353,12 +1631,16 @@ function renderResultsFromBackend(response) {
                     let cellStyle = "";
                     const vrLookup = col.vrKey || col.key;
                     if (vrLookup in vr) {
-                        cellStyle = vr[vrLookup] ? " style='background:#4caf50;color:#fff'" : " style='background:#f44336;color:#fff'";
+                        if (vrLookup === "fibGap" && vr[vrLookup]) {
+                            cellStyle = " style='background:#9b59b6;color:#fff;font-weight:700'";
+                        } else {
+                            cellStyle = vr[vrLookup] ? " style='background:#d4edda;color:#000;font-weight:700'" : " style='background:#f8d7da;color:#000;font-weight:700'";
+                        }
                     }
                     const stickyClass = (col.key === 'symbol') ? ' sticky-col' : '';
                     if (col.key === "symbol") {
                         const displayVal = (v === null || v === undefined || v === "") ? "n.d" : v;
-                        cellMap[col.key] = `<td class='${stickyClass}' data-col='${col.key}'${cellStyle} style='white-space:nowrap'>${displayVal} <span class='news-arrow-sym' title='Toggle news (${_newsCount})' style='cursor:pointer;color:${_newsArrowColor};font-size:8px;margin-left:2px' onclick="event.stopPropagation();var el=document.getElementById('${_newsRowId}');var arrows=el.parentNode.querySelectorAll('.news-arrow');if(el.style.display==='none'){el.style.display='table-row';this.innerHTML='&#9650;';arrows.forEach(function(a){a.innerHTML='&#9650;'})}else{el.style.display='none';this.innerHTML='&#9660;';arrows.forEach(function(a){a.innerHTML='&#9660;'})}">&#9660;</span></td>`;
+                        cellMap[col.key] = `<td class='${stickyClass}' data-col='${col.key}'${cellStyle} style='white-space:nowrap'>${displayVal} <span class='news-arrow-sym' title='Toggle news (${_newsCount})' style='cursor:pointer;color:${_newsArrowColor};font-size:11px;margin-left:4px' onclick="event.stopPropagation();var el=document.getElementById('${_newsRowId}');var arrows=el.parentNode.querySelectorAll('.news-arrow');if(el.style.display==='none'){el.style.display='table-row';this.innerHTML='&#9650;';arrows.forEach(function(a){a.innerHTML='&#9650;'})}else{el.style.display='none';this.innerHTML='&#9660;';arrows.forEach(function(a){a.innerHTML='&#9660;'})}">&#9660;</span></td>`;
                     } else if (col.raw) {
                         cellMap[col.key] = `<td class='${stickyClass}' data-col='${col.key}'${cellStyle}>${(v === null || v === undefined || v === "") ? "n.d" : v}</td>`;
                     } else {
@@ -1369,7 +1651,7 @@ function renderResultsFromBackend(response) {
                 // --- Primary pivots ---
                 let pivotStyle = "";
                 if ("Pivot" in vr) {
-                    pivotStyle = vr["Pivot"] ? " style='background:#4caf50;color:#fff'" : " style='background:#f44336;color:#fff'";
+                    pivotStyle = vr["Pivot"] ? " style='background:#d4edda;color:#000;font-weight:700'" : " style='background:#f8d7da;color:#000;font-weight:700'";
                 }
                 for (const pp of pivotPrimary) {
                     const pKey = 'pivot_' + pp;
@@ -1395,11 +1677,6 @@ function renderResultsFromBackend(response) {
                     }
                 }
 
-                // --- Change ---
-                const tdAddColor = decision === "UP" ? " style='background:#4caf50'" :
-                                   decision === "DOWN" ? " style='background:#f44336'" : "";
-                cellMap['_change'] = `<td data-col='_change'${tdAddColor}>${decision}</td>`;
-
                 // --- Place order ---
                 const totalIdBuySell = idBuySell + secondIdBuySell;
                 cellMap['_placeOrder'] = `<td data-col='_placeOrder'><button type='button' id='${totalIdBuySell}' data-toggle='modal' data-target='#exampleModalCenter' class='buttonbuysell' onclick='addButtonBuy(${idPlaceOrder}, "${totalIdBuySell}")'>click</button></td>`;
@@ -1407,12 +1684,16 @@ function renderResultsFromBackend(response) {
                 // --- News toggle cell ---
                 const newsItems = _newsItems;
                 const newsRowId = _newsRowId;
+                const _newsKeywordMatch = dta.newsKeywordMatch || false;
                 {
                     let newsStyle = "";
-                    if (newsItems.length > 0) {
+                    if (_newsKeywordMatch) {
+                        // Keyword match — yellow highlight
+                        newsStyle = " style='background:#f1c40f;color:#000;font-weight:700;cursor:pointer'";
+                    } else if (newsItems.length > 0) {
                         const vr2 = dta.variableResults || {};
                         if ("news" in vr2) {
-                            newsStyle = vr2["news"] ? " style='background:#4caf50;color:#fff;cursor:pointer'" : " style='background:#f44336;color:#fff;cursor:pointer'";
+                            newsStyle = vr2["news"] ? " style='background:#d4edda;color:#000;font-weight:700;cursor:pointer'" : " style='background:#f8d7da;color:#000;font-weight:700;cursor:pointer'";
                         } else {
                             newsStyle = " style='cursor:pointer'";
                         }
@@ -1445,10 +1726,11 @@ function renderResultsFromBackend(response) {
                         + 1 /* news col */;
                     txt1 += `<tr id='${newsRowId}' style='display:none;background:#f6f8fa'>`;
                     txt1 += `<td colspan='${totalCols}' style='padding:10px 18px'>`;
-                    txt1 += `<div style='font-size:12px;font-weight:600;color:#0969da;margin-bottom:6px'>&#128240; News for ${(dta.symbol||'').replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>`;
+                    txt1 += `<div style='font-size:15px;font-weight:600;color:#0969da;margin-bottom:6px'>&#128240; News for ${(dta.symbol||'').replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>`;
                     if (newsItems.length > 0) {
-                        txt1 += `<table style='width:100%;border-collapse:collapse;font-size:12px'>`;
-                        txt1 += `<tr style='border-bottom:1px solid #d0d7de'><th style='padding:5px 6px;text-align:left;color:#57606a'>Date/Time</th><th style='padding:5px 6px;text-align:left;color:#57606a'>Source</th><th style='padding:5px 6px;text-align:left;color:#57606a'>Headline</th></tr>`;
+                        txt1 += `<table style='width:100%;border-collapse:collapse;font-size:14px'>`;
+                        txt1 += `<tr style='border-bottom:1px solid #d0d7de'><th style='padding:5px 6px;text-align:left;color:#57606a;font-size:14px'>Date/Time</th><th style='padding:5px 6px;text-align:left;color:#57606a;font-size:14px'>Source</th><th style='padding:5px 6px;text-align:left;color:#57606a;font-size:14px'>Headline</th></tr>`;
+                        const _matchedHls = new Set((dta.matchedKeywordHeadlines || []).map(h => h.toLowerCase()));
                         for (const ni of newsItems) {
                             let displayTime = ni.parsedTime || ni.time || "";
                             try {
@@ -1461,11 +1743,13 @@ function renderResultsFromBackend(response) {
                             const escProv = (ni.provider || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
                             const escTime = displayTime.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
                             const articleLink = `<a href='javascript:void(0)' onclick='focusIBKR()' style='color:#0969da;text-decoration:underline;cursor:pointer'>${escHl || "link"}</a>`;
-                            txt1 += `<tr style='border-bottom:1px solid #d0d7de'><td style='padding:4px 6px;white-space:nowrap;color:#57606a'>${escTime}</td><td style='padding:4px 6px;color:#1f2328'>${escProv}</td><td style='padding:4px 6px;color:#1f2328'>${articleLink}</td></tr>`;
+                            const _hlMatch = _matchedHls.has((ni.headline || "").toLowerCase());
+                            const _hlBg = _hlMatch ? "background:#f1c40f;" : "";
+                            txt1 += `<tr style='border-bottom:1px solid #d0d7de;${_hlBg}'><td style='padding:4px 6px;white-space:nowrap;color:#57606a'>${escTime}</td><td style='padding:4px 6px;color:#1f2328'>${escProv}</td><td style='padding:4px 6px;color:#1f2328;font-weight:${_hlMatch?"700":"400"}'>${articleLink}</td></tr>`;
                         }
                         txt1 += `</table>`;
                     } else {
-                        txt1 += `<div style='color:#57606a;font-size:12px;padding:6px 0;'>No news available</div>`;
+                        txt1 += `<div style='color:#57606a;font-size:14px;padding:6px 0;'>No news available</div>`;
                     }
                     txt1 += `</td></tr>`;
                 }
@@ -1524,15 +1808,52 @@ function renderResultsFromBackend(response) {
                         // Does not meet threshold — clear first-time tracking
                         delete _previouslyMatchedAll[sym];
                     }
+
+                    // Fibonacci level hit — play unique chime
+                    const vr = dta.variableResults || {};
+                    if (vr.fibGap === true && !_soundPlayed) {
+                        playBeepFibLevel();
+                        _soundPlayed = true;
+                    }
+
+                    // News keyword match — play alert sound
+                    if (dta.newsKeywordMatch && !_soundPlayed) {
+                        playBeepNewsKeyword();
+                        _soundPlayed = true;
+                    }
                 }
             }
+        }
+
+        // TTS: read matched keyword headlines aloud if enabled
+        {
+            const readAloud = document.querySelector('.NewsReadAloud');
+            if (readAloud && readAloud.value === 'on') {
+                for (const groupKey in msg) {
+                    const rows = Array.isArray(msg[groupKey])
+                        ? msg[groupKey]
+                        : Object.values(msg[groupKey] || {});
+                    for (const dta of rows) {
+                        const matched = dta.matchedKeywordHeadlines || [];
+                        const sym = dta.symbol || dta.cusip || "";
+                        for (const hl of matched) {
+                            readHeadlineAloud(sym + ": " + hl);
+                        }
+                    }
+                }
+            }
+        }
+
+        // AUTO-ORDER: process scan results for automated order execution
+        if (typeof _aoProcessScanResults === 'function') {
+            try { _aoProcessScanResults(msg); } catch(e) { console.error('Auto-order error:', e); }
         }
 
         // append to DOM
         var para = document.createElement("H3");
         var scanLabel = window._activeScanName ? (etf + " — " + window._activeScanName) : etf;
         para.textContent = scanLabel;
-        para.style.color = "#e6edf3";
+        para.style.color = "#1f2328";
         document.getElementById("add1").appendChild(para);
         var thetable = document.createElement("DIV");
         thetable.innerHTML = txt1;
@@ -1541,20 +1862,24 @@ function renderResultsFromBackend(response) {
         space.innerHTML = "<br><br>";
         document.getElementById("add1").appendChild(space);
 
-        try {
-            var st = document.getElementById("SortingTable" + tableId);
-            if (st) st.innerHTML = "Change <select id='filterText" + tableId + "' style='display:inline-block; color:black;' onchange='filterText(" + tableId + ")'> <option disabled selected>Select</option> <option value='UP' >UP</option> <option value='DOWN'>DOWN</option> <option value='all'>All</option> </select>";
-        } catch (e) { /* ignore */ }
 
-        // adjust font-size based on number of columns (defensive)
-        try {
-            var el = document.getElementsByClassName("rsult" + tableId)[0];
-            if (el) {
-                var numberofcolumns = el.querySelectorAll('thead th:not(.col-hidden)').length;
-                el.style.fontSize = (numberofcolumns <= 17) ? "11px" : "9.2px";
-            }
-        } catch (e) {
-            // ignore
+
+        // font-size is controlled by CSS — no JS override needed
+
+        // Ensure control bar container exists inside add1 (rendered below tables)
+        if (!document.getElementById('data-control-bar')) {
+            var bar = document.createElement('div');
+            bar.id = 'data-control-bar';
+            bar.innerHTML = '<div class="ctrl-section"><span class="ctrl-label">Columns:</span><div id="col-toggle-chips"></div></div>'
+                + '<div class="ctrl-sep"></div>'
+                + '<div class="ctrl-section"><span class="ctrl-label">Jump to:</span><div id="col-group-nav"></div></div>'
+                + '<div class="ctrl-sep"></div>'
+                + '<div class="ctrl-section">'
+                + '<button class="col-group-btn" onclick="toggleAllColumns(true)" title="Show all columns">Show All</button>'
+                + '<button class="col-group-btn" onclick="toggleAllColumns(false)" title="Hide all except Ticker">Hide All</button>'
+                + '<button class="col-group-btn" onclick="resetColumnOrder()" title="Reset column order to default">Reset Order</button>'
+                + '</div>';
+            document.getElementById('add1').appendChild(bar);
         }
 
         // Initialize control bar & drag-drop for this table
@@ -2116,18 +2441,117 @@ function _initDragReorder(tableId) {
 		$('#sendOrderToFlask').click(function(){
 			document.getElementById("notConnected").innerHTML = "";
 			document.getElementById("notConnected").classList.add("loader");
-			//mystock nshare bracketLimit longshortside pricelimit supportlimit stoplosslimit resistencelimit
-			var tickerOrder = document.getElementsByClassName("mystock")[0].value;
-			var limitPrice = document.getElementsByClassName("pricelimit")[0].value;
-			var bracketlimit = document.getElementsByClassName("bracketLimit")[0].value;
-			var longshort = document.getElementsByClassName("longshortside")[0].value;
-			var highBraket = document.getElementsByClassName("resistencelimit")[0].value;
-			var lowBraket = document.getElementsByClassName("supportlimit")[0].value;
-			var quantity = document.getElementsByClassName("nshare")[0].value;
-			var stoplosslimit = document.getElementsByClassName("stoplosslimit")[0].value;
 
-			var sendOrderToIB = {"tickerOrder": tickerOrder, "limitPrice": limitPrice, "bracketlimit": bracketlimit, "longshort": longshort, "highBraket": highBraket, "lowBraket": lowBraket, "quantity":quantity, "stoplosslimit": stoplosslimit};
+			// Check if multi-level is enabled
+			var mlEnabled = document.querySelector('.ml-enabled-chk') && document.querySelector('.ml-enabled-chk').checked;
 
+			if (mlEnabled) {
+				// Multi-level mode: build and send multiple orders
+				var mlOrders = _mlBuildOrders();
+				if (mlOrders.length === 0) {
+					document.getElementById("notConnected").classList.remove("loader");
+					var msgEl = document.createElement("H4");
+					msgEl.style.color = "#f44336";
+					msgEl.innerHTML = "No valid levels — check price references and allocations";
+					document.getElementById("notConnected").appendChild(msgEl);
+					return;
+				}
+				var completed = 0;
+				var succeeded = 0;
+				var failed = 0;
+				var total = mlOrders.length;
+				var statusDiv = document.getElementById("notConnected");
+
+				for (var oi = 0; oi < mlOrders.length; oi++) {
+					(function(order, levelNum) {
+						$.ajax({
+							url: '/sendorders',
+							data: order,
+							type: 'POST',
+							dataType: 'json',
+							success: function(response) {
+								completed++;
+								if (response["status"] === "ok") {
+									succeeded++;
+								} else {
+									failed++;
+								}
+								if (completed === total) {
+									statusDiv.classList.remove("loader");
+									var msgEl = document.createElement("H4");
+									if (failed === 0) {
+										msgEl.style.color = "#4caf50";
+										msgEl.innerHTML = "All " + total + " level orders sent successfully";
+									} else {
+										msgEl.style.color = "#f44336";
+										msgEl.innerHTML = succeeded + " of " + total + " orders sent (" + failed + " failed)";
+									}
+									statusDiv.appendChild(msgEl);
+								}
+							},
+							error: function(xhr, status, error) {
+								completed++;
+								failed++;
+								if (completed === total) {
+									statusDiv.classList.remove("loader");
+									var msgEl = document.createElement("H4");
+									msgEl.style.color = "#f44336";
+									msgEl.innerHTML = succeeded + " of " + total + " orders sent (" + failed + " failed)";
+									statusDiv.appendChild(msgEl);
+								}
+							}
+						});
+					})(mlOrders[oi], oi + 1);
+				}
+
+				// Show level summary while waiting
+				var previewHtml = '<div style="font-size:13px;color:#57606a;margin-top:4px;">';
+				for (var p = 0; p < mlOrders.length; p++) {
+					previewHtml += 'Level ' + mlOrders[p]._levelIdx + ' (' + mlOrders[p]._refLabel + '): ' + mlOrders[p].quantity + ' shs @ $' + mlOrders[p].limitPrice + '<br>';
+				}
+				previewHtml += '</div>';
+				statusDiv.innerHTML += previewHtml;
+				return;
+			}
+
+			// Single order mode (existing behavior)
+			var tickerOrder = document.querySelector('.mystock') ? document.querySelector('.mystock').value : '';
+			var limitPrice = document.querySelector('.pricelimit') ? document.querySelector('.pricelimit').value : '';
+			var bracketlimit = document.querySelector('.bracketLimit') ? document.querySelector('.bracketLimit').value : 'limit';
+			var longshort = document.querySelector('.longshortside') ? document.querySelector('.longshortside').value : 'long';
+			var highBraket = document.querySelector('.resistencelimit') ? document.querySelector('.resistencelimit').value : '';
+			var lowBraket = document.querySelector('.supportlimit') ? document.querySelector('.supportlimit').value : '';
+			var qtyMode = document.querySelector('.oe-qty-mode') ? document.querySelector('.oe-qty-mode').value : 'shares';
+			var quantity;
+			if (qtyMode === 'dollars') {
+				var dollarAmt = parseFloat(document.querySelector('.oe-dollar-amt') ? document.querySelector('.oe-dollar-amt').value : '100');
+				var entryP = parseFloat(document.querySelector('.pricelimit') ? document.querySelector('.pricelimit').value : '0');
+				quantity = (entryP > 0) ? String(Math.floor(dollarAmt / entryP)) : '1';
+			} else {
+				quantity = document.querySelector('.nshare') ? document.querySelector('.nshare').value : '1';
+			}
+			var stoplosslimit = document.querySelector('.stoplosslimit') ? document.querySelector('.stoplosslimit').value : '';
+			var useTrailingStop = (document.querySelector('.oe-trailing-chk') && document.querySelector('.oe-trailing-chk').checked) ? 'on' : 'off';
+			var trailingAmount = document.querySelector('.oe-trailing-amount') ? document.querySelector('.oe-trailing-amount').value : '';
+			var trailingType = document.querySelector('.oe-trailing-type') ? document.querySelector('.oe-trailing-type').value : 'amount';
+			var tif = document.querySelector('.oe-tif') ? document.querySelector('.oe-tif').value : 'DAY';
+			var outsideRth = document.querySelector('.oe-session') ? document.querySelector('.oe-session').value : 'regular';
+
+			var sendOrderToIB = {
+				"tickerOrder": tickerOrder,
+				"limitPrice": limitPrice,
+				"bracketlimit": bracketlimit,
+				"longshort": longshort,
+				"highBraket": highBraket,
+				"lowBraket": lowBraket,
+				"quantity": quantity,
+				"stoplosslimit": stoplosslimit,
+				"useTrailingStop": useTrailingStop,
+				"trailingAmount": trailingAmount,
+				"trailingType": trailingType,
+				"tif": tif,
+				"outsideRth": outsideRth
+			};
 
 			$.ajax({
 				url: '/sendorders',
@@ -2201,57 +2625,1096 @@ function clearFilter(nInt)
 
 
 function addButtonBuy (nelm, idtouse) {
-												// idtouse is now a string id, not a DOM element
-												var currentId = (typeof idtouse === 'string') ? idtouse : idtouse.id;
-												var el = document.getElementById(currentId);
-												if (!el) { console.error('addButtonBuy: element not found:', currentId); return; }
-												var symbolCell = el.parentElement.parentElement.children[0];
-												var nameTicker = (symbolCell.childNodes[0] ? symbolCell.childNodes[0].textContent : symbolCell.innerText).trim();
+    var currentId = (typeof idtouse === 'string') ? idtouse : idtouse.id;
+    var el = document.getElementById(currentId);
+    if (!el) { console.error('addButtonBuy: element not found:', currentId); return; }
+    var symbolCell = el.parentElement.parentElement.children[0];
+    var nameTicker = (symbolCell.childNodes[0] ? symbolCell.childNodes[0].textContent : symbolCell.innerText).trim();
 
-												var stockName = nameTicker;
-												var longshort = "LONG";
-												var parentChildren = 7;
-												var actualPrice = el.parentElement.parentElement.children[2].innerText.trim();
-												var supporT = (parseFloat(actualPrice) * 0.99).toFixed(2);
-												var resistencE = (parseFloat(actualPrice) * 1.01).toFixed(2);
-												var startDiv = "<div class = 'buysell'>";
-												var startForm = "<form id = 'formToSendToFlask'>";
-												var divBuySell = "<div class = 'buysell'>";
-												var divStock = "<div class = 'makeColum'> <label class='labelbuysell'>Stock</label> <input type='text' value='" + stockName + "' class = 'buysellinput mystock'></div>";
-												var divNShare = "<div class = 'makeColum'> <label class='labelbuysell'>N Share</label> <input type='number' value='1' class = 'buysellinput nshare'></div>";
-												var divBrackteLimit = "<div class = 'makeColum'> <label class='labelbuysell'>Type</label> <select class = 'buysellSelect bracketLimit' id = 'changevalues" + nelm + "'> <option value='bracket' selected=''>Bracket </option> <option value='limit'>Limit</option> </select> </div>";
-												var divBuySell = "<div class = 'makeColum'> <label class='labelbuysell'>Side</label> <select class = 'buysellSelect longshortside' onchange='SupportResistenceChange()'> <option value='long' selected=''>Long </option> <option value='short'>Short</option> </select> </div>";
-												var thecurrentPrice = "<div class = 'makeColum'> <label class='labelbuysell'>Price</label> <input type='number' value='" + actualPrice + "' class = 'buysellinput pricelimit' onchange='SupportResistenceChange()'></div>";
+    var stockName = nameTicker;
+    var actualPrice = el.parentElement.parentElement.children[2].innerText.trim();
+    var supporT = (parseFloat(actualPrice) * 0.99).toFixed(2);
+    var resistencE = (parseFloat(actualPrice) * 1.01).toFixed(2);
 
-												var supportLevel = "<div class = 'makeColum'> <label class='labelbuysell'>Stop</label> <input type='number' value='" + supporT + "' class = 'buysellinput supportlimit' id = 'support" + nelm + "'></div>";
-											  	var StopLoss = "<div class = 'makeColum'> <label class='labelbuysell'>StopLoss(%)</label> <input type='number' value='10' class = 'buysellinput stoplosslimit'></div>";
-											  	var resistenceLevel = "<div class = 'makeColum'> <label class='labelbuysell'>Target</label> <input type='number' value='" + resistencE +"' class = 'buysellinput resistencelimit' id = 'resistence" + nelm + "'></div>";
-											  	var fast_ema = "<div class = 'makeColum'> <label class='labelbuysell'>FastEMA</label> <input type='number' value='13' class = 'buysellinput'></div>";
-											  	var send = "<div class = 'makeColum'> <label class='labelbuysell'>Order</label> <button class = 'buysellinput' id = 'sendToFlask" + parentChildren + "'>Send</button></div>";
-											  	var send1 = "<div class = 'makeColum'> <label class='labelbuysell'>Order</label> <button class = 'buysellinput'>Send</button></div>";
-											  	var divBuySellClose = "</div>";
-											  	var endForm = "</form>";
-											  	var endDiv = "</div>";
-											  	//mystock nshare bracketLimit longshortside pricelimit supportlimit stoplosslimit resistencelimit
-											  	var secondPart = "<div class='secondPart'> <div class='makeColum1'> <label class='labelbuysell'>Support %</label> <input type='number' value='1' class='percentageClass' onchange='SupportResistenceChange()'> </div> <div class='makeColum1'> <label class='labelbuysell'>Resist %</label> <input type='number' value='1' class='percentageClass' onchange='SupportResistenceChange()'> </div> </div>";
+    // Store current symbol for multi-level indicator lookups
+    window._mlCurrentSymbol = stockName;
 
-											  	var elementToAppend = startForm + startDiv  + divStock + divNShare + divBrackteLimit + divBuySell + thecurrentPrice + supportLevel + StopLoss + resistenceLevel + fast_ema + send  + endDiv + endForm + secondPart; // + send1;
-											  	document.getElementById("elementToAppendBuySell").innerHTML = elementToAppend;
-											  	/*
-											  	myelement = document.createElement("DIV");
-											  	myelement.setAttribute("class", "buysell");
-											  	myelement.innerHTML = elementToAppend;
-											  	document.getElementById("elfeo").appendChild(myelement);
-											  	*/
-											  	document.getElementById('changevalues' + nelm).addEventListener("change", changeOptions);
+    var html = '';
+    html += '<form id="formToSendToFlask" class="oe-form">';
 
-											  	event.preventDefault();
-											  	//nelm = nelm + 1;
-											}
+    // --- Preset Management Row ---
+    html += '<div class="oe-section oe-preset-bar">';
+    html += '  <label class="oe-label">Preset</label>';
+    html += '  <select id="oe_preset_dropdown" class="oe-select" style="flex:1;min-width:140px;"><option value="">-- Select Preset --</option></select>';
+    html += '  <input type="text" id="oe_preset_name" class="oe-input" placeholder="New preset name..." style="flex:1;max-width:150px;">';
+    html += '  <button type="button" class="oe-btn oe-btn-sm" onclick="_oeLoadPreset()">Load</button>';
+    html += '  <button type="button" class="oe-btn oe-btn-sm oe-btn-primary" onclick="_oeSavePreset()">Save</button>';
+    html += '  <button type="button" class="oe-btn oe-btn-sm oe-btn-danger" onclick="_oeDeletePreset()">Delete</button>';
+    html += '  <label class="oe-chk-label" style="margin-left:8px;"><input type="checkbox" id="oe_preset_default"> Default</label>';
+    html += '</div>';
 
+    // --- Row 1: Core Fields ---
+    html += '<div class="oe-row">';
+    html += '  <div class="oe-field"><label class="oe-label">Symbol</label><input type="text" value="' + stockName + '" class="oe-input mystock"></div>';
+    html += '  <div class="oe-field"><label class="oe-label">Side</label><select class="oe-select longshortside" onchange="_oeRecalcStopTarget();_mlRecalcAll()"><option value="long" selected>Long</option><option value="short">Short</option></select></div>';
+    html += '  <div class="oe-field"><label class="oe-label">Order Type</label><select class="oe-select bracketLimit" id="changevalues' + nelm + '"><option value="bracket" selected>Bracket</option><option value="limit">Limit</option></select></div>';
+    html += '  <div class="oe-field"><label class="oe-chk-label" style="margin-top:18px;"><input type="checkbox" class="ml-enabled-chk" onchange="_mlToggle()"> Multi-Level</label></div>';
+    html += '</div>';
 
+    // --- Single-Order Section (shown when multi-level is OFF) ---
+    html += '<div class="oe-single-section">';
+    html += '<div class="oe-row">';
+    html += '  <div class="oe-field"><label class="oe-label">Qty Mode</label><select class="oe-select oe-qty-mode" onchange="_oeToggleQtyMode()"><option value="shares" selected>Shares</option><option value="dollars">$ per Trade</option></select></div>';
+    html += '  <div class="oe-field oe-qty-shares-field"><label class="oe-label">Qty</label><input type="number" value="1" class="oe-input nshare" min="1" step="1"></div>';
+    html += '  <div class="oe-field oe-qty-dollars-field" style="display:none;"><label class="oe-label">$ Amount</label><input type="number" value="100" class="oe-input oe-dollar-amt" min="1" step="1" onchange="_oeCalcSharesFromDollars()"></div>';
+    html += '  <div class="oe-field oe-qty-dollars-field" style="display:none;"><label class="oe-label">Shares (calc)</label><input type="number" class="oe-input oe-dollar-shares" readonly tabindex="-1" style="background:#f6f8fa;"></div>';
+    html += '</div>';
+    html += '<div class="oe-row">';
+    html += '  <div class="oe-field"><label class="oe-label">Entry Price</label><input type="number" step="0.01" value="' + actualPrice + '" class="oe-input pricelimit" onchange="_oeRecalcStopTarget()"></div>';
+    html += '  <div class="oe-field oe-bracket-field"><label class="oe-label">Target Price</label><input type="number" step="0.01" value="' + resistencE + '" class="oe-input resistencelimit" id="resistence' + nelm + '"></div>';
+    html += '  <div class="oe-field oe-bracket-field"><label class="oe-label">Stop Price</label><input type="number" step="0.01" value="' + supporT + '" class="oe-input supportlimit" id="support' + nelm + '"></div>';
+    html += '  <div class="oe-field oe-bracket-field"><label class="oe-label">Stop Loss %</label><input type="number" step="0.1" value="1" class="oe-input stoplosslimit"></div>';
+    html += '</div>';
+    html += '<div class="oe-row oe-bracket-field">';
+    html += '  <div class="oe-field"><label class="oe-label">Stop %</label><input type="number" step="0.1" value="1" class="oe-input oe-pct-support" onchange="_oeRecalcStopTarget()"></div>';
+    html += '  <div class="oe-field"><label class="oe-label">Target %</label><input type="number" step="0.1" value="1" class="oe-input oe-pct-resist" onchange="_oeRecalcStopTarget()"></div>';
+    html += '</div>';
+    html += '</div>'; // end oe-single-section
 
+    // --- Multi-Level Section (shown when multi-level is ON) ---
+    html += '<div class="ml-section" style="display:none;">';
+    html += '<div class="ml-header">Multi-Level Order Builder</div>';
+    html += '<div class="oe-row">';
+    html += '  <div class="oe-field"><label class="oe-label">Total Budget ($)</label><input type="number" value="100" min="1" step="1" class="oe-input ml-total-budget" onchange="_mlRebalanceAlloc();_mlRecalcAll()"></div>';
+    html += '  <div class="oe-field"><label class="oe-label">Split Mode</label><select class="oe-select ml-split-mode" onchange="_mlRebalanceAlloc();_mlRecalcAll()"><option value="equal" selected>Equal Split</option><option value="manual">Manual</option><option value="weighted_front">Front-Weighted</option><option value="weighted_back">Back-Weighted</option></select></div>';
+    html += '</div>';
+    html += '<div class="ml-levels-hdr">';
+    html += '  <span class="ml-hdr-ref">Price Reference</span>';
+    html += '  <span class="ml-hdr-off">Offset %</span>';
+    html += '  <span class="ml-hdr-alloc">Alloc ($)</span>';
+    html += '  <span class="ml-hdr-price">Entry Price</span>';
+    html += '  <span class="ml-hdr-shs">Shares</span>';
+    html += '  <span class="ml-hdr-act"></span>';
+    html += '</div>';
+    html += '<div id="ml_levels_container"></div>';
+    html += '<div style="margin:6px 0;">';
+    html += '  <button type="button" class="oe-btn oe-btn-sm oe-btn-primary" onclick="_mlAddLevel()">+ Add Level</button>';
+    html += '  <span class="ml-summary" id="ml_summary"></span>';
+    html += '</div>';
 
+    // Bracket settings for multi-level
+    html += '<div class="oe-row oe-bracket-field">';
+    html += '  <div class="oe-field"><label class="oe-label">Stop %</label><input type="number" step="0.1" value="1" class="oe-input ml-stop-pct"></div>';
+    html += '  <div class="oe-field"><label class="oe-label">Target %</label><input type="number" step="0.1" value="1" class="oe-input ml-target-pct"></div>';
+    html += '</div>';
+    html += '</div>'; // end ml-section
+
+    // --- Trailing Stop (shared) ---
+    html += '<div class="oe-row oe-bracket-field">';
+    html += '  <div class="oe-field"><label class="oe-chk-label"><input type="checkbox" class="oe-trailing-chk" onchange="_oeToggleTrailing()"> Trailing Stop</label></div>';
+    html += '  <div class="oe-field oe-trailing-fields" style="display:none;"><label class="oe-label">Trail Amount</label><input type="number" step="0.01" value="1.00" class="oe-input oe-trailing-amount"></div>';
+    html += '  <div class="oe-field oe-trailing-fields" style="display:none;"><label class="oe-label">Trail Type</label><select class="oe-select oe-trailing-type"><option value="amount" selected>$ Amount</option><option value="percent">% Pct</option></select></div>';
+    html += '</div>';
+
+    // --- Row 5: Time in Force / Session ---
+    html += '<div class="oe-row">';
+    html += '  <div class="oe-field"><label class="oe-label">Time in Force</label><select class="oe-select oe-tif"><option value="DAY" selected>Day</option><option value="GTC">Good Till Cancel</option></select></div>';
+    html += '  <div class="oe-field"><label class="oe-label">Trading Session</label><select class="oe-select oe-session"><option value="regular" selected>Regular Hours</option><option value="extended">Regular + Extended</option><option value="overnight">Regular + Extended + Overnight</option></select></div>';
+    html += '</div>';
+
+    html += '</form>';
+
+    document.getElementById("elementToAppendBuySell").innerHTML = html;
+    document.getElementById('changevalues' + nelm).addEventListener("change", _oeToggleBracket);
+    _oeCalcSharesFromDollars();
+    _oeRefreshPresetDropdown();
+    _oeLoadDefaultPreset(actualPrice);
+    // Add one default level for multi-level
+    _mlAddLevel();
+
+    event.preventDefault();
+}
+
+// --- Order Entry Helper Functions ---
+
+function _oeToggleQtyMode() {
+    var mode = document.querySelector('.oe-qty-mode') ? document.querySelector('.oe-qty-mode').value : 'shares';
+    var sharesEls = document.querySelectorAll('.oe-qty-shares-field');
+    var dollarEls = document.querySelectorAll('.oe-qty-dollars-field');
+    for (var i = 0; i < sharesEls.length; i++) sharesEls[i].style.display = (mode === 'shares') ? '' : 'none';
+    for (var i = 0; i < dollarEls.length; i++) dollarEls[i].style.display = (mode === 'dollars') ? '' : 'none';
+    if (mode === 'dollars') _oeCalcSharesFromDollars();
+}
+
+function _oeCalcSharesFromDollars() {
+    var dollarEl = document.querySelector('.oe-dollar-amt');
+    var sharesEl = document.querySelector('.oe-dollar-shares');
+    var priceEl = document.querySelector('.pricelimit');
+    if (!dollarEl || !sharesEl || !priceEl) return;
+    var dollars = parseFloat(dollarEl.value) || 0;
+    var price = parseFloat(priceEl.value) || 0;
+    var shares = (price > 0) ? Math.floor(dollars / price) : 0;
+    sharesEl.value = shares;
+}
+
+// ============================================================
+// Multi-Level Order Functions
+// ============================================================
+
+var _mlLevelCounter = 0;
+
+var _mlPriceRefs = [
+    { value: 'current',    label: 'Current Price',   dataKey: 'close' },
+    { value: 'vwap',       label: 'VWAP',            dataKey: 'vwap' },
+    { value: 'pivot_pp',   label: 'Pivot PP',        dataKey: 'Pivot.PP' },
+    { value: 'pivot_s1',   label: 'Pivot S1',        dataKey: 'Pivot.S1' },
+    { value: 'pivot_s2',   label: 'Pivot S2',        dataKey: 'Pivot.S2' },
+    { value: 'pivot_s3',   label: 'Pivot S3',        dataKey: 'Pivot.S3' },
+    { value: 'pivot_r1',   label: 'Pivot R1',        dataKey: 'Pivot.R1' },
+    { value: 'pivot_r2',   label: 'Pivot R2',        dataKey: 'Pivot.R2' },
+    { value: 'pivot_r3',   label: 'Pivot R3',        dataKey: 'Pivot.R3' },
+    { value: 'prevClose',  label: 'Prev Close (Gap)',dataKey: 'prevClose' },
+    { value: 'smaFast',    label: 'Fast SMA',        dataKey: 'smaFast' },
+    { value: 'smaMedium',  label: 'Medium SMA',      dataKey: 'smaMedium' },
+    { value: 'smaSlow',    label: 'Slow SMA',        dataKey: 'smaSlow' },
+    { value: 'sma50',      label: '50 SMA',          dataKey: 'cross50SMA_value' },
+    { value: 'sma200',     label: '200 SMA',         dataKey: 'cross200SMA_value' },
+    { value: 'emaFast',    label: 'Fast EMA',        dataKey: 'emaFast' },
+    { value: 'emaSlow',    label: 'Slow EMA',        dataKey: 'emaSlow' },
+    { value: 'lowOfDay',   label: 'Low of Day',      dataKey: 'lowOfDay' },
+    { value: 'highOfDay',  label: 'High of Day',     dataKey: 'highOfDay' },
+    { value: 'custom',     label: 'Custom Price',    dataKey: null },
+];
+
+function _mlGetRefPrice(refValue) {
+    var sym = window._mlCurrentSymbol || '';
+    var data = (window._scanStockData && window._scanStockData[sym]) ? window._scanStockData[sym] : null;
+    if (refValue === 'custom') return 0;
+    var ref = _mlPriceRefs.find(function(r) { return r.value === refValue; });
+    if (!ref || !ref.dataKey || !data) return 0;
+    var parts = ref.dataKey.split('.');
+    var val = data;
+    for (var i = 0; i < parts.length; i++) {
+        if (val && typeof val === 'object') val = val[parts[i]];
+        else return 0;
+    }
+    return parseFloat(val) || 0;
+}
+
+function _mlToggle() {
+    var enabled = document.querySelector('.ml-enabled-chk') && document.querySelector('.ml-enabled-chk').checked;
+    var singleSec = document.querySelector('.oe-single-section');
+    var mlSec = document.querySelector('.ml-section');
+    if (singleSec) singleSec.style.display = enabled ? 'none' : '';
+    if (mlSec) mlSec.style.display = enabled ? '' : 'none';
+    if (enabled) _mlRecalcAll();
+}
+
+function _mlAddLevel() {
+    var container = document.getElementById('ml_levels_container');
+    if (!container) return;
+    _mlLevelCounter++;
+    var idx = _mlLevelCounter;
+    var row = document.createElement('div');
+    row.className = 'ml-level-row';
+    row.id = 'ml_level_' + idx;
+    row.setAttribute('data-idx', idx);
+    var optionsHtml = '';
+    for (var i = 0; i < _mlPriceRefs.length; i++) {
+        var sel = (i === 0) ? ' selected' : '';
+        optionsHtml += '<option value="' + _mlPriceRefs[i].value + '"' + sel + '>' + _mlPriceRefs[i].label + '</option>';
+    }
+    row.innerHTML =
+        '<select class="oe-select ml-ref" onchange="_mlRecalcLevel(' + idx + ')">' + optionsHtml + '</select>' +
+        '<input type="number" class="oe-input ml-offset" value="0" step="0.1" onchange="_mlRecalcLevel(' + idx + ')" style="width:70px;">' +
+        '<span class="ml-offset-label">%</span>' +
+        '<input type="number" class="oe-input ml-alloc" value="0" min="0" step="1" onchange="_mlRecalcLevel(' + idx + ')" style="width:70px;">' +
+        '<input type="number" class="oe-input ml-custom-price" value="" step="0.01" placeholder="Price" style="width:75px;display:none;" onchange="_mlRecalcLevel(' + idx + ')">' +
+        '<span class="ml-calc-price" id="ml_price_' + idx + '">--</span>' +
+        '<span class="ml-calc-shares" id="ml_shares_' + idx + '">--</span>' +
+        '<button type="button" class="oe-btn oe-btn-sm oe-btn-danger ml-remove-btn" onclick="_mlRemoveLevel(' + idx + ')">x</button>';
+    container.appendChild(row);
+    _mlRebalanceAlloc();
+    _mlRecalcAll();
+}
+
+function _mlRemoveLevel(idx) {
+    var el = document.getElementById('ml_level_' + idx);
+    if (el) el.remove();
+    _mlRebalanceAlloc();
+    _mlRecalcAll();
+}
+
+function _mlGetLevelRows() {
+    var container = document.getElementById('ml_levels_container');
+    if (!container) return [];
+    return Array.from(container.querySelectorAll('.ml-level-row'));
+}
+
+function _mlRebalanceAlloc() {
+    var mode = document.querySelector('.ml-split-mode') ? document.querySelector('.ml-split-mode').value : 'equal';
+    var totalBudget = parseFloat(document.querySelector('.ml-total-budget') ? document.querySelector('.ml-total-budget').value : '100') || 100;
+    var rows = _mlGetLevelRows();
+    if (rows.length === 0) return;
+    if (mode === 'equal') {
+        var perLevel = Math.floor(totalBudget / rows.length);
+        var remainder = totalBudget - (perLevel * rows.length);
+        for (var i = 0; i < rows.length; i++) {
+            var allocEl = rows[i].querySelector('.ml-alloc');
+            if (allocEl) allocEl.value = perLevel + (i === 0 ? remainder : 0);
+        }
+    } else if (mode === 'weighted_front') {
+        // Front-weighted: first level gets more
+        var weights = [];
+        var total = 0;
+        for (var i = 0; i < rows.length; i++) { var w = rows.length - i; weights.push(w); total += w; }
+        var assigned = 0;
+        for (var i = 0; i < rows.length; i++) {
+            var a = (i === rows.length - 1) ? (totalBudget - assigned) : Math.round(totalBudget * weights[i] / total);
+            rows[i].querySelector('.ml-alloc').value = a;
+            assigned += a;
+        }
+    } else if (mode === 'weighted_back') {
+        // Back-weighted: last level gets more
+        var weights = [];
+        var total = 0;
+        for (var i = 0; i < rows.length; i++) { var w = i + 1; weights.push(w); total += w; }
+        var assigned = 0;
+        for (var i = 0; i < rows.length; i++) {
+            var a = (i === rows.length - 1) ? (totalBudget - assigned) : Math.round(totalBudget * weights[i] / total);
+            rows[i].querySelector('.ml-alloc').value = a;
+            assigned += a;
+        }
+    }
+    // mode === 'manual': don't touch allocations
+}
+
+function _mlRecalcLevel(idx) {
+    var row = document.getElementById('ml_level_' + idx);
+    if (!row) return;
+    var refSel = row.querySelector('.ml-ref');
+    var offsetEl = row.querySelector('.ml-offset');
+    var allocEl = row.querySelector('.ml-alloc');
+    var customEl = row.querySelector('.ml-custom-price');
+    var priceSpan = document.getElementById('ml_price_' + idx);
+    var sharesSpan = document.getElementById('ml_shares_' + idx);
+    if (!refSel || !offsetEl || !allocEl || !priceSpan || !sharesSpan) return;
+
+    var refVal = refSel.value;
+    // Show/hide custom price input
+    if (customEl) customEl.style.display = (refVal === 'custom') ? '' : 'none';
+
+    var basePrice;
+    if (refVal === 'custom') {
+        basePrice = parseFloat(customEl ? customEl.value : '0') || 0;
+    } else {
+        basePrice = _mlGetRefPrice(refVal);
+    }
+    var offsetPct = parseFloat(offsetEl.value) || 0;
+    var entryPrice = basePrice > 0 ? +(basePrice * (1 + offsetPct / 100)).toFixed(2) : 0;
+
+    var alloc = parseFloat(allocEl.value) || 0;
+    var shares = (entryPrice > 0) ? Math.floor(alloc / entryPrice) : 0;
+
+    priceSpan.textContent = entryPrice > 0 ? ('$' + entryPrice.toFixed(2)) : '--';
+    priceSpan.title = basePrice > 0 ? ('Base: $' + basePrice.toFixed(2)) : 'No data';
+    sharesSpan.textContent = shares > 0 ? (shares + ' shs') : '--';
+
+    _mlUpdateSummary();
+}
+
+function _mlRecalcAll() {
+    var rows = _mlGetLevelRows();
+    for (var i = 0; i < rows.length; i++) {
+        var idx = parseInt(rows[i].getAttribute('data-idx'));
+        if (idx) _mlRecalcLevel(idx);
+    }
+}
+
+function _mlUpdateSummary() {
+    var rows = _mlGetLevelRows();
+    var totalAlloc = 0, totalShares = 0, levelCount = rows.length;
+    for (var i = 0; i < rows.length; i++) {
+        totalAlloc += parseFloat(rows[i].querySelector('.ml-alloc') ? rows[i].querySelector('.ml-alloc').value : '0') || 0;
+        var sharesSpan = rows[i].querySelector('.ml-calc-shares');
+        if (sharesSpan) {
+            var txt = sharesSpan.textContent.replace(/[^0-9]/g, '');
+            totalShares += parseInt(txt) || 0;
+        }
+    }
+    var summary = document.getElementById('ml_summary');
+    if (summary) summary.textContent = levelCount + ' level(s) | $' + totalAlloc.toFixed(0) + ' allocated | ' + totalShares + ' total shares';
+}
+
+function _mlGetSettings() {
+    var enabled = document.querySelector('.ml-enabled-chk') ? document.querySelector('.ml-enabled-chk').checked : false;
+    var totalBudget = document.querySelector('.ml-total-budget') ? document.querySelector('.ml-total-budget').value : '100';
+    var splitMode = document.querySelector('.ml-split-mode') ? document.querySelector('.ml-split-mode').value : 'equal';
+    var stopPct = document.querySelector('.ml-stop-pct') ? document.querySelector('.ml-stop-pct').value : '1';
+    var targetPct = document.querySelector('.ml-target-pct') ? document.querySelector('.ml-target-pct').value : '1';
+    var levels = [];
+    var rows = _mlGetLevelRows();
+    for (var i = 0; i < rows.length; i++) {
+        var refSel = rows[i].querySelector('.ml-ref');
+        var offsetEl = rows[i].querySelector('.ml-offset');
+        var allocEl = rows[i].querySelector('.ml-alloc');
+        var customEl = rows[i].querySelector('.ml-custom-price');
+        levels.push({
+            ref: refSel ? refSel.value : 'current',
+            offset: offsetEl ? offsetEl.value : '0',
+            alloc: allocEl ? allocEl.value : '0',
+            customPrice: customEl ? customEl.value : '',
+        });
+    }
+    return {
+        enabled: enabled,
+        totalBudget: totalBudget,
+        splitMode: splitMode,
+        stopPct: stopPct,
+        targetPct: targetPct,
+        levels: levels,
+    };
+}
+
+function _mlApplySettings(s) {
+    if (!s) return;
+    var chk = document.querySelector('.ml-enabled-chk');
+    if (chk) chk.checked = !!s.enabled;
+    var budgetEl = document.querySelector('.ml-total-budget');
+    if (budgetEl && s.totalBudget) budgetEl.value = s.totalBudget;
+    var splitEl = document.querySelector('.ml-split-mode');
+    if (splitEl && s.splitMode) splitEl.value = s.splitMode;
+    var stopEl = document.querySelector('.ml-stop-pct');
+    if (stopEl && s.stopPct) stopEl.value = s.stopPct;
+    var targetEl = document.querySelector('.ml-target-pct');
+    if (targetEl && s.targetPct) targetEl.value = s.targetPct;
+    // Rebuild levels
+    var container = document.getElementById('ml_levels_container');
+    if (container) container.innerHTML = '';
+    _mlLevelCounter = 0;
+    if (s.levels && s.levels.length > 0) {
+        for (var i = 0; i < s.levels.length; i++) {
+            _mlAddLevel();
+            var rows = _mlGetLevelRows();
+            var row = rows[rows.length - 1];
+            if (!row) continue;
+            var refSel = row.querySelector('.ml-ref');
+            var offsetEl = row.querySelector('.ml-offset');
+            var allocEl = row.querySelector('.ml-alloc');
+            var customEl = row.querySelector('.ml-custom-price');
+            if (refSel && s.levels[i].ref) refSel.value = s.levels[i].ref;
+            if (offsetEl && s.levels[i].offset !== undefined) offsetEl.value = s.levels[i].offset;
+            if (allocEl && s.levels[i].alloc !== undefined) allocEl.value = s.levels[i].alloc;
+            if (customEl && s.levels[i].customPrice !== undefined) customEl.value = s.levels[i].customPrice;
+        }
+    } else {
+        _mlAddLevel();
+    }
+    _mlToggle();
+    _mlRecalcAll();
+}
+
+function _mlBuildOrders() {
+    // Build array of orders from multi-level configuration
+    var sym = document.querySelector('.mystock') ? document.querySelector('.mystock').value : '';
+    var side = document.querySelector('.longshortside') ? document.querySelector('.longshortside').value : 'long';
+    var bracketlimit = document.querySelector('.bracketLimit') ? document.querySelector('.bracketLimit').value : 'limit';
+    var tif = document.querySelector('.oe-tif') ? document.querySelector('.oe-tif').value : 'DAY';
+    var outsideRth = document.querySelector('.oe-session') ? document.querySelector('.oe-session').value : 'regular';
+    var useTrailingStop = (document.querySelector('.oe-trailing-chk') && document.querySelector('.oe-trailing-chk').checked) ? 'on' : 'off';
+    var trailingAmount = document.querySelector('.oe-trailing-amount') ? document.querySelector('.oe-trailing-amount').value : '';
+    var trailingType = document.querySelector('.oe-trailing-type') ? document.querySelector('.oe-trailing-type').value : 'amount';
+    var stopPct = document.querySelector('.ml-stop-pct') ? document.querySelector('.ml-stop-pct').value : '1';
+    var targetPct = document.querySelector('.ml-target-pct') ? document.querySelector('.ml-target-pct').value : '1';
+
+    var orders = [];
+    var rows = _mlGetLevelRows();
+    for (var i = 0; i < rows.length; i++) {
+        var idx = parseInt(rows[i].getAttribute('data-idx'));
+        var refSel = rows[i].querySelector('.ml-ref');
+        var offsetEl = rows[i].querySelector('.ml-offset');
+        var allocEl = rows[i].querySelector('.ml-alloc');
+        var customEl = rows[i].querySelector('.ml-custom-price');
+
+        var refVal = refSel ? refSel.value : 'current';
+        var basePrice;
+        if (refVal === 'custom') {
+            basePrice = parseFloat(customEl ? customEl.value : '0') || 0;
+        } else {
+            basePrice = _mlGetRefPrice(refVal);
+        }
+        var offsetPct = parseFloat(offsetEl ? offsetEl.value : '0') || 0;
+        var entryPrice = basePrice > 0 ? +(basePrice * (1 + offsetPct / 100)).toFixed(2) : 0;
+        if (entryPrice <= 0) continue;
+
+        var alloc = parseFloat(allocEl ? allocEl.value : '0') || 0;
+        var qty = Math.floor(alloc / entryPrice);
+        if (qty < 1) continue;
+
+        var targetPrice = 0, stopPrice = 0;
+        if (bracketlimit === 'bracket') {
+            var tp = parseFloat(targetPct) || 0;
+            var sp = parseFloat(stopPct) || 0;
+            if (side === 'long') {
+                targetPrice = +(entryPrice * (1 + tp / 100)).toFixed(2);
+                stopPrice = +(entryPrice * (1 - sp / 100)).toFixed(2);
+            } else {
+                targetPrice = +(entryPrice * (1 - tp / 100)).toFixed(2);
+                stopPrice = +(entryPrice * (1 + sp / 100)).toFixed(2);
+            }
+        }
+
+        orders.push({
+            tickerOrder: sym,
+            limitPrice: String(entryPrice),
+            bracketlimit: bracketlimit,
+            longshort: side,
+            highBraket: targetPrice > 0 ? String(targetPrice) : '',
+            lowBraket: stopPrice > 0 ? String(stopPrice) : '',
+            quantity: String(qty),
+            stoplosslimit: stopPct,
+            useTrailingStop: useTrailingStop,
+            trailingAmount: trailingAmount,
+            trailingType: trailingType,
+            tif: tif,
+            outsideRth: outsideRth,
+            _levelIdx: i + 1,
+            _refLabel: refSel ? refSel.options[refSel.selectedIndex].text : '',
+        });
+    }
+    return orders;
+}
+
+function _oeToggleBracket() {
+    var isBracket = document.querySelector('.bracketLimit').value === 'bracket';
+    var els = document.querySelectorAll('.oe-bracket-field');
+    for (var i = 0; i < els.length; i++) {
+        els[i].style.display = isBracket ? '' : 'none';
+    }
+}
+
+function _oeToggleTrailing() {
+    var checked = document.querySelector('.oe-trailing-chk').checked;
+    var els = document.querySelectorAll('.oe-trailing-fields');
+    for (var i = 0; i < els.length; i++) {
+        els[i].style.display = checked ? '' : 'none';
+    }
+}
+
+function _oeRecalcStopTarget() {
+    try {
+        var price = parseFloat(document.querySelector('.pricelimit').value);
+        var side = document.querySelector('.longshortside').value;
+        var stopPct = parseFloat(document.querySelector('.oe-pct-support').value) || 0;
+        var targetPct = parseFloat(document.querySelector('.oe-pct-resist').value) || 0;
+        var stopEl = document.querySelector('.supportlimit');
+        var targetEl = document.querySelector('.resistencelimit');
+        if (side === 'long') {
+            stopEl.value = (price * (1.0 - stopPct / 100.0)).toFixed(2);
+            targetEl.value = (price * (1.0 + targetPct / 100.0)).toFixed(2);
+        } else {
+            stopEl.value = (price * (1.0 + stopPct / 100.0)).toFixed(2);
+            targetEl.value = (price * (1.0 - targetPct / 100.0)).toFixed(2);
+        }
+    } catch(e) { console.warn('_oeRecalcStopTarget', e); }
+    _oeCalcSharesFromDollars();
+}
+
+function _oeGetSettings() {
+    return {
+        qtyMode: document.querySelector('.oe-qty-mode') ? document.querySelector('.oe-qty-mode').value : 'shares',
+        quantity: document.querySelector('.nshare') ? document.querySelector('.nshare').value : '1',
+        dollarAmt: document.querySelector('.oe-dollar-amt') ? document.querySelector('.oe-dollar-amt').value : '100',
+        orderType: document.querySelector('.bracketLimit') ? document.querySelector('.bracketLimit').value : 'bracket',
+        side: document.querySelector('.longshortside') ? document.querySelector('.longshortside').value : 'long',
+        stopLossPct: document.querySelector('.stoplosslimit') ? document.querySelector('.stoplosslimit').value : '1',
+        stopPct: document.querySelector('.oe-pct-support') ? document.querySelector('.oe-pct-support').value : '1',
+        targetPct: document.querySelector('.oe-pct-resist') ? document.querySelector('.oe-pct-resist').value : '1',
+        useTrailingStop: document.querySelector('.oe-trailing-chk') ? document.querySelector('.oe-trailing-chk').checked : false,
+        trailingAmount: document.querySelector('.oe-trailing-amount') ? document.querySelector('.oe-trailing-amount').value : '1',
+        trailingType: document.querySelector('.oe-trailing-type') ? document.querySelector('.oe-trailing-type').value : 'amount',
+        tif: document.querySelector('.oe-tif') ? document.querySelector('.oe-tif').value : 'DAY',
+        session: document.querySelector('.oe-session') ? document.querySelector('.oe-session').value : 'regular',
+        multiLevel: _mlGetSettings(),
+    };
+}
+
+function _oeApplySettings(s, entryPrice) {
+    if (!s) return;
+    if (s.qtyMode) { var el = document.querySelector('.oe-qty-mode'); if (el) el.value = s.qtyMode; }
+    if (s.quantity) { var el = document.querySelector('.nshare'); if (el) el.value = s.quantity; }
+    if (s.dollarAmt) { var el = document.querySelector('.oe-dollar-amt'); if (el) el.value = s.dollarAmt; }
+    if (s.orderType) { var el = document.querySelector('.bracketLimit'); if (el) { el.value = s.orderType; _oeToggleBracket(); } }
+    if (s.side) { var el = document.querySelector('.longshortside'); if (el) el.value = s.side; }
+    if (s.stopLossPct) { var el = document.querySelector('.stoplosslimit'); if (el) el.value = s.stopLossPct; }
+    if (s.stopPct) { var el = document.querySelector('.oe-pct-support'); if (el) el.value = s.stopPct; }
+    if (s.targetPct) { var el = document.querySelector('.oe-pct-resist'); if (el) el.value = s.targetPct; }
+    if (s.useTrailingStop !== undefined) { var el = document.querySelector('.oe-trailing-chk'); if (el) { el.checked = s.useTrailingStop; _oeToggleTrailing(); } }
+    if (s.trailingAmount) { var el = document.querySelector('.oe-trailing-amount'); if (el) el.value = s.trailingAmount; }
+    if (s.trailingType) { var el = document.querySelector('.oe-trailing-type'); if (el) el.value = s.trailingType; }
+    if (s.tif) { var el = document.querySelector('.oe-tif'); if (el) el.value = s.tif; }
+    if (s.session) { var el = document.querySelector('.oe-session'); if (el) el.value = s.session; }
+    _oeToggleQtyMode();
+    if (s.multiLevel) _mlApplySettings(s.multiLevel);
+    if (entryPrice) _oeRecalcStopTarget();
+}
+
+function _oeRefreshPresetDropdown() {
+    $.get("/order-presets/list").done(function(resp) {
+        var presets = (resp && resp.presets) ? resp.presets : [];
+        var dd = document.getElementById("oe_preset_dropdown");
+        if (!dd) return;
+        dd.innerHTML = '<option value="">-- Select Preset --</option>';
+        presets.forEach(function(p) {
+            var opt = document.createElement("option");
+            opt.value = p.name;
+            opt.textContent = (p.title || p.name) + (p.isDefault ? ' (default)' : '');
+            dd.appendChild(opt);
+        });
+    });
+}
+
+function _oeLoadDefaultPreset(entryPrice) {
+    $.get("/order-presets/list").done(function(resp) {
+        var presets = (resp && resp.presets) ? resp.presets : [];
+        var def = presets.find(function(p) { return p.isDefault; });
+        if (def) {
+            $.ajax({
+                url: "/order-presets/load",
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify({ name: def.name }),
+                success: function(doc) {
+                    _oeApplySettings(doc.settings, entryPrice);
+                    var dd = document.getElementById("oe_preset_dropdown");
+                    if (dd) dd.value = def.name;
+                    var cb = document.getElementById("oe_preset_default");
+                    if (cb) cb.checked = true;
+                }
+            });
+        }
+    });
+}
+
+function _oeLoadPreset() {
+    var dd = document.getElementById("oe_preset_dropdown");
+    var name = dd ? dd.value : '';
+    if (!name) { alert('Select a preset from the dropdown first'); return; }
+    $.ajax({
+        url: "/order-presets/load",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({ name: name }),
+        success: function(doc) {
+            _oeApplySettings(doc.settings, document.querySelector('.pricelimit') ? document.querySelector('.pricelimit').value : null);
+            var cb = document.getElementById("oe_preset_default");
+            if (cb) cb.checked = !!(doc.meta && doc.meta.isDefault);
+        },
+        error: function() { alert('Failed to load preset'); }
+    });
+}
+
+function _oeSavePreset() {
+    var dd = document.getElementById("oe_preset_dropdown");
+    var nameInput = document.getElementById("oe_preset_name");
+    var name = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : (dd ? dd.value : '');
+    if (!name) { alert('Enter a preset name or select one to overwrite'); return; }
+    var isDefault = document.getElementById("oe_preset_default") ? document.getElementById("oe_preset_default").checked : false;
+    var settings = _oeGetSettings();
+    var payload = { name: name, overwrite: false, isDefault: isDefault, settings: settings };
+
+    $.ajax({
+        url: "/order-presets/save",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify(payload),
+        success: function(r) {
+            if (r && r.ok) {
+                alert('Preset saved: ' + name);
+                if (nameInput) nameInput.value = '';
+                _oeRefreshPresetDropdown();
+            }
+        },
+        error: function(xhr) {
+            if (xhr.status === 409) {
+                if (confirm("Preset '" + name + "' already exists. Overwrite?")) {
+                    payload.overwrite = true;
+                    $.ajax({
+                        url: "/order-presets/save",
+                        type: "POST",
+                        contentType: "application/json",
+                        data: JSON.stringify(payload),
+                        success: function(r) {
+                            if (r && r.ok) {
+                                alert('Preset overwritten: ' + name);
+                                if (nameInput) nameInput.value = '';
+                                _oeRefreshPresetDropdown();
+                            }
+                        },
+                        error: function() { alert('Save failed'); }
+                    });
+                }
+            } else {
+                alert('Save failed');
+            }
+        }
+    });
+}
+
+function _oeDeletePreset() {
+    var dd = document.getElementById("oe_preset_dropdown");
+    var name = dd ? dd.value : '';
+    if (!name) { alert('Select a preset from the dropdown first'); return; }
+    if (!confirm("Delete preset '" + name + "'?")) return;
+    $.ajax({
+        url: "/order-presets/delete",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({ name: name }),
+        success: function(r) {
+            if (r && r.ok) {
+                alert('Preset deleted: ' + name);
+                _oeRefreshPresetDropdown();
+            }
+        },
+        error: function() { alert('Delete failed'); }
+    });
+}
+
+// =====================================================================
+// AUTO-ORDER ENGINE
+// =====================================================================
+
+// Track which symbols have been auto-ordered (reset per scan cycle by user choice)
+var _aoOrdersSent = {};   // { "AAPL": count, ... }
+
+function _aoTogglePanel() {
+    var on = document.getElementById("ao_enabled").checked;
+    var body = document.getElementById("ao_body");
+    var dot = document.getElementById("ao_status_dot");
+    if (on) {
+        body.classList.add("ao-active");
+        dot.classList.add("ao-on");
+    } else {
+        body.classList.remove("ao-active");
+        dot.classList.remove("ao-on");
+    }
+}
+
+function _aoToggleStockList() {
+    var v = document.getElementById("ao_stock_filter").value;
+    document.getElementById("ao_selected_stocks_row").style.display = (v === "selected") ? "" : "none";
+}
+
+function _aoTogglePricing() {
+    var t = document.getElementById("ao_entry_type").value;
+    document.getElementById("ao_pricing_row").style.display = (t === "limit") ? "" : "none";
+}
+
+function _aoToggleQtyMode() {
+    var mode = document.getElementById("ao_qty_mode") ? document.getElementById("ao_qty_mode").value : "shares";
+    var sharesEls = document.querySelectorAll(".ao-qty-shares-field");
+    var dollarEls = document.querySelectorAll(".ao-qty-dollars-field");
+    for (var i = 0; i < sharesEls.length; i++) sharesEls[i].style.display = (mode === "shares") ? "" : "none";
+    for (var i = 0; i < dollarEls.length; i++) dollarEls[i].style.display = (mode === "dollars") ? "" : "none";
+}
+
+function _aoTogglePricePct() {
+    var m = document.getElementById("ao_price_mode").value;
+    document.getElementById("ao_price_pct_field").style.display = (m === "last") ? "none" : "";
+}
+
+function _aoToggleBracket() {
+    var v = document.getElementById("ao_order_type").value;
+    var els = document.querySelectorAll(".ao-bracket-field");
+    for (var i = 0; i < els.length; i++) {
+        els[i].style.display = (v === "bracket") ? "" : "none";
+    }
+}
+
+function _aoToggleTrailing() {
+    var on = document.getElementById("ao_trailing_stop").checked;
+    var els = document.querySelectorAll(".ao-trailing-fields");
+    for (var i = 0; i < els.length; i++) {
+        els[i].style.display = on ? "" : "none";
+    }
+}
+
+function _aoLog(msg) {
+    var log = document.getElementById("ao_log");
+    if (!log) return;
+    if (log.querySelector("em")) log.innerHTML = "";
+    var ts = new Date().toLocaleTimeString();
+    var entry = document.createElement("div");
+    entry.className = "ao-log-entry";
+    entry.textContent = "[" + ts + "] " + msg;
+    log.insertBefore(entry, log.firstChild);
+    // keep max 100 entries
+    while (log.children.length > 100) log.removeChild(log.lastChild);
+}
+
+// Get all auto-order settings as an object
+function _aoGetSettings() {
+    return {
+        enabled: document.getElementById("ao_enabled") ? document.getElementById("ao_enabled").checked : false,
+        startHour: parseInt(document.getElementById("ao_start_hour").value) || 9,
+        startMin: parseInt(document.getElementById("ao_start_min").value) || 30,
+        stopHour: parseInt(document.getElementById("ao_stop_hour").value) || 16,
+        stopMin: parseInt(document.getElementById("ao_stop_min").value) || 0,
+        stockFilter: document.getElementById("ao_stock_filter").value || "all",
+        selectedStocks: (document.getElementById("ao_selected_stocks").value || "").trim(),
+        side: document.getElementById("ao_side").value || "long",
+        qtyMode: document.getElementById("ao_qty_mode") ? document.getElementById("ao_qty_mode").value : "shares",
+        quantity: document.getElementById("ao_quantity").value || "1",
+        dollarAmt: document.getElementById("ao_dollar_amt") ? document.getElementById("ao_dollar_amt").value : "100",
+        entryType: document.getElementById("ao_entry_type").value || "limit",
+        priceMode: document.getElementById("ao_price_mode").value || "last",
+        pricePct: document.getElementById("ao_price_pct").value || "0.5",
+        orderType: document.getElementById("ao_order_type").value || "bracket",
+        targetPct: document.getElementById("ao_target_pct").value || "2",
+        stopPct: document.getElementById("ao_stop_pct").value || "1",
+        useTrailingStop: document.getElementById("ao_trailing_stop") ? document.getElementById("ao_trailing_stop").checked : false,
+        trailMode: document.getElementById("ao_trail_mode").value || "amount",
+        trailValue: document.getElementById("ao_trail_value").value || "1",
+        tif: document.getElementById("ao_tif").value || "DAY",
+        session: document.getElementById("ao_session").value || "regular",
+        maxPerSym: parseInt(document.getElementById("ao_max_per_sym").value) || 1,
+    };
+}
+
+// Apply settings to auto-order panel
+function _aoApplySettings(s) {
+    if (!s) return;
+    function _set(id, val) { var el = document.getElementById(id); if (el) el.value = val; }
+    function _chk(id, val) { var el = document.getElementById(id); if (el) el.checked = !!val; }
+    _chk("ao_enabled", s.enabled);
+    _set("ao_start_hour", s.startHour != null ? s.startHour : 9);
+    _set("ao_start_min", s.startMin != null ? s.startMin : 30);
+    _set("ao_stop_hour", s.stopHour != null ? s.stopHour : 16);
+    _set("ao_stop_min", s.stopMin != null ? s.stopMin : 0);
+    _set("ao_stock_filter", s.stockFilter || "all");
+    _set("ao_selected_stocks", s.selectedStocks || "");
+    _set("ao_side", s.side || "long");
+    _set("ao_qty_mode", s.qtyMode || "shares");
+    _set("ao_quantity", s.quantity || "1");
+    _set("ao_dollar_amt", s.dollarAmt || "100");
+    _set("ao_entry_type", s.entryType || "limit");
+    _set("ao_price_mode", s.priceMode || "last");
+    _set("ao_price_pct", s.pricePct || "0.5");
+    _set("ao_order_type", s.orderType || "bracket");
+    _set("ao_target_pct", s.targetPct || "2");
+    _set("ao_stop_pct", s.stopPct || "1");
+    _chk("ao_trailing_stop", s.useTrailingStop);
+    _set("ao_trail_mode", s.trailMode || "amount");
+    _set("ao_trail_value", s.trailValue || "1");
+    _set("ao_tif", s.tif || "DAY");
+    _set("ao_session", s.session || "regular");
+    _set("ao_max_per_sym", s.maxPerSym || "1");
+    _aoTogglePanel();
+    _aoToggleStockList();
+    _aoTogglePricing();
+    _aoTogglePricePct();
+    _aoToggleBracket();
+    _aoToggleTrailing();
+    _aoToggleQtyMode();
+}
+
+// Auto-order preset CRUD
+function _aoRefreshPresetDropdown() {
+    $.get("/order-presets/list").done(function(resp) {
+        var presets = (resp && resp.presets) ? resp.presets : [];
+        var dd = document.getElementById("ao_preset_dropdown");
+        if (!dd) return;
+        dd.innerHTML = '<option value="">-- Select --</option>';
+        presets.forEach(function(p) {
+            // only show auto-order presets (prefixed with "ao_")
+            if (p.name && p.name.indexOf("ao_") === 0) {
+                var opt = document.createElement("option");
+                opt.value = p.name;
+                var display = (p.title || p.name).replace(/^ao_/, "");
+                opt.textContent = display + (p.isDefault ? ' (default)' : '');
+                dd.appendChild(opt);
+            }
+        });
+    });
+}
+
+function _aoSavePreset() {
+    var dd = document.getElementById("ao_preset_dropdown");
+    var nameInput = document.getElementById("ao_preset_name");
+    var rawName = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : (dd ? dd.value : '');
+    if (!rawName) { alert('Enter a preset name or select one to overwrite'); return; }
+    // Ensure ao_ prefix for namespace
+    var name = rawName.indexOf("ao_") === 0 ? rawName : ("ao_" + rawName);
+    var isDefault = document.getElementById("ao_preset_default") ? document.getElementById("ao_preset_default").checked : false;
+    var settings = _aoGetSettings();
+    var payload = { name: name, overwrite: false, isDefault: isDefault, settings: settings };
+
+    $.ajax({
+        url: "/order-presets/save",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify(payload),
+        success: function(r) {
+            if (r && r.ok) {
+                alert('Auto-order preset saved: ' + name.replace(/^ao_/, ""));
+                if (nameInput) nameInput.value = '';
+                _aoRefreshPresetDropdown();
+            }
+        },
+        error: function(xhr) {
+            if (xhr.status === 409) {
+                if (confirm("Preset '" + name.replace(/^ao_/, "") + "' already exists. Overwrite?")) {
+                    payload.overwrite = true;
+                    $.ajax({
+                        url: "/order-presets/save",
+                        type: "POST",
+                        contentType: "application/json",
+                        data: JSON.stringify(payload),
+                        success: function(r) {
+                            if (r && r.ok) {
+                                alert('Preset overwritten');
+                                if (nameInput) nameInput.value = '';
+                                _aoRefreshPresetDropdown();
+                            }
+                        },
+                        error: function() { alert('Save failed'); }
+                    });
+                }
+            } else { alert('Save failed'); }
+        }
+    });
+}
+
+function _aoLoadPreset() {
+    var dd = document.getElementById("ao_preset_dropdown");
+    var name = dd ? dd.value : '';
+    if (!name) { alert('Select a preset first'); return; }
+    $.ajax({
+        url: "/order-presets/load",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({ name: name }),
+        success: function(doc) {
+            _aoApplySettings(doc.settings);
+            var cb = document.getElementById("ao_preset_default");
+            if (cb) cb.checked = !!(doc.meta && doc.meta.isDefault);
+        },
+        error: function() { alert('Failed to load preset'); }
+    });
+}
+
+function _aoDeletePreset() {
+    var dd = document.getElementById("ao_preset_dropdown");
+    var name = dd ? dd.value : '';
+    if (!name) { alert('Select a preset first'); return; }
+    if (!confirm("Delete auto-order preset '" + name.replace(/^ao_/, "") + "'?")) return;
+    $.ajax({
+        url: "/order-presets/delete",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({ name: name }),
+        success: function(r) {
+            if (r && r.ok) {
+                alert('Preset deleted');
+                _aoRefreshPresetDropdown();
+            }
+        },
+        error: function() { alert('Delete failed'); }
+    });
+}
+
+function _aoLoadDefaultPreset() {
+    $.get("/order-presets/list").done(function(resp) {
+        var presets = (resp && resp.presets) ? resp.presets : [];
+        var def = presets.find(function(p) { return p.isDefault && p.name && p.name.indexOf("ao_") === 0; });
+        if (def) {
+            $.ajax({
+                url: "/order-presets/load",
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify({ name: def.name }),
+                success: function(doc) {
+                    _aoApplySettings(doc.settings);
+                    var dd = document.getElementById("ao_preset_dropdown");
+                    if (dd) dd.value = def.name;
+                    var cb = document.getElementById("ao_preset_default");
+                    if (cb) cb.checked = true;
+                }
+            });
+        }
+    });
+}
+
+// Compute entry price for auto-order based on settings & stock data
+function _aoCalcEntryPrice(ao, stockData) {
+    var lastPrice = parseFloat(stockData.close) || 0;
+    if (ao.entryType === "market") return 0;  // market order, no price needed
+    var mode = ao.priceMode;
+    var pct = parseFloat(ao.pricePct) || 0;
+    if (mode === "last") return lastPrice;
+    // For bid/ask modes, use last price as approximation (real bid/ask would need streaming data)
+    // The backend will handle dynamic pricing via the priceMode field
+    if (mode === "bid_minus_pct") return +(lastPrice * (1 - pct / 100)).toFixed(2);
+    if (mode === "bid_plus_pct") return +(lastPrice * (1 + pct / 100)).toFixed(2);
+    if (mode === "ask_minus_pct") return +(lastPrice * (1 - pct / 100)).toFixed(2);
+    if (mode === "ask_plus_pct") return +(lastPrice * (1 + pct / 100)).toFixed(2);
+    return lastPrice;
+}
+
+// Core: attempt auto-order for a matching stock
+function _aoSendOrder(ao, sym, stockData) {
+    var maxPerSym = parseInt(ao.maxPerSym) || 1;
+    var sentCount = _aoOrdersSent[sym] || 0;
+    if (sentCount >= maxPerSym) {
+        _aoLog(sym + ": skipped (max " + maxPerSym + " orders already sent)");
+        return;
+    }
+
+    var entryPrice = _aoCalcEntryPrice(ao, stockData);
+    var side = ao.side || "long";
+    var qty;
+    if (ao.qtyMode === 'dollars') {
+        var dollarAmt = parseFloat(ao.dollarAmt) || 100;
+        var priceForCalc = entryPrice > 0 ? entryPrice : (parseFloat(stockData.close) || 0);
+        qty = (priceForCalc > 0) ? Math.floor(dollarAmt / priceForCalc) : 0;
+        if (qty < 1) {
+            _aoLog(sym + ": skipped ($" + dollarAmt + " not enough for price $" + priceForCalc + ")");
+            return;
+        }
+    } else {
+        qty = parseInt(ao.quantity) || 1;
+    }
+
+    // Compute target & stop from entry price
+    var targetPct = parseFloat(ao.targetPct) || 0;
+    var stopPct = parseFloat(ao.stopPct) || 0;
+    var targetPrice = 0, stopPrice = 0;
+    if (ao.orderType === "bracket" && entryPrice > 0) {
+        if (side === "long") {
+            targetPrice = +(entryPrice * (1 + targetPct / 100)).toFixed(2);
+            stopPrice = +(entryPrice * (1 - stopPct / 100)).toFixed(2);
+        } else {
+            targetPrice = +(entryPrice * (1 - targetPct / 100)).toFixed(2);
+            stopPrice = +(entryPrice * (1 + stopPct / 100)).toFixed(2);
+        }
+    }
+
+    // Trailing stop: candle low mode uses lowOfDay from scan data
+    var useTrailingStop = ao.useTrailingStop ? "on" : "off";
+    var trailingAmount = "";
+    var trailingType = "amount";
+    if (ao.useTrailingStop) {
+        if (ao.trailMode === "candle_low") {
+            // Set trailing based on distance from entry to low of day
+            var lowOfDay = parseFloat(stockData.lowOfDay) || 0;
+            if (lowOfDay > 0 && entryPrice > 0) {
+                trailingAmount = Math.abs(entryPrice - lowOfDay).toFixed(2);
+            } else {
+                trailingAmount = parseFloat(ao.trailValue).toFixed(2);
+            }
+            trailingType = "amount";
+        } else {
+            trailingAmount = parseFloat(ao.trailValue).toFixed(2);
+            trailingType = ao.trailMode;  // "amount" or "percent"
+        }
+    }
+
+    var orderPayload = {
+        tickerOrder: sym,
+        limitPrice: entryPrice > 0 ? String(entryPrice) : "",
+        bracketlimit: ao.orderType || "bracket",
+        longshort: side,
+        highBraket: targetPrice > 0 ? String(targetPrice) : "",
+        lowBraket: stopPrice > 0 ? String(stopPrice) : "",
+        quantity: String(qty),
+        stoplosslimit: String(stopPct),
+        useTrailingStop: useTrailingStop,
+        trailingAmount: trailingAmount,
+        trailingType: trailingType,
+        tif: ao.tif || "DAY",
+        outsideRth: ao.session || "regular",
+        entryType: ao.entryType || "limit",
+        priceMode: ao.priceMode || "last",
+        pricePct: ao.pricePct || "0",
+    };
+
+    _aoLog(sym + ": sending " + side.toUpperCase() + " " + ao.entryType + " order (qty " + qty + " @ " + (entryPrice || "MKT") + ")...");
+
+    $.ajax({
+        url: "/sendorders",
+        data: orderPayload,
+        type: "POST",
+        dataType: "json",
+        success: function(resp) {
+            if (resp && resp.status === "ok") {
+                _aoOrdersSent[sym] = (sentCount + 1);
+                _aoLog(sym + ": ORDER SENT OK — " + (resp.sentOrders ? resp.sentOrders.length : 0) + " order(s)");
+            } else {
+                _aoLog(sym + ": ORDER FAILED — " + (resp.message || resp.Connection || "unknown error"));
+            }
+        },
+        error: function(xhr, status, err) {
+            _aoLog(sym + ": ORDER ERROR — " + (err || "server unreachable"));
+        }
+    });
+}
+
+// Check time window
+function _aoInTimeWindow(ao) {
+    var now = new Date();
+    var h = now.getHours();
+    var m = now.getMinutes();
+    var nowMins = h * 60 + m;
+    var startMins = (parseInt(ao.startHour) || 0) * 60 + (parseInt(ao.startMin) || 0);
+    var stopMins = (parseInt(ao.stopHour) || 0) * 60 + (parseInt(ao.stopMin) || 0);
+    return nowMins >= startMins && nowMins < stopMins;
+}
+
+// Check if a symbol passes the stock filter
+function _aoPassesFilter(ao, sym) {
+    if (ao.stockFilter === "none") return false;
+    if (ao.stockFilter === "all") return true;
+    if (ao.stockFilter === "selected") {
+        var list = (ao.selectedStocks || "").split(",").map(function(s) { return s.trim().toUpperCase(); }).filter(Boolean);
+        return list.indexOf(sym.toUpperCase()) !== -1;
+    }
+    return false;
+}
+
+// Main auto-order processor: called from scan response handler
+function _aoProcessScanResults(msg) {
+    var ao = _aoGetSettings();
+    if (!ao.enabled) return;
+    if (!_aoInTimeWindow(ao)) {
+        _aoLog("Outside time window (" + ao.startHour + ":" + (ao.startMin < 10 ? "0" : "") + ao.startMin + " - " + ao.stopHour + ":" + (ao.stopMin < 10 ? "0" : "") + ao.stopMin + ") — skipping");
+        return;
+    }
+
+    for (var groupKey in msg) {
+        var rows = Array.isArray(msg[groupKey]) ? msg[groupKey] : Object.values(msg[groupKey] || {});
+        for (var i = 0; i < rows.length; i++) {
+            var dta = rows[i];
+            var pc = dta.passCount || 0;
+            var tc = dta.totalCount || 0;
+            var sym = dta.symbol || dta.cusip || "";
+            if (!sym) continue;
+
+            // Only auto-send when ALL conditions met
+            if (tc > 0 && pc === tc) {
+                if (_aoPassesFilter(ao, sym)) {
+                    _aoSendOrder(ao, sym, dta);
+                }
+            }
+        }
+    }
+}
+
+// Initialize auto-order panel on page load
+$(function() {
+    _aoRefreshPresetDropdown();
+    _aoLoadDefaultPreset();
+});
 
 
 
@@ -2371,10 +3834,15 @@ const BG_RESULTS_POLL_MS = {{ cfg_dict.get("bg_results_poll_ms", 5000) | int }};
       // find each generated table
       $("#add1 table").each(function(){
         $(this).find("tbody tr").each(function(){
-          // first two <td>s are Ticker / Cusip (guarded)
-          const tds = $(this).find("td");
+          // Skip news rows (they contain nested tables with headlines)
+          if (this.id && this.id.startsWith("newsRow_")) return;
+          // Use > td to get only direct child tds (not nested news table tds)
+          const tds = $(this).children("td");
           if (tds.length < 2) return;
-          const ticker = tds.eq(0).text().trim();
+          // Clone the first td and remove the news arrow span to get clean ticker text
+          const tickerTd = tds.eq(0).clone();
+          tickerTd.find(".news-arrow-sym").remove();
+          const ticker = tickerTd.text().trim();
           const cusip  = tds.eq(1).text().trim();
           if (!ticker) return;
           // avoid duplicates
@@ -3040,9 +4508,15 @@ function buildSecuritiesFromResultsDOM() {
   try {
     $("#add1 table").each(function(){
       $(this).find("tbody tr").each(function(){
-        const tds = $(this).find("td");
+        // Skip news rows (they contain nested tables with headlines)
+        if (this.id && this.id.startsWith("newsRow_")) return;
+        // Use > td to get only direct child tds (not nested news table tds)
+        const tds = $(this).children("td");
         if (tds.length < 2) return;
-        const ticker = tds.eq(0).text().trim();
+        // Clone the first td and remove the news arrow span to get clean ticker text
+        const tickerTd = tds.eq(0).clone();
+        tickerTd.find(".news-arrow-sym").remove();
+        const ticker = tickerTd.text().trim();
         const cusip  = tds.eq(1).text().trim();
         if (!ticker) return;
         if (!securities.ticker.includes(ticker)) securities.ticker.push(ticker);

@@ -344,22 +344,22 @@ table[id^="responsive-data-table"] {
     width: 100%;
     border-collapse: collapse;
     border-spacing: 0;
-    font-size: 7px;
+    font-size: 10.5px;
     font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
     table-layout: auto;
 }
 
 .data-table-wrapper table th,
 .data-table-wrapper table td {
-    padding: 1px 2px;
+    padding: 1px 3px;
     white-space: nowrap;
     border-bottom: 1px solid #d0d7de;
     border-right: 1px solid #e8e8e8;
     overflow: hidden;
     text-overflow: ellipsis;
     color: #1f2328;
-    font-size: 7px;
-    line-height: 1.1;
+    font-size: 10.5px;
+    line-height: 1.15;
 }
 
 /* --- Sticky header row --- */
@@ -370,7 +370,7 @@ table[id^="responsive-data-table"] {
     background: #f6f8fa;
     color: #1f2328;
     font-weight: 600;
-    font-size: 6.5px;
+    font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0px;
     border-bottom: 1px solid #d0d7de;
@@ -386,8 +386,8 @@ table[id^="responsive-data-table"] {
     z-index: 10;
     background: #ffffff;
     border-right: 2px solid #d0d7de;
-    min-width: 30px;
-    max-width: 50px;
+    min-width: 40px;
+    max-width: 60px;
 }
 
 .data-table-wrapper thead th.sticky-col {

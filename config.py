@@ -22,6 +22,7 @@ class Config:
 
         self.setups_dir = Path(flask_section.get("setups_dir", "setups"))
         self.watchlists_dir = Path(flask_section.get("watchlists_dir", "watchlists"))
+        self.order_presets_dir = Path(flask_section.get("order_presets_dir", "order_presets"))
 
         ibkr_section = config["IBKR"] if "IBKR" in config else {}
 

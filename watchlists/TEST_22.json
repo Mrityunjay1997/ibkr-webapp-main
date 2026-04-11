@@ -1,0 +1,16 @@
+{
+  "meta": {
+    "title": "TEST 22",
+    "created_at": "2026-04-09T10:27:15.501465+00:00"
+  },
+  "tickers": [
+    {
+      "ticker": "TSLA",
+      "cusip": "custom0"
+    },
+    {
+      "ticker": "META",
+      "cusip": "custom1"
+    }
+  ]
+}

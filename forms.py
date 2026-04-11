@@ -298,6 +298,32 @@ class Parameters(FlaskForm):
         choices=_STANDARD_COMPARISON_CHOICES,
     )
 
+    # ------------------------------------------------------------------
+    # 2nd Pullback Retracement
+    # ------------------------------------------------------------------
+
+    PullbackPct2 = IntegerField("2nd Pullback Retracement")
+    PercentagePullbackPct2 = DecimalField("2nd Pullback Retracement %")
+    PercentagePullbackPct2_1 = DecimalField("2nd Pullback Retracement %1")
+
+    ComparisonPullbackPct2 = SelectField(
+        "2nd Pullback Retracement",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
+    # ------------------------------------------------------------------
+    # Fibonacci Gap (daily gap vs Fib retracement levels)
+    # ------------------------------------------------------------------
+
+    FibGap = IntegerField("Fibonacci Gap")
+    PercentageFibGap = DecimalField("Fibonacci Gap %")
+    PercentageFibGap1 = DecimalField("Fibonacci Gap %1")
+
+    ComparisonFibGap = SelectField(
+        "Fibonacci Gap",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
     ComparisonPivotPoint = SelectField(
         "Programming Language",
         choices=_STANDARD_COMPARISON_CHOICES,
@@ -355,6 +381,8 @@ class Parameters(FlaskForm):
     HighOfDay_tf = SelectField("High Of Day Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     HighOfDay1_tf = SelectField("High Of Day1 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
 
+    Volume_tf = SelectField("Volume Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    Volume1_tf = SelectField("Volume1 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     averageVolume_tf = SelectField("Average Volume Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     averageVolume1_tf = SelectField("Average Volume1 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     relativeVolume_tf = SelectField("Relative Volume Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
@@ -393,6 +421,14 @@ class Parameters(FlaskForm):
     # Average volume configuration
     # ------------------------------------------------------------------
 
+    Volume = IntegerField("Volume")
+    PercentageVolume = DecimalField("Percentage Volume")
+
+    ComparisonVolume = SelectField(
+        "Volume",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
     AverageVolume = IntegerField("Average Volume")
     PercentageAverageVolume = DecimalField("Percentage Average Volume")
 
@@ -410,6 +446,19 @@ class Parameters(FlaskForm):
 
     ComparisonRelativeVolume = SelectField(
         "Programming Language",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
+    # ------------------------------------------------------------------
+    # Market Cap (in millions, from IBKR fundamental ratios)
+    # ------------------------------------------------------------------
+
+    MarketCap = IntegerField("Market Cap")
+    PercentageMarketCap = DecimalField("Market Cap Threshold")
+    PercentageMarketCap1 = DecimalField("Market Cap Threshold1")
+
+    ComparisonMarketCap = SelectField(
+        "Market Cap",
         choices=_STANDARD_COMPARISON_CHOICES,
     )
 
@@ -501,6 +550,12 @@ class Parameters(FlaskForm):
         default="value",
     )
 
+    VolumeBool = RadioField(
+        "",
+        choices=[("percentage", "%"), ("value", "val")],
+        default="value",
+    )
+
     averageVolumeBool = RadioField(
         "",
         choices=[("percentage", "%"), ("value", "val")],
@@ -546,10 +601,20 @@ class Parameters(FlaskForm):
         choices=[
             ("minutes", "Minutes"),
             ("hours", "Hours"),
+            ("days", "Days"),
         ],
         default="minutes",
     )
     NewsExcludePublishers = StringField("Exclude Publishers")
+    NewsKeywords = StringField("News Keywords")
+    NewsReadAloud = SelectField(
+        "Read Headlines Aloud",
+        choices=[
+            ("off", "Off"),
+            ("on", "On"),
+        ],
+        default="off",
+    )
 
     # ------------------------------------------------------------------
     # ETF processing mode

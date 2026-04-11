@@ -31,6 +31,7 @@ logger = logging.getLogger("ibkr_app")
 cfg = Config()
 cfg.setups_dir.mkdir(exist_ok=True)
 cfg.watchlists_dir.mkdir(exist_ok=True)
+cfg.order_presets_dir.mkdir(exist_ok=True)
 
 
 # -----------------------------------------------------------------------------
@@ -468,6 +469,12 @@ def sendorders():
         high_bracket = asset["highBraket"]
         low_bracket = asset["lowBraket"]
         quantity = int(asset["quantity"])
+        use_trailing_stop = asset.get("useTrailingStop", "off") == "on"
+        trailing_amount = asset.get("trailingAmount", "")
+        trailing_type = asset.get("trailingType", "amount")  # "amount" or "percent"
+        tif = asset.get("tif", "DAY")  # DAY, GTC
+        outside_rth = asset.get("outsideRth", "regular")  # regular, extended, overnight
+        entry_type = asset.get("entryType", "limit")  # "limit" or "market"
 
         # ------------------------------------------------------------
         # Resolve contract via symbol lookup
@@ -519,7 +526,30 @@ def sendorders():
         # ------------------------------------------------------------
         # Build orders
         # ------------------------------------------------------------
-        if bracket_limit == "bracket":
+        trailing_amt = None
+        if use_trailing_stop and trailing_amount:
+            trailing_amt = round(float(trailing_amount), 2)
+
+        # outsideRth mapping
+        allow_outside_rth = outside_rth in ("extended", "overnight")
+
+        if entry_type == "market":
+            # Market order — no limit price, optional bracket legs
+            from ibapi.order import Order as IBOrder
+            orders = []
+            parent = IBOrder()
+            parent.eTradeOnly = False
+            parent.firmQuoteOnly = False
+            parent.orderId = orders_id
+            parent.action = action
+            parent.orderType = "MKT"
+            parent.totalQuantity = quantity
+            parent.tif = tif
+            parent.outsideRth = allow_outside_rth
+            parent.transmit = True
+            orders.append(parent)
+
+        elif bracket_limit == "bracket":
 
             price_to_use = round(float(limit_price), 2) if limit_price != "" else None
             bracket_high = round(float(high_bracket), 2) if high_bracket != "" else None
@@ -532,6 +562,11 @@ def sendorders():
                 price_to_use,
                 bracket_high,
                 bracket_low,
+                tif=tif,
+                outside_rth=allow_outside_rth,
+                use_trailing_stop=use_trailing_stop,
+                trailing_amount=trailing_amt,
+                trailing_percent=(trailing_type == "percent"),
             )
 
         else:
@@ -544,6 +579,8 @@ def sendorders():
                 price_to_use,
                 None,
                 None,
+                tif=tif,
+                outside_rth=allow_outside_rth,
             )
 
         # ------------------------------------------------------------
@@ -838,6 +875,146 @@ def watchlists_delete():
     except Exception as e:
         logger.exception("Failed to delete watchlist: %s", e)
         return jsonify({"error": "failed to delete watchlist"}), 500
+
+
+# -------------------------------------------------------------------------
+# Order Presets
+# -------------------------------------------------------------------------
+
+def _order_preset_path(name: str) -> Path:
+    return cfg.order_presets_dir / (_sanitize_name(name) + ".json")
+
+
+def list_order_presets():
+    out = []
+    if not cfg.order_presets_dir.exists():
+        return out
+    for p in sorted(cfg.order_presets_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+        if p.is_file() and p.suffix == ".json":
+            try:
+                with p.open("r", encoding="utf-8") as fh:
+                    doc = json.load(fh)
+                    meta = doc.get("meta", {})
+            except Exception:
+                meta = {}
+            out.append({
+                "name": p.stem,
+                "title": meta.get("title") or p.stem,
+                "isDefault": meta.get("isDefault", False),
+            })
+    return out
+
+
+@app.route("/order-presets/list", methods=["GET"])
+def order_presets_list():
+    try:
+        return jsonify({"presets": list_order_presets()}), 200
+    except Exception as e:
+        logger.exception("Failed to list order presets: %s", e)
+        return jsonify({"error": "failed to list order presets"}), 500
+
+
+@app.route("/order-presets/save", methods=["POST"])
+def order_presets_save():
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"error": "JSON payload required"}), 400
+
+        name = payload.get("name", "").strip()
+        overwrite = bool(payload.get("overwrite", False))
+        settings = payload.get("settings", {})
+        is_default = bool(payload.get("isDefault", False))
+
+        if not name:
+            return jsonify({"error": "name is required"}), 400
+
+        safe = _sanitize_name(name)
+        p = _order_preset_path(safe)
+        if p.exists() and not overwrite:
+            return jsonify({"error": "preset already exists", "exists": True}), 409
+
+        # If setting as default, clear default flag from all others
+        if is_default:
+            for op in cfg.order_presets_dir.iterdir():
+                if op.is_file() and op.suffix == ".json":
+                    try:
+                        with op.open("r", encoding="utf-8") as fh:
+                            doc = json.load(fh)
+                        if doc.get("meta", {}).get("isDefault"):
+                            doc["meta"]["isDefault"] = False
+                            with op.open("w", encoding="utf-8") as fh:
+                                json.dump(doc, fh, ensure_ascii=False, indent=2)
+                    except Exception:
+                        pass
+
+        doc = {
+            "meta": {
+                "title": name,
+                "created_at": datetime.now(UTC).isoformat(),
+                "isDefault": is_default,
+            },
+            "settings": settings,
+        }
+
+        with p.open("w", encoding="utf-8") as fh:
+            json.dump(doc, fh, ensure_ascii=False, indent=2)
+
+        logger.info("Saved order preset: %s -> %s", name, p)
+        return jsonify({"ok": True, "name": safe}), 200
+
+    except Exception as e:
+        logger.exception("Failed to save order preset: %s", e)
+        return jsonify({"error": "failed to save order preset"}), 500
+
+
+@app.route("/order-presets/load", methods=["POST"])
+def order_presets_load():
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"error": "JSON payload required"}), 400
+        name = payload.get("name", "").strip()
+        if not name:
+            return jsonify({"error": "name required"}), 400
+
+        safe = _sanitize_name(name)
+        p = _order_preset_path(safe)
+        if not p.exists():
+            return jsonify({"error": "not found"}), 404
+
+        with p.open("r", encoding="utf-8") as fh:
+            doc = json.load(fh)
+
+        return jsonify(doc), 200
+
+    except Exception as e:
+        logger.exception("Failed to load order preset: %s", e)
+        return jsonify({"error": "failed to load order preset"}), 500
+
+
+@app.route("/order-presets/delete", methods=["POST"])
+def order_presets_delete():
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"error": "JSON payload required"}), 400
+        name = payload.get("name", "").strip()
+        if not name:
+            return jsonify({"error": "name required"}), 400
+
+        safe = _sanitize_name(name)
+        p = _order_preset_path(safe)
+        if not p.exists():
+            return jsonify({"error": "not found"}), 404
+
+        p.unlink()
+        logger.info("Deleted order preset: %s", safe)
+        return jsonify({"ok": True}), 200
+
+    except Exception as e:
+        logger.exception("Failed to delete order preset: %s", e)
+        return jsonify({"error": "failed to delete order preset"}), 500
 
 
 # -------------------------------------------------------------------------
