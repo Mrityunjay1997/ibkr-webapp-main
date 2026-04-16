@@ -312,6 +312,106 @@ class Parameters(FlaskForm):
     )
 
     # ------------------------------------------------------------------
+    # Fibonacci Pullback (retracement levels on intraday/session moves)
+    # ------------------------------------------------------------------
+    # Fibonacci pullback checks if price is near Fib retracement levels
+    # of the move from previous close to session high
+    # Can select specific Fib level (38.2%, 50%, 61.8%, 78.6%)
+    # and tolerance percentage
+
+    FibPullbackLevel = SelectField(
+        "Fib Level",
+        choices=[
+            ("38.2", "38.2%"),
+            ("50.0", "50.0%"),
+            ("61.8", "61.8%"),
+            ("78.6", "78.6%"),
+        ],
+        default="61.8",
+    )
+
+    FibPullback = DecimalField("Fib Pullback Tolerance %")
+    PercentageFibPullback = DecimalField("Fib Pullback Within %")
+    PercentageFibPullback1 = DecimalField("Fib Pullback Within %1")
+
+    ComparisonFibPullback = SelectField(
+        "Fib Pullback",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
+    FibPullback_tf = SelectField(
+        "Fib Pullback TF",
+        choices=[],
+        default="1 day",
+    )
+
+    # ------------------------------------------------------------------
+    # Gap Pullback (intraday pullback to overnight gap Fib levels)
+    # ------------------------------------------------------------------
+    # Gap Pullback checks if intraday price is near Fib retracement levels
+    # of the overnight gap (open - previous close)
+    # Can select specific Fib level (38.2%, 50%, 61.8%, 78.6%)
+    # and tolerance percentage
+
+    GapPullbackLevel = SelectField(
+        "Gap Level",
+        choices=[
+            ("38.2", "38.2%"),
+            ("50.0", "50.0%"),
+            ("61.8", "61.8%"),
+            ("78.6", "78.6%"),
+        ],
+        default="61.8",
+    )
+
+    GapPullback = DecimalField("Gap Pullback Tolerance %")
+    PercentageGapPullback = DecimalField("Gap Pullback Within %")
+    PercentageGapPullback1 = DecimalField("Gap Pullback Within %1")
+
+    ComparisonGapPullback = SelectField(
+        "Gap Pullback",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
+    GapPullback_tf = SelectField(
+        "Gap Pullback TF",
+        choices=[],
+        default="1 min",
+    )
+
+    # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Up Gap (daily gap up from previous close 9:30 AM - 4 PM EST)
+    # ------------------------------------------------------------------
+    # Measures how much a stock gaps UP from previous close as %
+    # Perfect for finding gap-up plays that may pullback
+    # Uses only regular trading hours (9:30 AM - 4 PM EST)
+
+    UpGap = IntegerField("Up Gap")
+    PercentageUpGap = DecimalField("Up Gap %")
+    PercentageUpGap1 = DecimalField("Up Gap %1")
+
+    ComparisonUpGap = SelectField(
+        "Up Gap",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
+    # ------------------------------------------------------------------
+    # Down Gap (daily gap down from previous close 9:30 AM - 4 PM EST)
+    # ------------------------------------------------------------------
+    # Measures how much a stock gaps DOWN from previous close as %
+    # Perfect for finding gap-down stocks for reversal plays
+    # Uses only regular trading hours (9:30 AM - 4 PM EST)
+
+    DownGap = IntegerField("Down Gap")
+    PercentageDownGap = DecimalField("Down Gap %")
+    PercentageDownGap1 = DecimalField("Down Gap %1")
+
+    ComparisonDownGap = SelectField(
+        "Down Gap",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
     # Fibonacci Gap (daily gap vs Fib retracement levels)
     # ------------------------------------------------------------------
 
@@ -390,6 +490,14 @@ class Parameters(FlaskForm):
 
     Cross50SMA_tf = SelectField("Cross 50 SMA Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     Cross200SMA_tf = SelectField("Cross 200 SMA Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+
+    BreakHigh_tf = SelectField("Break High Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    PullbackPct_tf = SelectField("Pullback Retracement Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    PullbackPct2_tf = SelectField("2nd Pullback Retracement Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    UpGap_tf = SelectField("Up Gap Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    DownGap_tf = SelectField("Down Gap Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    FibGap_tf = SelectField("Fibonacci Gap Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    Pivot_tf = SelectField("Pivot Point Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
 
     # ------------------------------------------------------------------
     # Price level comparisons
@@ -614,6 +722,15 @@ class Parameters(FlaskForm):
             ("on", "On"),
         ],
         default="off",
+    )
+    NewsAutoReadAll = SelectField(
+        "Auto-Read All News",
+        choices=[
+            ("off", "Off"),
+            ("on", "On"),
+        ],
+        default="off",
+        render_kw={"title": "Automatically read all news headlines aloud after results are returned"}
     )
 
     # ------------------------------------------------------------------

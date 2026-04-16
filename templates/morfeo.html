@@ -647,7 +647,9 @@
 										</tr>
 										<tr>
 											<th style="padding:10px">Break High</th>
-											<td>&nbsp;</td>
+											<td style="padding:10px">
+												<div id="tf_breakHigh">{{ Param.BreakHigh_tf(class_="BreakHigh_tf") }}</div>
+											</td>
 											<td style="padding:10px"><div id="changeBreakHigh">{{ Param.BreakHigh(class_="BreakHigh", value='5') }}</div></td>
 											<td style="padding:10px">{{ Param.ComparisonBreakHigh(class_="ComparisonBreakHigh") }}</td>
 											<td style="padding:10px"><div id="percentageBreakHigh">{{ Param.PercentageBreakHigh(class_="PercentageBreakHigh", value='0') }}</div></td>
@@ -661,7 +663,9 @@
 										</tr>
 										<tr>
 											<th style="padding:10px">Pullback Retracement</th>
-											<td>&nbsp;</td>
+											<td style="padding:10px">
+												<div id="tf_pullbackPct">{{ Param.PullbackPct_tf(class_="PullbackPct_tf") }}</div>
+											</td>
 											<td style="padding:10px"><div id="changePullbackPct">{{ Param.PullbackPct(class_="PullbackPct", value='0') }}</div></td>
 											<td style="padding:10px">{{ Param.ComparisonPullbackPct(class_="ComparisonPullbackPct") }}</td>
 											<td style="padding:10px"><div id="percentagePullbackPct">{{ Param.PercentagePullbackPct(class_="PercentagePullbackPct", value='0') }}</div></td>
@@ -669,18 +673,72 @@
 										</tr>
 										<tr>
 											<th style="padding:10px">2nd Pullback</th>
-											<td>&nbsp;</td>
+											<td style="padding:10px">
+												<div id="tf_pullbackPct2">{{ Param.PullbackPct2_tf(class_="PullbackPct2_tf") }}</div>
+											</td>
 											<td style="padding:10px"><div id="changePullbackPct2"><div id="nchangeinput14">{{ Param.PullbackPct2(class_="PullbackPct2", value='0') }}</div></div></td>
 											<td style="padding:10px">{{ Param.ComparisonPullbackPct2(class_="ComparisonPullbackPct2") }}</td>
 											<td style="padding:10px"><div id="percentagePullbackPct2"><div id="changeinput14">{{ Param.PercentagePullbackPct2(class_="PercentagePullbackPct2", value='0') }}</div></div></td>
 											<td>&nbsp;</td>
 										</tr>
 										<tr>
-											<th style="padding:10px">Fibonacci Gap</th>
+											<th style="padding:10px">Fib Pullback %</th>
+											<td style="padding:10px">
+												<div id="tf_fibPullback">{{ Param.FibPullback_tf(class_="FibPullback_tf") }}</div>
+											</td>
+											<td style="padding:10px">
+												<div style="display: flex; gap: 8px;">
+													<div>{{ Param.FibPullbackLevel(class_="FibPullbackLevel", style="width:100px") }}</div>
+													<div style="flex: 1;"><div id="changeFibPullback">{{ Param.FibPullback(class_="FibPullback", value='0', style="width:100%") }}</div></div>
+												</div>
+											</td>
+											<td style="padding:10px">{{ Param.ComparisonFibPullback(class_="ComparisonFibPullback") }}</td>
+											<td style="padding:10px"><div id="percentageFibPullback"><div id="changeinput_fibpullback">{{ Param.PercentageFibPullback(class_="PercentageFibPullback", value='5') }}</div></div></td>
 											<td>&nbsp;</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Gap Pullback %</th>
+											<td style="padding:10px">
+												<div id="tf_gapPullback">{{ Param.GapPullback_tf(class_="GapPullback_tf") }}</div>
+											</td>
+											<td style="padding:10px">
+												<div style="display: flex; gap: 8px;">
+													<div>{{ Param.GapPullbackLevel(class_="GapPullbackLevel", style="width:100px") }}</div>
+													<div style="flex: 1;"><div id="changeGapPullback">{{ Param.GapPullback(class_="GapPullback", value='0', style="width:100%") }}</div></div>
+												</div>
+											</td>
+											<td style="padding:10px">{{ Param.ComparisonGapPullback(class_="ComparisonGapPullback") }}</td>
+											<td style="padding:10px"><div id="percentageGapPullback"><div id="changeinput_gappullback">{{ Param.PercentageGapPullback(class_="PercentageGapPullback", value='5') }}</div></div></td>
+											<td>&nbsp;</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Fibonacci Gap</th>
+											<td style="padding:10px">
+												<div id="tf_fibGap">{{ Param.FibGap_tf(class_="FibGap_tf") }}</div>
+											</td>
 											<td style="padding:10px"><div id="changeFibGap"><div id="nchangeinput15">{{ Param.FibGap(class_="FibGap", value='0') }}</div></div></td>
 											<td style="padding:10px">{{ Param.ComparisonFibGap(class_="ComparisonFibGap") }}</td>
 											<td style="padding:10px"><div id="percentageFibGap"><div id="changeinput15">{{ Param.PercentageFibGap(class_="PercentageFibGap", value='5') }}</div></div></td>
+											<td>&nbsp;</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Up Gap %</th>
+											<td style="padding:10px">
+												<div id="tf_upGap">{{ Param.UpGap_tf(class_="UpGap_tf") }}</div>
+											</td>
+											<td style="padding:10px"><div id="changeUpGap"><div id="nchangeinput_upgap">{{ Param.UpGap(class_="UpGap", value='0') }}</div></div></td>
+											<td style="padding:10px">{{ Param.ComparisonUpGap(class_="ComparisonUpGap") }}</td>
+											<td style="padding:10px"><div id="percentageUpGap"><div id="changeinput_upgap">{{ Param.PercentageUpGap(class_="PercentageUpGap", value='5') }}</div></div></td>
+											<td>&nbsp;</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Down Gap %</th>
+											<td style="padding:10px">
+												<div id="tf_downGap">{{ Param.DownGap_tf(class_="DownGap_tf") }}</div>
+											</td>
+											<td style="padding:10px"><div id="changeDownGap"><div id="nchangeinput_downgap">{{ Param.DownGap(class_="DownGap", value='0') }}</div></div></td>
+											<td style="padding:10px">{{ Param.ComparisonDownGap(class_="ComparisonDownGap") }}</td>
+											<td style="padding:10px"><div id="percentageDownGap"><div id="changeinput_downgap">{{ Param.PercentageDownGap(class_="PercentageDownGap", value='5') }}</div></div></td>
 											<td>&nbsp;</td>
 										</tr>
 										<tr>
@@ -693,7 +751,9 @@
 										</tr>
 										<tr>
 											<th style="padding:10px">Pivot Point</th>
-											<td>&nbsp;</td>
+											<td style="padding:10px">
+												<div id="tf_pivot">{{ Param.Pivot_tf(class_="Pivot_tf") }}</div>
+											</td>
 											<td style="padding:10px"> <div id = "changePP"> {{ Param.PivotPoint(class_="PivotPoint") }} </div></td>
 											<td style="padding:10px">{{ Param.ComparisonPivotPoint(class_="ComparisonPivotPoint") }}</td>
 											<td style="padding:10px"><div id = "percentagePP"> {{ Param.PercentagePivotPoint(class_="PercentagePivotPoint", value = '0') }} </div> </td>
@@ -772,6 +832,10 @@
 										<tr>
 											<th style="padding:10px">Read Headlines Aloud</th>
 											<td style="padding:10px" colspan="4">{{ Param.NewsReadAloud(class_="NewsReadAloud") }}</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Auto-Read All News</th>
+											<td style="padding:10px" colspan="4">{{ Param.NewsAutoReadAll(class_="NewsAutoReadAll") }}</td>
 										</tr>
 									</tbody>
 								</table>
@@ -868,6 +932,28 @@
 							  </div>
 							</div>
 
+							<!-- News Article Modal -->
+							<div class="modal fade" id="newsArticleModal" tabindex="-1" role="dialog" aria-labelledby="newsArticleModalTitle" aria-hidden="true">
+							  <div class="modal-dialog modal-lg" role="document" style="max-width:900px;">
+							    <div class="modal-content" style="background:#fff;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
+							      <div class="modal-header" style="background:#fff;border-bottom:1px solid #e0e0e0;border-radius:10px 10px 0 0;padding:14px 20px;">
+							        <h5 class="modal-title" id="newsArticleModalTitle" style="font-size:16px;font-weight:700;color:#1f2328;">News Article</h5>
+							        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+							          <span aria-hidden="true">&times;</span>
+							        </button>
+							      </div>
+							      <div class="modal-body" style="background:#fff;padding:18px 20px;max-height:600px;overflow-y:auto;">
+							        <div id="newsArticleContent" style="color:#1f2328;line-height:1.6;">
+							          <div style="text-align:center;color:#888;">Loading article...</div>
+							        </div>
+							      </div>
+							      <div class="modal-footer" style="background:#fff;border-top:1px solid #e0e0e0;border-radius:0 0 10px 10px;padding:12px 20px;">
+							        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+							      </div>
+							    </div>
+							  </div>
+							</div>
+
 							<!-- ===== Auto-Order Panel ===== -->
 							<div class="ao-panel" id="ao_panel">
 								<div class="ao-panel-header">
@@ -940,8 +1026,19 @@
 											</select>
 										</div>
 										<div class="ao-field">
-											<label class="ao-label">Quantity</label>
+											<label class="ao-label">Quantity Mode</label>
+											<select id="ao_qty_mode" class="ao-select" onchange="_aoToggleQtyMode()">
+												<option value="shares" selected>Shares</option>
+												<option value="dollars">Dollar Amount</option>
+											</select>
+										</div>
+										<div class="ao-field ao-qty-shares-field">
+											<label class="ao-label">Quantity (Shares)</label>
 											<input type="number" id="ao_quantity" class="ao-input" value="1" min="1" step="1">
+										</div>
+										<div class="ao-field ao-qty-dollars-field" style="display:none;">
+											<label class="ao-label">Amount ($)</label>
+											<input type="number" id="ao_dollar_amt" class="ao-input" value="100" min="10" step="1">
 										</div>
 										<div class="ao-field">
 											<label class="ao-label">Entry Type</label>
@@ -1058,6 +1155,48 @@
 					            } catch(e) {
 					                alert('Could not bring IBKR TWS to foreground. Make sure TWS is running.');
 					            }
+					        }
+					    });
+					}
+
+					function openNewsArticleModal(provider, articleId) {
+					    // Show modal with loading state
+					    $('#newsArticleModal').modal('show');
+					    $('#newsArticleContent').html('<div style="text-align:center;color:#888;">Loading article...</div>');
+
+					    // Fetch article from backend
+					    $.ajax({
+					        url: '/news/article',
+					        type: 'GET',
+					        data: {
+					            provider: provider,
+					            articleId: articleId
+					        },
+					        dataType: 'json',
+					        success: function(data) {
+					            var articleText = data.articleText || '';
+					            var articleType = data.articleType || 0;
+
+					            // If HTML article, wrap in styled container; if plain text, escape and wrap in <pre>
+					            var displayHtml = '';
+					            if (articleType === 1) {
+					                // HTML content
+					                displayHtml = '<div style="font-size:14px;color:#1f2328;line-height:1.6;">' + articleText + '</div>';
+					            } else {
+					                // Plain text - escape and use <pre> for formatting
+					                var escaped = $('<div/>').text(articleText).html();
+					                displayHtml = '<pre style="font-size:14px;color:#1f2328;line-height:1.6;white-space:pre-wrap;word-wrap:break-word;font-family:\'Segoe UI\', sans-serif;">' + escaped + '</pre>';
+					            }
+
+					            $('#newsArticleContent').html(displayHtml);
+					        },
+					        error: function(xhr) {
+					            var errorMsg = 'Failed to load article.';
+					            try {
+					                var resp = JSON.parse(xhr.responseText);
+					                if (resp.error) errorMsg = resp.error;
+					            } catch(e) {}
+					            $('#newsArticleContent').html('<div style="color:#d32f2f;font-size:14px;padding:10px;background:#ffebee;border-radius:4px;">' + errorMsg + '</div>');
 					        }
 					    });
 					}
@@ -1266,6 +1405,26 @@
         osc.stop(now + i*0.1 + 0.08);
       }
     } catch(e){ console.warn("news keyword beep failed", e); }
+  }
+
+  // Car horn beep for Fibonacci Pullback — loud, attention-grabbing pattern
+  function playBeepCarHorn(){
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = ctx.currentTime;
+      const pattern = [180, 150, 180, 150]; // Deep horn tones
+      for (let i=0; i<pattern.length; i++){
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = pattern[i];
+        gain.gain.value = 0.25; // louder than other beeps
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + i*0.15);
+        osc.stop(now + i*0.15 + 0.12);
+      }
+    } catch(e){ console.warn("car horn beep failed", e); }
   }
 
   // TTS: read headline text aloud
@@ -1502,10 +1661,22 @@ function renderResultsFromBackend(response) {
                     if ("pullbackPct1" in dta) headerCols.push({ key: "pullbackPct1", label: "Pullback %1" });
                     if ("pullbackPct2" in dta) headerCols.push({ key: "pullbackPct2", label: "2nd Pullback %" });
                     if ("pullbackPct2_1" in dta) headerCols.push({ key: "pullbackPct2_1", label: "2nd Pullback %1" });
+                    if ("fibPullback" in dta) headerCols.push({ key: "fibPullback", label: "Fib Pb%", vrKey: "fibPullback" });
+                    if ("fibPullback1" in dta) headerCols.push({ key: "fibPullback1", label: "Fib Pb%1" });
+                    if ("fibPullbackLevel" in dta) headerCols.push({ key: "fibPullbackLevel", label: "Fib Pb Level" });
+                    if ("fibPullbackMoveSize" in dta) headerCols.push({ key: "fibPullbackMoveSize", label: "Move Size" });
+                    if ("gapPullback" in dta) headerCols.push({ key: "gapPullback", label: "Gap Pb%", vrKey: "gapPullback" });
+                    if ("gapPullback1" in dta) headerCols.push({ key: "gapPullback1", label: "Gap Pb%1" });
+                    if ("gapPullbackLevel" in dta) headerCols.push({ key: "gapPullbackLevel", label: "Gap Pb Level" });
+                    if ("gapPullbackSize" in dta) headerCols.push({ key: "gapPullbackSize", label: "Gap Size" });
                     if ("fibGap" in dta) headerCols.push({ key: "fibGap", label: "Fib Gap %", vrKey: "fibGap" });
                     if ("fibGap1" in dta) headerCols.push({ key: "fibGap1", label: "Fib Gap %1" });
                     if ("fibGapLevel" in dta) headerCols.push({ key: "fibGapLevel", label: "Fib Level" });
                     if ("fibGapDir" in dta) headerCols.push({ key: "fibGapDir", label: "Gap Dir" });
+                    if ("upGap" in dta) headerCols.push({ key: "upGap", label: "Up Gap %", vrKey: "upGap" });
+                    if ("upGap1" in dta) headerCols.push({ key: "upGap1", label: "Up Gap %1" });
+                    if ("downGap" in dta) headerCols.push({ key: "downGap", label: "Down Gap %", vrKey: "downGap" });
+                    if ("downGap1" in dta) headerCols.push({ key: "downGap1", label: "Down Gap %1" });
                     if ("marketCap" in dta) headerCols.push({ key: "marketCap", label: "Mkt Cap (M)", raw: true, vrKey: "marketCap" });
                     if ("marketCap1" in dta) headerCols.push({ key: "marketCap1", label: "Mkt Cap1 (M)", raw: true });
                     if ("cross50SMA_value" in dta) headerCols.push({ key: "cross50SMA_value", label: "50 SMA", vrKey: "cross50SMA_val" });
@@ -1562,7 +1733,13 @@ function renderResultsFromBackend(response) {
                         const stickyClass = (cd.key === 'symbol') ? ' sticky-col' : '';
                         const hiddenClass = hiddenCols[cd.key] ? ' col-hidden' : '';
                         let label = cd.label;
-                        headerHtml += `<th class='${stickyClass}${hiddenClass}' data-col='${cd.key}' data-col-idx='${colIdx}' draggable='true'>${label}</th>`;
+                        // Split label across 2 lines: first word on line 1, rest on line 2
+                        const parts = label.trim().split(/\s+/);
+                        let displayLabel = label;
+                        if (parts.length > 1) {
+                            displayLabel = parts[0] + '<br>' + parts.slice(1).join(' ');
+                        }
+                        headerHtml += `<th class='${stickyClass}${hiddenClass}' data-col='${cd.key}' data-col-idx='${colIdx}' draggable='true' style='white-space: normal; text-align: center; padding: 8px 4px;'>${displayLabel}</th>`;
                         colIdx++;
                     }
                     headerHtml += "</tr></thead><tbody>";
@@ -1742,7 +1919,7 @@ function renderResultsFromBackend(response) {
                             const escHl = (ni.headline || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
                             const escProv = (ni.provider || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
                             const escTime = displayTime.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-                            const articleLink = `<a href='javascript:void(0)' onclick='focusIBKR()' style='color:#0969da;text-decoration:underline;cursor:pointer'>${escHl || "link"}</a>`;
+                            const articleLink = `<a href='javascript:void(0)' onclick="openNewsArticleModal('${(ni.provider || '').replace(/'/g, "\\'")}', '${(ni.articleId || '').replace(/'/g, "\\'")}')" style='color:#0969da;text-decoration:underline;cursor:pointer'>${escHl || "link"}</a>`;
                             const _hlMatch = _matchedHls.has((ni.headline || "").toLowerCase());
                             const _hlBg = _hlMatch ? "background:#f1c40f;" : "";
                             txt1 += `<tr style='border-bottom:1px solid #d0d7de;${_hlBg}'><td style='padding:4px 6px;white-space:nowrap;color:#57606a'>${escTime}</td><td style='padding:4px 6px;color:#1f2328'>${escProv}</td><td style='padding:4px 6px;color:#1f2328;font-weight:${_hlMatch?"700":"400"}'>${articleLink}</td></tr>`;
@@ -1816,6 +1993,30 @@ function renderResultsFromBackend(response) {
                         _soundPlayed = true;
                     }
 
+                    // Fibonacci Pullback hit — play car horn beep
+                    if (vr.fibPullback === true && !_soundPlayed) {
+                        playBeepCarHorn();
+                        _soundPlayed = true;
+                    }
+
+                    // Gap Pullback hit — play car horn beep
+                    if (vr.gapPullback === true && !_soundPlayed) {
+                        playBeepCarHorn();
+                        _soundPlayed = true;
+                    }
+
+                    // Up Gap hit — play car horn beep
+                    if (vr.upGap === true && !_soundPlayed) {
+                        playBeepCarHorn();
+                        _soundPlayed = true;
+                    }
+
+                    // Down Gap hit — play car horn beep
+                    if (vr.downGap === true && !_soundPlayed) {
+                        playBeepCarHorn();
+                        _soundPlayed = true;
+                    }
+
                     // News keyword match — play alert sound
                     if (dta.newsKeywordMatch && !_soundPlayed) {
                         playBeepNewsKeyword();
@@ -1838,6 +2039,33 @@ function renderResultsFromBackend(response) {
                         const sym = dta.symbol || dta.cusip || "";
                         for (const hl of matched) {
                             readHeadlineAloud(sym + ": " + hl);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Auto-read all news headlines (not just keyword matches) if enabled
+        {
+            const autoReadAllNews = document.querySelector('.NewsAutoReadAll');
+            if (autoReadAllNews && autoReadAllNews.value === 'on') {
+                for (const groupKey in msg) {
+                    const rows = Array.isArray(msg[groupKey])
+                        ? msg[groupKey]
+                        : Object.values(msg[groupKey] || {});
+                    for (const dta of rows) {
+                        const allHeadlines = dta.newsHeadlines || [];
+                        const sym = dta.symbol || dta.cusip || "";
+                        if (allHeadlines.length > 0) {
+                            // Read symbol first
+                            readHeadlineAloud("News for " + sym);
+                            // Then read each headline
+                            for (const hl of allHeadlines) {
+                                const headline = hl.headline || "";
+                                if (headline.trim()) {
+                                    readHeadlineAloud(headline);
+                                }
+                            }
                         }
                     }
                 }
@@ -2669,13 +2897,37 @@ function addButtonBuy (nelm, idtouse) {
     html += '  <div class="oe-field oe-qty-dollars-field" style="display:none;"><label class="oe-label">$ Amount</label><input type="number" value="100" class="oe-input oe-dollar-amt" min="1" step="1" onchange="_oeCalcSharesFromDollars()"></div>';
     html += '  <div class="oe-field oe-qty-dollars-field" style="display:none;"><label class="oe-label">Shares (calc)</label><input type="number" class="oe-input oe-dollar-shares" readonly tabindex="-1" style="background:#f6f8fa;"></div>';
     html += '</div>';
+    
+    // Entry Price Mode (Manual or Fibonacci-based)
+    html += '<div class="oe-row">';
+    html += '  <div class="oe-field"><label class="oe-label">Entry Mode</label><select class="oe-select oe-entry-mode" onchange="_oeToggleEntryMode()"><option value="manual" selected>Manual Price</option><option value="fibonacci">Fibonacci Pullback</option></select></div>';
+    html += '</div>';
+    
+    // Manual Entry Section
+    html += '<div class="oe-entry-manual-section">';
     html += '<div class="oe-row">';
     html += '  <div class="oe-field"><label class="oe-label">Entry Price</label><input type="number" step="0.01" value="' + actualPrice + '" class="oe-input pricelimit" onchange="_oeRecalcStopTarget()"></div>';
     html += '  <div class="oe-field oe-bracket-field"><label class="oe-label">Target Price</label><input type="number" step="0.01" value="' + resistencE + '" class="oe-input resistencelimit" id="resistence' + nelm + '"></div>';
     html += '  <div class="oe-field oe-bracket-field"><label class="oe-label">Stop Price</label><input type="number" step="0.01" value="' + supporT + '" class="oe-input supportlimit" id="support' + nelm + '"></div>';
-    html += '  <div class="oe-field oe-bracket-field"><label class="oe-label">Stop Loss %</label><input type="number" step="0.1" value="1" class="oe-input stoplosslimit"></div>';
     html += '</div>';
+    html += '</div>'; // end manual section
+    
+    // Fibonacci Entry Section
+    html += '<div class="oe-entry-fib-section" style="display:none;">';
+    html += '<div class="oe-row">';
+    html += '  <div class="oe-field"><label class="oe-label">Entry at Fib Level</label><select class="oe-select oe-fib-entry-level" onchange="_oeCalcFromFib()"><option value="">-- Select Level --</option><option value="38.2">38.2%</option><option value="50">50%</option><option value="61.8">61.8%</option></select></div>';
+    html += '  <div class="oe-field"><label class="oe-label">Entry Offset %</label><input type="number" step="0.1" value="0" class="oe-input oe-fib-entry-offset" onchange="_oeCalcFromFib()"></div>';
+    html += '  <div class="oe-field"><label class="oe-label">Entry Level Value</label><input type="number" step="0.01" class="oe-input oe-fib-entry-val" readonly style="background:#f6f8fa;"></div>';
+    html += '</div>';
+    html += '<div class="oe-row">';
+    html += '  <div class="oe-field"><label class="oe-label">Calculated Entry</label><input type="number" step="0.01" class="oe-input oe-fib-entry-price" readonly style="background:#f6f8fa;" onchange="_oeRecalcStopTarget()"></div>';
+    html += '  <div class="oe-field oe-bracket-field"><label class="oe-label">Target at Fib %</label><input type="number" step="0.1" value="0" class="oe-input oe-fib-target-offset" onchange="_oeCalcFromFib()"></div>';
+    html += '  <div class="oe-field oe-bracket-field"><label class="oe-label">Stop at Fib %</label><input type="number" step="0.1" value="0" class="oe-input oe-fib-stop-offset" onchange="_oeCalcFromFib()"></div>';
+    html += '</div>';
+    html += '</div>'; // end fib section
+    
     html += '<div class="oe-row oe-bracket-field">';
+    html += '  <div class="oe-field"><label class="oe-label">Stop Loss %</label><input type="number" step="0.1" value="1" class="oe-input stoplosslimit"></div>';
     html += '  <div class="oe-field"><label class="oe-label">Stop %</label><input type="number" step="0.1" value="1" class="oe-input oe-pct-support" onchange="_oeRecalcStopTarget()"></div>';
     html += '  <div class="oe-field"><label class="oe-label">Target %</label><input type="number" step="0.1" value="1" class="oe-input oe-pct-resist" onchange="_oeRecalcStopTarget()"></div>';
     html += '</div>';
@@ -3120,6 +3372,68 @@ function _oeRecalcStopTarget() {
     _oeCalcSharesFromDollars();
 }
 
+function _oeToggleEntryMode() {
+    var mode = document.querySelector('.oe-entry-mode') ? document.querySelector('.oe-entry-mode').value : 'manual';
+    var manualSection = document.querySelector('.oe-entry-manual-section');
+    var fibSection = document.querySelector('.oe-entry-fib-section');
+    if (manualSection) manualSection.style.display = (mode === 'manual') ? '' : 'none';
+    if (fibSection) fibSection.style.display = (mode === 'fibonacci') ? '' : 'none';
+    if (mode === 'fibonacci') _oeCalcFromFib();
+}
+
+function _oeCalcFromFib() {
+    try {
+        var sym = window._mlCurrentSymbol || '';
+        var data = (window._scanStockData && window._scanStockData[sym]) ? window._scanStockData[sym] : null;
+        if (!data) {
+            console.warn('No scan data found for', sym);
+            return;
+        }
+        
+        // Get the selected Fibonacci level and offset
+        var fibLevel = document.querySelector('.oe-fib-entry-level').value;
+        var entryOffset = parseFloat(document.querySelector('.oe-fib-entry-offset').value) || 0;
+        var targetOffset = parseFloat(document.querySelector('.oe-fib-target-offset').value) || 0;
+        var stopOffset = parseFloat(document.querySelector('.oe-fib-stop-offset').value) || 0;
+        
+        // Map level names to data keys
+        var levelMap = {
+            '38.2': 'fib38',
+            '50': 'fib50',
+            '61.8': 'fib618'
+        };
+        
+        var dataKey = levelMap[fibLevel];
+        if (!dataKey || !data[dataKey]) {
+            console.warn('Fibonacci level data not available:', fibLevel);
+            return;
+        }
+        
+        var fibValue = parseFloat(data[dataKey]) || 0;
+        if (fibValue <= 0) return;
+        
+        // Update fib value display
+        document.querySelector('.oe-fib-entry-val').value = fibValue.toFixed(2);
+        
+        // Calculate entry price: fib level +/- offset%
+        var entryPrice = fibValue * (1 + entryOffset / 100.0);
+        document.querySelector('.oe-fib-entry-price').value = entryPrice.toFixed(2);
+        document.querySelector('.pricelimit').value = entryPrice.toFixed(2);
+        
+        // Calculate target: entry +/- target offset%
+        var targetPrice = entryPrice * (1 + targetOffset / 100.0);
+        document.querySelector('.resistencelimit').value = targetPrice.toFixed(2);
+        
+        // Calculate stop: entry +/- stop offset%
+        var stopPrice = entryPrice * (1 + stopOffset / 100.0);
+        document.querySelector('.supportlimit').value = stopPrice.toFixed(2);
+        
+        _oeCalcSharesFromDollars();
+    } catch(e) {
+        console.error('_oeCalcFromFib error:', e);
+    }
+}
+
 function _oeGetSettings() {
     return {
         qtyMode: document.querySelector('.oe-qty-mode') ? document.querySelector('.oe-qty-mode').value : 'shares',
@@ -3127,6 +3441,11 @@ function _oeGetSettings() {
         dollarAmt: document.querySelector('.oe-dollar-amt') ? document.querySelector('.oe-dollar-amt').value : '100',
         orderType: document.querySelector('.bracketLimit') ? document.querySelector('.bracketLimit').value : 'bracket',
         side: document.querySelector('.longshortside') ? document.querySelector('.longshortside').value : 'long',
+        entryMode: document.querySelector('.oe-entry-mode') ? document.querySelector('.oe-entry-mode').value : 'manual',
+        fibEntryLevel: document.querySelector('.oe-fib-entry-level') ? document.querySelector('.oe-fib-entry-level').value : '',
+        fibEntryOffset: document.querySelector('.oe-fib-entry-offset') ? document.querySelector('.oe-fib-entry-offset').value : '0',
+        fibTargetOffset: document.querySelector('.oe-fib-target-offset') ? document.querySelector('.oe-fib-target-offset').value : '0',
+        fibStopOffset: document.querySelector('.oe-fib-stop-offset') ? document.querySelector('.oe-fib-stop-offset').value : '0',
         stopLossPct: document.querySelector('.stoplosslimit') ? document.querySelector('.stoplosslimit').value : '1',
         stopPct: document.querySelector('.oe-pct-support') ? document.querySelector('.oe-pct-support').value : '1',
         targetPct: document.querySelector('.oe-pct-resist') ? document.querySelector('.oe-pct-resist').value : '1',
@@ -3146,6 +3465,11 @@ function _oeApplySettings(s, entryPrice) {
     if (s.dollarAmt) { var el = document.querySelector('.oe-dollar-amt'); if (el) el.value = s.dollarAmt; }
     if (s.orderType) { var el = document.querySelector('.bracketLimit'); if (el) { el.value = s.orderType; _oeToggleBracket(); } }
     if (s.side) { var el = document.querySelector('.longshortside'); if (el) el.value = s.side; }
+    if (s.entryMode) { var el = document.querySelector('.oe-entry-mode'); if (el) { el.value = s.entryMode; _oeToggleEntryMode(); } }
+    if (s.fibEntryLevel) { var el = document.querySelector('.oe-fib-entry-level'); if (el) el.value = s.fibEntryLevel; }
+    if (s.fibEntryOffset) { var el = document.querySelector('.oe-fib-entry-offset'); if (el) el.value = s.fibEntryOffset; }
+    if (s.fibTargetOffset) { var el = document.querySelector('.oe-fib-target-offset'); if (el) el.value = s.fibTargetOffset; }
+    if (s.fibStopOffset) { var el = document.querySelector('.oe-fib-stop-offset'); if (el) el.value = s.fibStopOffset; }
     if (s.stopLossPct) { var el = document.querySelector('.stoplosslimit'); if (el) el.value = s.stopLossPct; }
     if (s.stopPct) { var el = document.querySelector('.oe-pct-support'); if (el) el.value = s.stopPct; }
     if (s.targetPct) { var el = document.querySelector('.oe-pct-resist'); if (el) el.value = s.targetPct; }
@@ -3155,6 +3479,7 @@ function _oeApplySettings(s, entryPrice) {
     if (s.tif) { var el = document.querySelector('.oe-tif'); if (el) el.value = s.tif; }
     if (s.session) { var el = document.querySelector('.oe-session'); if (el) el.value = s.session; }
     _oeToggleQtyMode();
+    if (s.entryMode === 'fibonacci') _oeCalcFromFib();
     if (s.multiLevel) _mlApplySettings(s.multiLevel);
     if (entryPrice) _oeRecalcStopTarget();
 }

@@ -90,6 +90,44 @@ _NON_SIMPLE_MODES = frozenset(
 )
 
 
+def _normalize_market_cap(value):
+    """
+    Normalize market cap value to millions.
+    
+    Handles values with suffixes like '1.15m' (millions), '1.92b' (billions).
+    Returns the value in millions as a float, or None if parsing fails.
+    
+    Examples:
+      - "100" -> 100.0 (already in millions)
+      - "1500m" or "1500M" -> 1500.0 (millions)
+      - "2.5b" or "2.5B" -> 2500.0 (convert billions to millions)
+      - "1.15m" -> 1.15 (already in millions)
+    """
+    if value is None:
+        return None
+    
+    try:
+        # Convert to string and strip whitespace
+        val_str = str(value).strip().lower()
+        
+        # Check for billion suffix
+        if val_str.endswith('b'):
+            # Extract number and convert billions to millions
+            numeric = float(val_str[:-1])
+            return numeric * 1000.0
+        
+        # Check for million suffix (or no suffix - already in millions)
+        if val_str.endswith('m'):
+            # Extract number (already in millions)
+            return float(val_str[:-1])
+        
+        # No suffix - assume it's already in millions
+        return float(val_str)
+    
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
 def average_volume(data: pd.DataFrame, lookback: int) -> float:
     """
     Calculate the average volume over the last `lookback` rows.
@@ -533,6 +571,7 @@ class IBapi(EWrapper, EClient):
         """
         Callback for each historical news headline received from IBKR.
         """
+        logger.debug("historicalNews reqId=%s provider=%s headline=%.80s", request_id, provider_code, headline)
         with self._news_lock:
             if request_id not in self._news_data:
                 self._news_data[request_id] = []
@@ -673,12 +712,23 @@ class IBapi(EWrapper, EClient):
         if any(m.lower() in msg for m in self.config.muted_ibapi_errors):
             return
 
+        # Silently handle fundamental-data errors (e.g. 10358 "Fundamentals
+        # data is not allowed" when the account lacks a subscription).
+        # Unblock the wait loop but do NOT store in warningTicker.
+        if req_id in self._fundamental_done and not self._fundamental_done[req_id]:
+            logger.info("Fundamental request %s got error %s: %s — unblocking (suppressed)", req_id, error_code, error_string)
+            with self._fundamental_lock:
+                self._fundamental_done[req_id] = True
+            return
+
         # Silently handle news-request errors (e.g. "Rejected - Invalid
         # value in field # 48" when a provider code isn't subscribed).
-        # Unblock the wait loop but do NOT store in warningTicker.
+        # Do NOT set _news_done = True here — valid headlines from other
+        # providers may still arrive via historicalNews / historicalNewsEnd.
+        # The 5-second timeout in fetchNews() handles the case where
+        # historicalNewsEnd never fires.
         if req_id in self._news_done and not self._news_done[req_id]:
-            logger.info("News request %s got error %s: %s — unblocking (suppressed)", req_id, error_code, error_string)
-            self._news_done[req_id] = True
+            logger.info("News request %s got error %s: %s — suppressed (still waiting for headlines)", req_id, error_code, error_string)
             return
 
         # store but don't print
@@ -1169,6 +1219,22 @@ class IBapi(EWrapper, EClient):
         "cross200SMA_value": "Cross200SMA_tf",
         "cross200SMA_pctFromSMA": "Cross200SMA_tf",
         "cross200SMA_isAbove": "Cross200SMA_tf",
+        "breakHigh": "BreakHigh_tf",
+        "pullbackPct": "PullbackPct_tf",
+        "pullbackPct1": "PullbackPct_tf",
+        "pullbackPct2": "PullbackPct2_tf",
+        "pullbackPct2_1": "PullbackPct2_tf",
+        "fibPullback": "FibPullback_tf",
+        "fibPullback1": "FibPullback_tf",
+        "gapPullback": "GapPullback_tf",
+        "gapPullback1": "GapPullback_tf",
+        "upGap": "UpGap_tf",
+        "upGap1": "UpGap_tf",
+        "downGap": "DownGap_tf",
+        "downGap1": "DownGap_tf",
+        "fibGap": "FibGap_tf",
+        "Pivot": "Pivot_tf",
+        "Pivot1": "Pivot_tf",
     }
 
     @staticmethod
@@ -1956,6 +2022,204 @@ class IBapi(EWrapper, EClient):
             except Exception:
                 indicators["pullbackPct2"] = None
 
+        # --- Fibonacci Pullback (price pullback to Fib retracement levels) ---
+        # Calculates Fib retracement levels of the move from previous close to session high
+        # Checks if current price is within a tolerance of the selected Fib level
+        if form.get("ComparisonFibPullback", "Not used") != "Not used":
+            try:
+                close_price_fpb = float(result_full["close"].iloc[-1])
+                
+                # Get high of the session
+                if not result_session.empty:
+                    hod_fpb = float(result_session["high"].max())
+                else:
+                    hod_fpb = float(result_full["high"].iloc[-1])
+
+                # Get previous close based on selected timeframe
+                if len(unique_dates) >= 2:
+                    prev_date_fpb = unique_dates[-2]
+                    prev_mask_fpb = result_full.index.normalize() == prev_date_fpb
+                    pc_fpb = float(result_full.loc[prev_mask_fpb]["close"].iloc[-1])
+                else:
+                    pc_fpb = float(result_full["close"].iloc[-2]) if len(result_full) >= 2 else close_price_fpb
+
+                move_fpb = hod_fpb - pc_fpb
+
+                if move_fpb > 0:
+                    # Get selected Fib level
+                    fib_level_str = form.get("FibPullbackLevel", "61.8")
+                    fib_level_ratio = float(fib_level_str) / 100.0
+                    
+                    # Calculate Fib retracement level
+                    fib_pb_level = hod_fpb - (move_fpb * fib_level_ratio)
+                    
+                    # Distance from current price to fib level as % of move
+                    distance_from_fib = abs(close_price_fpb - fib_pb_level)
+                    fib_pb_pct = (distance_from_fib / move_fpb) * 100.0 if move_fpb != 0 else None
+                    
+                    indicators["fibPullback"] = fib_pb_pct
+                    indicators["fibPullbackLevel"] = round(fib_pb_level, 2)
+                    indicators["fibPullbackMoveSize"] = round(move_fpb, 2)
+                else:
+                    indicators["fibPullback"] = None
+                    indicators["fibPullbackLevel"] = None
+                    indicators["fibPullbackMoveSize"] = None
+
+                if form.get("ComparisonFibPullback") == "between":
+                    indicators["fibPullback1"] = indicators.get("fibPullback")
+            except Exception as e:
+                logger.debug("Fib pullback calculation error: %s", e)
+                indicators["fibPullback"] = None
+                indicators["fibPullbackLevel"] = None
+                indicators["fibPullbackMoveSize"] = None
+
+        # --- Gap Pullback (price pullback to gap Fib retracement levels) ---
+        # Calculates Fib retracement levels of the overnight gap (open - previous close)
+        # Checks if current price is within tolerance of the selected Fib level
+        if form.get("ComparisonGapPullback", "Not used") != "Not used":
+            try:
+                close_price_gpb = float(result_full["close"].iloc[-1])
+                open_price_gpb = float(result_full["open"].iloc[-1])
+                
+                # Get previous close (always previous trading day close for gap)
+                if len(unique_dates) >= 2:
+                    prev_date_gpb = unique_dates[-2]
+                    prev_mask_gpb = result_full.index.normalize() == prev_date_gpb
+                    pc_gpb = float(result_full.loc[prev_mask_gpb]["close"].iloc[-1])
+                else:
+                    pc_gpb = float(result_full["close"].iloc[-2]) if len(result_full) >= 2 else close_price_gpb
+
+                gap_gpb = open_price_gpb - pc_gpb
+
+                if gap_gpb != 0:
+                    # Get selected Fib level
+                    fib_level_str_gpb = form.get("GapPullbackLevel", "61.8")
+                    fib_level_ratio_gpb = float(fib_level_str_gpb) / 100.0
+                    
+                    # Calculate Fib retracement level of the gap
+                    # If gap is positive (up): pc + (gap * fib_ratio)
+                    # If gap is negative (down): pc + (gap * fib_ratio) 
+                    fib_gpb_level = pc_gpb + (gap_gpb * fib_level_ratio_gpb)
+                    
+                    # Distance from current price to fib level as % of gap
+                    distance_from_fib_gpb = abs(close_price_gpb - fib_gpb_level)
+                    gap_pb_pct = (distance_from_fib_gpb / abs(gap_gpb)) * 100.0 if gap_gpb != 0 else None
+                    
+                    indicators["gapPullback"] = gap_pb_pct
+                    indicators["gapPullbackLevel"] = round(fib_gpb_level, 2)
+                    indicators["gapPullbackSize"] = round(gap_gpb, 2)
+                else:
+                    indicators["gapPullback"] = None
+                    indicators["gapPullbackLevel"] = None
+                    indicators["gapPullbackSize"] = None
+
+                if form.get("ComparisonGapPullback") == "between":
+                    indicators["gapPullback1"] = indicators.get("gapPullback")
+            except Exception as e:
+                logger.debug("Gap pullback calculation error: %s", e)
+                indicators["gapPullback"] = None
+                indicators["gapPullbackLevel"] = None
+                indicators["gapPullbackSize"] = None
+
+        # --- Fibonacci Pullback Levels (for entry/exit orders) ---
+        # Calculate Fibonacci retracement levels of the gap regardless of comparison mode
+        # These are useful for order entry/exit strategies
+        try:
+            close_price_fib = float(result_full["close"].iloc[-1])
+            open_price_fib = float(result_full["open"].iloc[-1])
+
+            if len(unique_dates) >= 2:
+                prev_date_fib = unique_dates[-2]
+                prev_mask_fib = result_full.index.normalize() == prev_date_fib
+                prev_close_fib = float(result_full.loc[prev_mask_fib]["close"].iloc[-1])
+            else:
+                prev_close_fib = float(result_full["close"].iloc[-2]) if len(result_full) >= 2 else close_price_fib
+
+            gap = open_price_fib - prev_close_fib
+
+            # Fib retracement levels of the gap (available for order entry)
+            fib38 = prev_close_fib + gap * 0.382
+            fib50 = prev_close_fib + gap * 0.500
+            fib618 = prev_close_fib + gap * 0.618
+
+            indicators["fib38"] = round(fib38, 2) if fib38 else None
+            indicators["fib50"] = round(fib50, 2) if fib50 else None
+            indicators["fib618"] = round(fib618, 2) if fib618 else None
+            indicators["fibGapLevel"] = None  # Default; overwritten below if comparing
+        except Exception:
+            indicators["fib38"] = None
+            indicators["fib50"] = None
+            indicators["fib618"] = None
+
+        # --- Up Gap & Down Gap (daily gap from 9:30 AM - 4 PM EST) ---
+        # Calculates gaps using only regular trading hours (9:30 AM - 4 PM EST)
+        # Excludes pre/post market trading
+        if form.get("ComparisonUpGap", "Not used") != "Not used" or form.get("ComparisonDownGap", "Not used") != "Not used":
+            try:
+                import pytz
+                from datetime import time as datetime_time
+                
+                # Filter to 9:30 AM - 4 PM EST only
+                eastern = pytz.timezone('US/Eastern')
+                result_rth = result_full.copy()
+                
+                # Filter by time of day (9:30 AM - 4 PM)
+                if hasattr(result_rth.index, 'tz_localize'):
+                    # Make timezone-aware if needed
+                    if result_rth.index.tz is None:
+                        result_rth.index = result_rth.index.tz_localize('UTC').tz_convert(eastern)
+                    else:
+                        result_rth.index = result_rth.index.tz_convert(eastern)
+                
+                # Extract trading hours (9:30 AM - 4 PM)
+                result_rth = result_rth.between_time('09:30', '16:00')
+                
+                # Get opening price during RTH (first bar after 9:30)
+                if len(result_rth) > 0:
+                    open_rth = float(result_rth["open"].iloc[0])
+                else:
+                    open_rth = float(result_full["open"].iloc[-1])
+                
+                # Get previous close
+                if len(unique_dates) >= 2:
+                    prev_date = unique_dates[-2]
+                    prev_mask = result_full.index.normalize() == prev_date
+                    prev_close = float(result_full.loc[prev_mask]["close"].iloc[-1])
+                else:
+                    prev_close = float(result_full["close"].iloc[-2]) if len(result_full) >= 2 else float(result_full["close"].iloc[-1])
+                
+                # Calculate gap
+                gap = open_rth - prev_close
+                
+                # UP GAP: positive gap
+                if gap > 0 and prev_close > 0:
+                    up_gap_pct = (gap / prev_close) * 100.0
+                    indicators["upGap"] = up_gap_pct
+                    if form.get("ComparisonUpGap") == "between":
+                        indicators["upGap1"] = up_gap_pct
+                else:
+                    indicators["upGap"] = 0
+                    if form.get("ComparisonUpGap") == "between":
+                        indicators["upGap1"] = 0
+                
+                # DOWN GAP: negative gap
+                if gap < 0 and prev_close > 0:
+                    down_gap_pct = (abs(gap) / prev_close) * 100.0
+                    indicators["downGap"] = down_gap_pct
+                    if form.get("ComparisonDownGap") == "between":
+                        indicators["downGap1"] = down_gap_pct
+                else:
+                    indicators["downGap"] = 0
+                    if form.get("ComparisonDownGap") == "between":
+                        indicators["downGap1"] = 0
+                        
+            except Exception as e:
+                logger.debug("Gap calculation error: %s", e)
+                indicators["upGap"] = None
+                indicators["upGap1"] = None
+                indicators["downGap"] = None
+                indicators["downGap1"] = None
+
         # --- Fibonacci Gap (daily gap vs Fib retracement levels) ---
         if form.get("ComparisonFibGap", "Not used") != "Not used":
             try:
@@ -2039,7 +2303,9 @@ class IBapi(EWrapper, EClient):
                     vol_val1 = float(result_full["volume"].iloc[-vol_lookback1:].sum()) if result_full.shape[0] >= 1 else float(np.nan)
                 indicators["volumeIndicator1"] = int(round(vol_val1)) if not np.isnan(vol_val1) else None
 
-        # --- Market Cap (passed in from getDataResult via reqMktData tick 258) ---
+        # --- Market Cap (normalized to millions) ---
+        # Source: reqMktData tick 258 (fundamental ratios via IBKR QuoteData subscription)
+        # Normalized by _normalize_market_cap() to handle m/M (millions) and b/B (billions) suffixes
         if market_cap is not None:
             indicators["marketCap"] = market_cap
             if form.get("ComparisonMarketCap") == "between":
@@ -3463,6 +3729,150 @@ class IBapi(EWrapper, EClient):
             variable_results["pullbackPct2"] = bool(pullback2_condition)
 
         # -------------------------
+        # FIBONACCI PULLBACK
+        # -------------------------
+        fib_pb_condition = None
+
+        if form.get("ComparisonFibPullback", "Not used") not in _NON_SIMPLE_MODES:
+            if form.get("ComparisonFibPullback") == "greater":
+                fib_pb_condition = _safe_compare(data.get("fibPullback"), ">", float(form.get("PercentageFibPullback", 0)))
+            elif form.get("ComparisonFibPullback") == "greaterEqual":
+                fib_pb_condition = _safe_compare(data.get("fibPullback"), ">=", float(form.get("PercentageFibPullback", 0)))
+            elif form.get("ComparisonFibPullback") == "lower":
+                fib_pb_condition = _safe_compare(data.get("fibPullback"), "<", float(form.get("PercentageFibPullback", 0)))
+            elif form.get("ComparisonFibPullback") == "lowerEqual":
+                fib_pb_condition = _safe_compare(data.get("fibPullback"), "<=", float(form.get("PercentageFibPullback", 0)))
+
+        elif form.get("ComparisonFibPullback") == "between":
+            fib_pb_condition = (
+                    _safe_compare(data.get("fibPullback"), ">=", float(form.get("PercentageFibPullback", 0)))
+                    and _safe_compare(data.get("fibPullback1"), "<=", float(form.get("PercentageFibPullback1", 0)))
+            )
+
+        elif form.get("ComparisonFibPullback") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form.get("PercentageFibPullback", 5))
+            except Exception:
+                threshold = 5.0
+            fib_pb_condition = _within_percent_check(
+                data.get("fibPullback"), data.get("close"),
+                form.get("ComparisonFibPullback"), threshold
+            )
+
+        if fib_pb_condition is not None:
+            condition = condition and fib_pb_condition
+            counting_ += 1
+            variable_results["fibPullback"] = bool(fib_pb_condition)
+
+        # -------------------------
+        # GAP PULLBACK
+        # -------------------------
+        gap_pb_condition = None
+
+        if form.get("ComparisonGapPullback", "Not used") not in _NON_SIMPLE_MODES:
+            if form.get("ComparisonGapPullback") == "greater":
+                gap_pb_condition = _safe_compare(data.get("gapPullback"), ">", float(form.get("PercentageGapPullback", 0)))
+            elif form.get("ComparisonGapPullback") == "greaterEqual":
+                gap_pb_condition = _safe_compare(data.get("gapPullback"), ">=", float(form.get("PercentageGapPullback", 0)))
+            elif form.get("ComparisonGapPullback") == "lower":
+                gap_pb_condition = _safe_compare(data.get("gapPullback"), "<", float(form.get("PercentageGapPullback", 0)))
+            elif form.get("ComparisonGapPullback") == "lowerEqual":
+                gap_pb_condition = _safe_compare(data.get("gapPullback"), "<=", float(form.get("PercentageGapPullback", 0)))
+
+        elif form.get("ComparisonGapPullback") == "between":
+            gap_pb_condition = (
+                    _safe_compare(data.get("gapPullback"), ">=", float(form.get("PercentageGapPullback", 0)))
+                    and _safe_compare(data.get("gapPullback1"), "<=", float(form.get("PercentageGapPullback1", 0)))
+            )
+
+        elif form.get("ComparisonGapPullback") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form.get("PercentageGapPullback", 5))
+            except Exception:
+                threshold = 5.0
+            gap_pb_condition = _within_percent_check(
+                data.get("gapPullback"), data.get("close"),
+                form.get("ComparisonGapPullback"), threshold
+            )
+
+        if gap_pb_condition is not None:
+            condition = condition and gap_pb_condition
+            counting_ += 1
+            variable_results["gapPullback"] = bool(gap_pb_condition)
+
+        # -------------------------
+        # UP GAP (gap up from previous close, 9:30 AM - 4 PM EST)
+        # -------------------------
+        up_gap_condition = None
+
+        if form.get("ComparisonUpGap", "Not used") not in _NON_SIMPLE_MODES:
+            if form.get("ComparisonUpGap") == "greater":
+                up_gap_condition = _safe_compare(data.get("upGap"), ">", float(form.get("PercentageUpGap", 0)))
+            elif form.get("ComparisonUpGap") == "greaterEqual":
+                up_gap_condition = _safe_compare(data.get("upGap"), ">=", float(form.get("PercentageUpGap", 0)))
+            elif form.get("ComparisonUpGap") == "lower":
+                up_gap_condition = _safe_compare(data.get("upGap"), "<", float(form.get("PercentageUpGap", 0)))
+            elif form.get("ComparisonUpGap") == "lowerEqual":
+                up_gap_condition = _safe_compare(data.get("upGap"), "<=", float(form.get("PercentageUpGap", 0)))
+
+        elif form.get("ComparisonUpGap") == "between":
+            up_gap_condition = (
+                    _safe_compare(data.get("upGap"), ">=", float(form.get("PercentageUpGap", 0)))
+                    and _safe_compare(data.get("upGap1"), "<=", float(form.get("PercentageUpGap1", 0)))
+            )
+
+        elif form.get("ComparisonUpGap") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form.get("PercentageUpGap", 5))
+            except Exception:
+                threshold = 5.0
+            up_gap_condition = _within_percent_check(
+                data.get("upGap"), data.get("close"),
+                form.get("ComparisonUpGap"), threshold
+            )
+
+        if up_gap_condition is not None:
+            condition = condition and up_gap_condition
+            counting_ += 1
+            variable_results["upGap"] = bool(up_gap_condition)
+
+        # -------------------------
+        # DOWN GAP (gap down from previous close, 9:30 AM - 4 PM EST)
+        # -------------------------
+        down_gap_condition = None
+
+        if form.get("ComparisonDownGap", "Not used") not in _NON_SIMPLE_MODES:
+            if form.get("ComparisonDownGap") == "greater":
+                down_gap_condition = _safe_compare(data.get("downGap"), ">", float(form.get("PercentageDownGap", 0)))
+            elif form.get("ComparisonDownGap") == "greaterEqual":
+                down_gap_condition = _safe_compare(data.get("downGap"), ">=", float(form.get("PercentageDownGap", 0)))
+            elif form.get("ComparisonDownGap") == "lower":
+                down_gap_condition = _safe_compare(data.get("downGap"), "<", float(form.get("PercentageDownGap", 0)))
+            elif form.get("ComparisonDownGap") == "lowerEqual":
+                down_gap_condition = _safe_compare(data.get("downGap"), "<=", float(form.get("PercentageDownGap", 0)))
+
+        elif form.get("ComparisonDownGap") == "between":
+            down_gap_condition = (
+                    _safe_compare(data.get("downGap"), ">=", float(form.get("PercentageDownGap", 0)))
+                    and _safe_compare(data.get("downGap1"), "<=", float(form.get("PercentageDownGap1", 0)))
+            )
+
+        elif form.get("ComparisonDownGap") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form.get("PercentageDownGap", 5))
+            except Exception:
+                threshold = 5.0
+            down_gap_condition = _within_percent_check(
+                data.get("downGap"), data.get("close"),
+                form.get("ComparisonDownGap"), threshold
+            )
+
+        if down_gap_condition is not None:
+            condition = condition and down_gap_condition
+            counting_ += 1
+            variable_results["downGap"] = bool(down_gap_condition)
+
+        # -------------------------
         # FIBONACCI GAP
         # -------------------------
         fib_gap_condition = None
@@ -3561,14 +3971,18 @@ class IBapi(EWrapper, EClient):
             keywords = [k.strip().lower() for k in keywords_raw.split(",") if k.strip()]
             if keywords:
                 headlines = data.get("newsHeadlines", [])
+                filtered_headlines = []
                 for h in headlines:
                     headline_text = (h.get("headline") or "").lower()
                     for kw in keywords:
                         if kw in headline_text:
+                            filtered_headlines.append(h)
                             matched_keyword_headlines.append(h.get("headline", ""))
                             break
 
-                news_keyword_match = len(matched_keyword_headlines) > 0
+                # Replace newsHeadlines with only those containing keywords
+                data["newsHeadlines"] = filtered_headlines
+                news_keyword_match = len(filtered_headlines) > 0
 
         if news_keyword_match is not None:
             variable_results["newsKeyword"] = bool(news_keyword_match)
@@ -3650,7 +4064,7 @@ class IBapi(EWrapper, EClient):
         # Wait briefly for the newsProviders callback if it hasn't fired yet
         if self._subscribed_news_providers is None:
             _pw = 0.0
-            while self._subscribed_news_providers is None and _pw < 2.0:
+            while self._subscribed_news_providers is None and _pw < 3.0:
                 time.sleep(0.1)
                 _pw += 0.1
 
@@ -3662,7 +4076,8 @@ class IBapi(EWrapper, EClient):
             # Pass all common provider codes — IB will silently ignore
             # any the account is not subscribed to and return data from
             # the ones that match.
-            provider_codes = "BRFUPDN+BRFG+DJNL+BZ+FLY+CZ+MT+DJ-N+DJ-RT"
+            provider_codes = "BZ+BRFG+BRFUPDN+FLY+DJNL+DJ-N+DJ-RT+MT+CZ+GS+BSW+TWST"
+            logger.info("No subscribed news providers discovered; using fallback codes: %s", provider_codes)
 
         end_dt = ""  # now
         start_dt = ""  # open-ended (let maxResults limit it)
@@ -3675,6 +4090,7 @@ class IBapi(EWrapper, EClient):
         )
 
         try:
+            logger.debug("Requesting historical news for conId %s", con_id)
             self.reqHistoricalNews(
                 news_req_id,
                 con_id,
@@ -3688,20 +4104,23 @@ class IBapi(EWrapper, EClient):
             logger.warning("reqHistoricalNews failed for conId %s: %s", con_id, e)
             return []
 
-        # Wait for news (bounded)
+        # Wait for news (bounded) - increased timeout to 10 seconds
         waited = 0.0
-        timeout = 5.0  # seconds
+        timeout = 10.0  # seconds (increased from 5.0 to allow more time for news to arrive)
+        poll_interval = 0.1
         while not self._news_done.get(news_req_id, False):
-            time.sleep(0.1)
-            waited += 0.1
+            time.sleep(poll_interval)
+            waited += poll_interval
             if waited >= timeout:
-                logger.warning("fetchNews timeout for conId %s after %.1fs", con_id, waited)
+                logger.warning("fetchNews timeout for conId %s after %.1fs, received %d headlines so far", 
+                              con_id, waited, len(self._news_data.get(news_req_id, [])))
                 break
 
         raw_headlines = self._news_data.get(news_req_id, [])
+        is_done = self._news_done.get(news_req_id, False)
         logger.info(
-            "reqHistoricalNews reqId=%s returned %d raw headlines (done=%s, waited=%.1fs)",
-            news_req_id, len(raw_headlines), self._news_done.get(news_req_id), waited,
+            "fetchNews reqId=%s returned %d raw headlines (done=%s, waited=%.1fs)",
+            news_req_id, len(raw_headlines), is_done, waited,
         )
 
         # Filter excluded publishers
@@ -3724,6 +4143,55 @@ class IBapi(EWrapper, EClient):
 
         # Limit to max requested
         deduped = deduped[:max_headlines]
+
+        # -------------------------
+        # Filter by timeframe if specified
+        # -------------------------
+        # Extract time window configuration for "Read Headlines Aloud" feature
+        news_within_minutes = 0
+        try:
+            time_unit = form.get("NewsTimeUnit", "minutes").lower()
+            within_value = int(form.get("NewsWithinValue", 0))
+            if within_value > 0:
+                if time_unit == "hours":
+                    news_within_minutes = within_value * 60
+                elif time_unit == "days":
+                    news_within_minutes = within_value * 1440
+                else:  # minutes (default)
+                    news_within_minutes = within_value
+        except Exception:
+            pass
+
+        # Apply timeframe filter if configured
+        if news_within_minutes > 0:
+            cutoff = datetime.now(timezone.utc) - timedelta(minutes=news_within_minutes)
+            filtered_by_time = []
+            for h in deduped:
+                time_str = h.get("time", "")
+                parsed_time = None
+                try:
+                    # Try standard IBKR format
+                    if " " in time_str:
+                        parsed_time = datetime.strptime(
+                            time_str.split(".")[0], "%Y-%m-%d %H:%M:%S"
+                        ).replace(tzinfo=timezone.utc)
+                    elif time_str.isdigit():
+                        parsed_time = datetime.fromtimestamp(
+                            int(time_str) / 1000, tz=timezone.utc
+                        )
+                except Exception:
+                    pass
+
+                # Include headline if it's within the timeframe, or if time couldn't be parsed
+                # (to be conservative and not drop headlines with parsing issues)
+                if parsed_time is None or parsed_time >= cutoff:
+                    filtered_by_time.append(h)
+            
+            deduped = filtered_by_time
+            logger.info(
+                "fetchNews timeframe filter: requested last %d minutes, returned %d / %d headlines",
+                news_within_minutes, len(deduped), len(filtered_by_time) if 'filtered_by_time' in locals() else 0
+            )
 
         # Parse times and build clean output
         import re as _re
@@ -4004,6 +4472,12 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         # Fetch market cap via fundamental ratios (tick type 258)
         # -------------------------
+        # Market cap is requested via reqMktData with "258" tag to get fundamental ratios.
+        # This provides near-real-time market cap data (not historical/lag).
+        # The normalization function _normalize_market_cap() handles various formats:
+        # - "1500m" or "1500M" -> 1500 (millions)
+        # - "2.5b" or "2.5B" -> 2500 (billions converted to millions)
+        # - "100" -> 100 (already in millions)
         _mktcap_value = None
         if form.get("ComparisonMarketCap", "Not used") != "Not used":
             with self.Locking:
@@ -4039,7 +4513,10 @@ class IBapi(EWrapper, EClient):
 
             if "MKTCAP" in ratios:
                 try:
-                    _mktcap_value = float(ratios["MKTCAP"])
+                    # Normalize market cap to millions (handles m/M and b/B suffixes)
+                    _mktcap_value = _normalize_market_cap(ratios["MKTCAP"])
+                    if _mktcap_value is not None:
+                        logger.info("Market cap for %s: %s -> %.2f million", m, ratios["MKTCAP"], _mktcap_value)
                 except (ValueError, TypeError):
                     pass
 
