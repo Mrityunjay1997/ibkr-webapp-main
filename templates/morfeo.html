@@ -766,6 +766,26 @@
 											</td>
 										</tr>
 										<tr>
+											<th style="padding:10px">Pivot Point 2</th>
+											<td style="padding:10px">
+												<div id="tf_pivot2">{{ Param.Pivot_tf2(class_="Pivot_tf2") }}</div>
+											</td>
+											<td style="padding:10px"> <div id = "changePP2"> {{ Param.PivotPoint2(class_="PivotPoint2") }} </div></td>
+											<td style="padding:10px">{{ Param.ComparisonPivotPoint2(class_="ComparisonPivotPoint2") }}</td>
+											<td style="padding:10px"><div id = "percentagePP2"> {{ Param.PercentagePivotPoint2(class_="PercentagePivotPoint2", value = '0') }} </div> </td>
+											<td>&nbsp;</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Pivot Point 3</th>
+											<td style="padding:10px">
+												<div id="tf_pivot3">{{ Param.Pivot_tf3(class_="Pivot_tf3") }}</div>
+											</td>
+											<td style="padding:10px"> <div id = "changePP3"> {{ Param.PivotPoint3(class_="PivotPoint3") }} </div></td>
+											<td style="padding:10px">{{ Param.ComparisonPivotPoint3(class_="ComparisonPivotPoint3") }}</td>
+											<td style="padding:10px"><div id = "percentagePP3"> {{ Param.PercentagePivotPoint3(class_="PercentagePivotPoint3", value = '0') }} </div> </td>
+											<td>&nbsp;</td>
+										</tr>
+										<tr>
 											<th style="padding:10px">Price Level</th>
 											<td>&nbsp;</td>
 											<td style="padding:10px">
@@ -819,6 +839,10 @@
 										<!-- keep hidden legacy field for backward compat -->
 										<input type="hidden" name="NewsWithinHours" value="0">
 										<tr>
+											<th style="padding:10px">Prefer News Providers</th>
+											<td style="padding:10px" colspan="4">{{ Param.NewsProviders(class_="NewsProviders", placeholder="e.g. BZ, FLY, DJNL, DJ-N, MT, GS (blank=all)", style="width:100%") }}</td>
+										</tr>
+										<tr>
 											<th style="padding:10px">Exclude Publishers (comma-separated)</th>
 											<td style="padding:10px" colspan="4">{{ Param.NewsExcludePublishers(class_="NewsExcludePublishers", placeholder="e.g. BZ, MT", style="width:100%") }}</td>
 										</tr>
@@ -831,7 +855,17 @@
 										</tr>
 										<tr>
 											<th style="padding:10px">Read Headlines Aloud</th>
-											<td style="padding:10px" colspan="4">{{ Param.NewsReadAloud(class_="NewsReadAloud") }}</td>
+											<td style="padding:10px" colspan="4">
+												<div style="display: flex; gap: 10px; align-items: center;">
+													{{ Param.NewsReadAloud(class_="NewsReadAloud") }}
+													<span style="font-size:11px;color:#888">|</span>
+													<div>
+														<span style="font-size:11px">Within (0 = all):</span>
+														{{ Param.NewsReadAloudWithinValue(class_="NewsReadAloudWithinValue", value='0', style="width:80px;display:inline-block") }}
+														{{ Param.NewsReadAloudTimeUnit(class_="NewsReadAloudTimeUnit", style="width:110px;display:inline-block;margin-left:6px") }}
+													</div>
+												</div>
+											</td>
 										</tr>
 										<tr>
 											<th style="padding:10px">Auto-Read All News</th>
@@ -839,17 +873,126 @@
 										</tr>
 									</tbody>
 								</table>
-								</div><!-- end bottom-tables-grid -->
 
-										<!-- Stock List Management moved after CSV -->
+								<!-- Price/Volume Monitoring Configuration -->
+								<table class="table table-bordered" style="margin-top:0;">
+									<thead>
+										<tr style="background:#1a5f7a; color:#fff;">
+											<th style="padding:10px" colspan="5">Price &amp; Volume Monitoring</th>
+										</tr>
+										<tr>
+											<th style="padding:10px">Setting</th>
+											<th style="padding:10px">Value</th>
+											<th style="padding:10px" colspan="3">&nbsp;</th>
+										</tr>
+									</thead>
+									<tbody>
+										<tr>
+											<th style="padding:10px">Enable % Change Monitoring</th>
+											<td style="padding:10px" colspan="4">{{ Param.EnablePctChangeMonitor(class_="EnablePctChangeMonitor") }}</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">% Change Threshold</th>
+											<td style="padding:10px" colspan="2">{{ Param.PctChangeThreshold(class_="PctChangeThreshold", value='3.0', style="width:80px") }}%</td>
+											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Alert on price changes above this %</span></td>
+										</tr>
+										<tr>
+											<th style="padding:10px">% Change Lookback Period</th>
+											<td style="padding:10px" colspan="2">{{ Param.PctChangeLookbackMinutes(class_="PctChangeLookbackMinutes", value='5', style="width:80px") }} min</td>
+											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Calculate % change over this time window</span></td>
+										</tr>
+										<tr style="background:#f0f0f0">
+											<th style="padding:10px">Enable Volume Monitoring</th>
+											<td style="padding:10px" colspan="4">{{ Param.EnableVolumeMonitor(class_="EnableVolumeMonitor") }}</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Volume Lookback Period</th>
+											<td style="padding:10px" colspan="2">{{ Param.VolumeLookbackMinutes(class_="VolumeLookbackMinutes", value='5', style="width:80px") }} min</td>
+											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Calculate volume total over this period</span></td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Volume Threshold</th>
+											<td style="padding:10px" colspan="2">{{ Param.VolumeThreshold(class_="VolumeThreshold", value='50000', style="width:100px") }} shares</td>
+											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Alert when volume exceeds this amount</span></td>
+										</tr>
+										<tr style="background:#f0f0f0">
+											<th style="padding:10px">Enable Key Level Detection</th>
+											<td style="padding:10px" colspan="4">{{ Param.EnableKeyLevelDetection(class_="EnableKeyLevelDetection") }}</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Key Level Proximity</th>
+											<td style="padding:10px" colspan="2">{{ Param.KeyLevelProximityPercent(class_="KeyLevelProximityPercent", value='1.0', style="width:80px") }}%</td>
+											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Highlight when within % of key level</span></td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Play Key Level Sound</th>
+											<td style="padding:10px" colspan="4">{{ Param.PlayKeyLevelSound(class_="PlayKeyLevelSound") }}</td>
+										</tr>
+									</tbody>
+								</table>
 
-                                <div class="card-panel section-fade">
-                                  <br>
-                                  <h3>Search for stock meeting variables <span id="active_scan_name" style="font-size:16px;color:#000;font-weight:700;margin-left:8px;"></span> <span class="badge-soft white-blue">Run</span></h3>
-                                  <div class="SubmitData"> {{ Param.submit() }} </div>
-                                </div>
-                                <div id="bg_poll_times" style="margin-top:6px;">
-                                    Scanner last run: <span id="bg_backend_last_run">never</span>
+								<!-- 200 SMA Bullish Crossover Detection Configuration -->
+								<table class="table table-bordered" style="margin-top:0;">
+									<thead>
+										<tr style="background:#27ae60; color:#fff;">
+											<th style="padding:10px" colspan="5">200 SMA Bullish Crossover Detection</th>
+										</tr>
+										<tr>
+											<th style="padding:10px">Setting</th>
+											<th style="padding:10px">Value</th>
+											<th style="padding:10px" colspan="3">&nbsp;</th>
+										</tr>
+									</thead>
+									<tbody>
+										<tr>
+											<th style="padding:10px">Enable 200 SMA Bullish Crossover</th>
+											<td style="padding:10px" colspan="4">{{ Param.Enable200SMABullishCrossover(class_="Enable200SMABullishCrossover") }}</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Play Sound on Crossover</th>
+											<td style="padding:10px" colspan="4">{{ Param.PlaySound200SMA(class_="PlaySound200SMA") }}</td>
+										</tr>
+									</tbody>
+								</table>
+
+								<!-- ON BALANCE VOLUME (OBV) ANALYSIS Configuration -->
+								<table class="table table-bordered" style="margin-top:0;">
+									<thead>
+										<tr style="background:#8e44ad; color:#fff;">
+											<th style="padding:10px" colspan="5">On Balance Volume (OBV) Analysis</th>
+										</tr>
+										<tr>
+											<th style="padding:10px">Setting</th>
+											<th style="padding:10px">Value</th>
+											<th style="padding:10px" colspan="3">&nbsp;</th>
+										</tr>
+									</thead>
+									<tbody>
+										<tr>
+											<th style="padding:10px">Enable OBV Analysis</th>
+											<td style="padding:10px" colspan="4">{{ Param.EnableOBVAnalysis(class_="EnableOBVAnalysis") }}</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">OBV Trend Lookback Period</th>
+											<td style="padding:10px" colspan="2">{{ Param.OBVTrendPeriod(class_="OBVTrendPeriod", value='20', style="width:80px") }} bars</td>
+											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Period for trend analysis (5-200)</span></td>
+										</tr>
+										<tr>
+											<th style="padding:10px">OBV Moving Average Period</th>
+											<td style="padding:10px" colspan="2">{{ Param.OBVMovingAveragePeriod(class_="OBVMovingAveragePeriod", value='10', style="width:80px") }} bars</td>
+											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Period for MA comparison (3-50)</span></td>
+										</tr>
+										<tr>
+											<th style="padding:10px">OBV Strength Threshold</th>
+											<td style="padding:10px" colspan="2">{{ Param.OBVStrengthThreshold(class_="OBVStrengthThreshold", value='15.0', style="width:80px") }}%</td>
+											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Min % change to signal strong (1-100)</span></td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Play Sound on Strong OBV Changes</th>
+											<td style="padding:10px" colspan="4">{{ Param.EnableOBVAudio(class_="EnableOBVAudio") }}</td>
+										</tr>
+									</tbody>
+								</table>
                                     &nbsp;|&nbsp;
                                     Last poll (browser): <span id="bg_client_last_poll">never</span>
                                 </div>
@@ -959,9 +1102,10 @@
 								<div class="ao-panel-header">
 									<span class="ao-status-dot" id="ao_status_dot"></span>
 									<h6>Auto-Order</h6>
-									<label class="ao-toggle-label" style="margin-left:auto;">
-										<input type="checkbox" id="ao_enabled" onchange="_aoTogglePanel()"> Enable
-									</label>
+									<div class="ao-toggle-label" style="margin-left:auto;display:flex;gap:8px;">
+										<button type="button" class="oe-btn oe-btn-sm" onclick="_aoOpenSettings()">Settings</button>
+										<label class="ao-toggle-label"><input type="checkbox" id="ao_enabled" onchange="_aoTogglePanel()"> Enable</label>
+									</div>
 								</div>
 								<div class="ao-body" id="ao_body">
 									<!-- Preset bar -->
@@ -1038,7 +1182,11 @@
 										</div>
 										<div class="ao-field ao-qty-dollars-field" style="display:none;">
 											<label class="ao-label">Amount ($)</label>
-											<input type="number" id="ao_dollar_amt" class="ao-input" value="100" min="10" step="1">
+											<input type="number" id="ao_dollar_amt" class="ao-input" value="100" min="10" step="1" onchange="_aoCalcSharesFromDollars()">
+										</div>
+										<div class="ao-field ao-qty-dollars-field" style="display:none;">
+											<label class="ao-label">Calc Shares from $</label>
+											<input type="number" id="ao_dollar_shares" class="ao-input" readonly style="background:#f6f8fa;" value="0">
 										</div>
 										<div class="ao-field">
 											<label class="ao-label">Entry Type</label>
@@ -1130,6 +1278,63 @@
 										<div class="ao-field" style="max-width:180px;">
 											<label class="ao-label">Max Orders per Symbol</label>
 											<input type="number" id="ao_max_per_sym" class="ao-input" value="1" min="1" step="1">
+										</div>
+									</div>
+
+									<!-- Fibonacci Settings -->
+									<div class="ao-section-title">Fibonacci Pullback Settings</div>
+									<div class="ao-row">
+										<div class="ao-field" style="flex:1 1 100%;">
+											<label class="ao-label" style="display:flex;align-items:center;gap:8px;">
+												<input type="checkbox" id="fib_enabled" checked style="width:16px;height:16px;cursor:pointer;">
+												<span>Enable Fib Pullback for Auto-Orders</span>
+											</label>
+										</div>
+									</div>
+									<div id="fib_settings_group" style="padding:10px;background:#f9f9f9;border-radius:4px;border-left:3px solid #0066cc;">
+										<div class="ao-row">
+											<div class="ao-field">
+												<label class="ao-label">Fib Levels to Use</label>
+												<div style="display:flex;flex-wrap:wrap;gap:10px;">
+													<label style="display:flex;align-items:center;gap:5px;font-size:12px;">
+														<input type="checkbox" class="fib_level_check" value="0.236" style="width:14px;height:14px;cursor:pointer;">
+														<span>23.6%</span>
+													</label>
+													<label style="display:flex;align-items:center;gap:5px;font-size:12px;">
+														<input type="checkbox" class="fib_level_check" value="0.382" checked style="width:14px;height:14px;cursor:pointer;">
+														<span>38.2%</span>
+													</label>
+													<label style="display:flex;align-items:center;gap:5px;font-size:12px;">
+														<input type="checkbox" class="fib_level_check" value="0.5" style="width:14px;height:14px;cursor:pointer;">
+														<span>50.0%</span>
+													</label>
+													<label style="display:flex;align-items:center;gap:5px;font-size:12px;">
+														<input type="checkbox" class="fib_level_check" value="0.618" checked style="width:14px;height:14px;cursor:pointer;">
+														<span>61.8%</span>
+													</label>
+													<label style="display:flex;align-items:center;gap:5px;font-size:12px;">
+														<input type="checkbox" class="fib_level_check" value="0.786" style="width:14px;height:14px;cursor:pointer;">
+														<span>78.6%</span>
+													</label>
+												</div>
+											</div>
+										</div>
+										<div class="ao-row">
+											<div class="ao-field">
+												<label class="ao-label">Entry Offset (%)</label>
+												<input type="number" id="fib_entry_offset" class="ao-input" value="0" step="0.5" style="max-width:100px;">
+												<span style="font-size:11px;color:#666;margin-left:6px;">Entry price adjustment</span>
+											</div>
+											<div class="ao-field">
+												<label class="ao-label">Stop Loss (% of Move)</label>
+												<input type="number" id="fib_stop_loss_pct" class="ao-input" value="2" step="0.5" min="0.5" style="max-width:100px;">
+												<span style="font-size:11px;color:#666;margin-left:6px;">Risk per trade</span>
+											</div>
+											<div class="ao-field">
+												<label class="ao-label">Target (% of Move)</label>
+												<input type="number" id="fib_target_pct" class="ao-input" value="2" step="0.5" min="0.5" style="max-width:100px;">
+												<span style="font-size:11px;color:#666;margin-left:6px;">Profit target</span>
+											</div>
 										</div>
 									</div>
 
@@ -1238,6 +1443,81 @@
 				   			<form>
 				   				<div id="add1" class="card-panel section-fade"></div>
 							</form>
+                            
+                            <!-- Gap Alert Container -->
+                            <div id="gapAlertPanel" style="
+                                background: #fff;
+                                border: 1px solid #ffb6c1;
+                                border-radius: 6px;
+                                padding: 12px;
+                                margin: 15px 0;
+                                display: none;
+                            ">
+                                <div style="
+                                    display: flex;
+                                    justify-content: space-between;
+                                    align-items: center;
+                                    margin-bottom: 10px;
+                                    border-bottom: 2px solid #ffb6c1;
+                                    padding-bottom: 8px;
+                                ">
+                                    <h3 style="margin: 0; color: #d63384; font-size: 14px;">🎯 Gap Alerts</h3>
+                                </div>
+                                <div id="gapAlertContainer" style="font-size: 12px;">
+                                    <p style="color: #999;">No gaps approaching</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Exclude List Management Panel -->
+                            <div id="excludeListPanel" style="
+                                background: #fff;
+                                border: 1px solid #dee2e6;
+                                border-radius: 6px;
+                                padding: 12px;
+                                margin: 15px 0;
+                            ">
+                                <div style="
+                                    display: flex;
+                                    justify-content: space-between;
+                                    align-items: center;
+                                    margin-bottom: 10px;
+                                    border-bottom: 2px solid #6c757d;
+                                    padding-bottom: 8px;
+                                ">
+                                    <h3 style="margin: 0; color: #333; font-size: 14px;">🚫 Exclude Stocks from Scans</h3>
+                                    <button class="btn btn-sm btn-info" onclick="_excludeRefreshList()" style="padding: 5px 10px; font-size: 11px;">🔄 Refresh</button>
+                                </div>
+                                
+                                <!-- Add/Remove Controls -->
+                                <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+                                    <input type="text" id="excludeSymbolInput" placeholder="Enter symbol (e.g., XYZ)" style="padding: 6px; border: 1px solid #ccc; border-radius: 3px; flex: 1; min-width: 150px; font-size: 12px;">
+                                    <button class="btn btn-success btn-sm" onclick="_excludeAddStock()" style="padding: 6px 12px; font-size: 11px;">+ Add</button>
+                                    <button class="btn btn-info btn-sm" onclick="_excludeExportCSV()" style="padding: 6px 12px; font-size: 11px;">📥 Export CSV</button>
+                                    <button class="btn btn-warning btn-sm" onclick="_excludeOpenImport()" style="padding: 6px 12px; font-size: 11px;">📤 Import CSV</button>
+                                    <button class="btn btn-danger btn-sm" onclick="_excludeClearAll()" style="padding: 6px 12px; font-size: 11px;">Clear All</button>
+                                </div>
+                                
+                                <!-- Hidden file input for CSV import -->
+                                <input type="file" id="excludeCSVInput" accept=".csv" style="display: none;" onchange="_excludeImportCSV()">
+                                
+                                <!-- List Display -->
+                                <div id="excludeListDisplay" style="
+                                    background: #f8f9fa;
+                                    border: 1px solid #dee2e6;
+                                    border-radius: 4px;
+                                    padding: 10px;
+                                    max-height: 200px;
+                                    overflow-y: auto;
+                                    font-size: 12px;
+                                ">
+                                    <div style="color: #999; text-align: center;">Loading...</div>
+                                </div>
+                                
+                                <!-- Count -->
+                                <div style="margin-top: 8px; font-size: 11px; color: #666; text-align: right;">
+                                    <span id="excludeCount">0</span> stocks excluded
+                                </div>
+                            </div>
 
 							<br><br><br>
                                 <div id = "createForm" style= "display: none;"></div>
@@ -1248,6 +1528,9 @@
 			   	</li>
 			  	</ul>
 		  	</div>
+		</aside>
+	</div><!-- END container -->
+	</div>
 		</aside>
 	</div><!-- END container -->
 	</div>
@@ -1427,17 +1710,352 @@
     } catch(e){ console.warn("car horn beep failed", e); }
   }
 
-  // TTS: read headline text aloud
-  function readHeadlineAloud(text){
+  // Key level alert — ascending then descending tone (1046Hz → 1319Hz → 1046Hz)
+  function playBeepKeyLevel(){
     try {
-      if (!window.speechSynthesis) return;
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = ctx.currentTime;
+      const freqs = [1046, 1319, 1046]; // C-E-C (ascending then descending)
+      for (let i=0; i<freqs.length; i++){
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = freqs[i];
+        gain.gain.value = 0.18;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + i*0.1);
+        osc.stop(now + i*0.1 + 0.12);
+      }
+    } catch(e){ console.warn("key level beep failed", e); }
+  }
+
+  // 200 SMA Bullish Crossover alert — triumphant rising tone (698Hz → 880Hz → 1047Hz)
+  function playBeep200SMABullishCrossover(){
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = ctx.currentTime;
+      const freqs = [698, 880, 1047]; // F-A-C (rising triumphant pattern)
+      for (let i=0; i<freqs.length; i++){
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = freqs[i];
+        gain.gain.value = 0.2;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + i*0.12);
+        osc.stop(now + i*0.12 + 0.14);
+      }
+    } catch(e){ console.warn("200 SMA crossover beep failed", e); }
+  }
+
+  // OBV Strong Bullish alert — triumphant arpeggio (C-E-G-C: 523-659-784-1047Hz)
+  function playBeepOBVBullish(){
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = ctx.currentTime;
+      const freqs = [523, 659, 784, 1047]; // C-E-G-C ascending
+      for (let i=0; i<freqs.length; i++){
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = freqs[i];
+        gain.gain.value = 0.22;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + i*0.08);
+        osc.stop(now + i*0.08 + 0.1);
+      }
+    } catch(e){ console.warn("OBV bullish beep failed", e); }
+  }
+
+  // OBV Strong Bearish alert — descending alert (G-E-C: 784-659-523Hz)
+  function playBeepOBVBearish(){
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = ctx.currentTime;
+      const freqs = [784, 659, 523]; // G-E-C descending
+      for (let i=0; i<freqs.length; i++){
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = freqs[i];
+        gain.gain.value = 0.22;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + i*0.08);
+        osc.stop(now + i*0.08 + 0.1);
+      }
+    } catch(e){ console.warn("OBV bearish beep failed", e); }
+  }
+
+  // TTS: read headline text aloud
+  // Queue for TTS headlines to ensure proper sequential playback
+  let _headlineQueue = [];
+  let _isPlayingHeadline = false;
+  // Track which headlines have been read to prevent infinite repetition
+  let _readHeadlinesCache = new Set();
+  // Track what's already queued to prevent duplicates in same loop
+  let _queuedHeadlines = new Set();
+  // Voice preference - default to 'female' for pleasant voice
+  let _preferredVoiceGender = localStorage.getItem('ttsVoiceGender') || 'female';
+  
+  // Get available voices and select based on preference
+  function _getPreferredVoice() {
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length === 0) return null;
+    
+    if (_preferredVoiceGender === 'system') {
+      return null; // Use system default
+    }
+    
+    // Priority order for female voices (more pleasant sounding)
+    const femaleKeywords = ['female', 'woman', 'samantha', 'victoria', 'karen', 'moira', 'zira', 'susan', 'michelle'];
+    const maleKeywords = ['male', 'man', 'alex', 'daniel', 'george', 'david'];
+    
+    // First pass: exact keyword match
+    for (let voice of voices) {
+      const voiceName = voice.name.toLowerCase();
+      if (_preferredVoiceGender === 'female') {
+        if (femaleKeywords.some(kw => voiceName.includes(kw))) return voice;
+      } else if (_preferredVoiceGender === 'male') {
+        if (maleKeywords.some(kw => voiceName.includes(kw))) return voice;
+      }
+    }
+    
+    // Second pass: broader search
+    for (let voice of voices) {
+      const voiceName = voice.name.toLowerCase();
+      if (_preferredVoiceGender === 'female' && !voiceName.includes('male')) {
+        return voice;
+      }
+      if (_preferredVoiceGender === 'male' && voiceName.includes('male')) {
+        return voice;
+      }
+    }
+    
+    // Fallback: return first voice if gender preference not found
+    return voices.length > 0 ? voices[0] : null;
+  }
+
+  function _processHeadlineQueue() {
+    if (_isPlayingHeadline || _headlineQueue.length === 0) return;
+    
+    const text = _headlineQueue.shift();
+    _isPlayingHeadline = true;
+    
+    try {
+      if (!window.speechSynthesis) {
+        _isPlayingHeadline = false;
+        _processHeadlineQueue();
+        return;
+      }
+      
       const utter = new SpeechSynthesisUtterance(text);
       utter.rate = 1.0;
       utter.pitch = 1.0;
       utter.volume = 0.9;
+      
+      // Apply voice preference
+      const preferredVoice = _getPreferredVoice();
+      if (preferredVoice) {
+        utter.voice = preferredVoice;
+      }
+      
+      // When speech ends, process next item in queue
+      utter.onend = function() {
+        _isPlayingHeadline = false;
+        // Add small delay before next item
+        setTimeout(_processHeadlineQueue, 300);
+      };
+      
+      // Also handle errors and continue with next item
+      utter.onerror = function() {
+        console.warn("TTS error for:", text);
+        _isPlayingHeadline = false;
+        setTimeout(_processHeadlineQueue, 300);
+      };
+      
       window.speechSynthesis.speak(utter);
-    } catch(e){ console.warn("TTS failed", e); }
+    } catch(e) {
+      console.warn("TTS failed:", e);
+      _isPlayingHeadline = false;
+      _processHeadlineQueue();
+    }
   }
+
+  function readHeadlineAloud(text) {
+    if (!text || text.trim() === "") return;
+    
+    // Don't queue if already read in this scan cycle
+    if (_readHeadlinesCache.has(text)) {
+      return; // Already read, skip
+    }
+    
+    // Don't queue if already in current queue
+    if (_queuedHeadlines.has(text)) {
+      return; // Already queued, skip duplicate
+    }
+    
+    // Mark as read and as queued, then add to queue
+    _readHeadlinesCache.add(text);
+    _queuedHeadlines.add(text);
+    _headlineQueue.push(text);
+    _processHeadlineQueue();
+  }
+  
+  // Clear the cache at the start of each new scan (called from renderResultsFromBackend)
+  function _clearHeadlineCache() {
+    _readHeadlinesCache.clear();
+    _queuedHeadlines.clear();
+  }
+  
+  // Utility function to set voice preference ('male', 'female', or 'system')
+  function setTTSVoiceGender(gender) {
+    if (!['male', 'female', 'system'].includes(gender)) {
+      console.warn('Invalid gender. Use: male, female, or system');
+      return;
+    }
+    _preferredVoiceGender = gender;
+    localStorage.setItem('ttsVoiceGender', gender);
+    console.log('TTS voice preference set to:', gender);
+  }
+  
+  // List all available voices
+  function listAvailableVoices() {
+    const voices = window.speechSynthesis.getVoices();
+    console.log('Available TTS Voices:');
+    voices.forEach((voice, idx) => {
+      console.log(`${idx}: ${voice.name} (${voice.lang})`);
+    });
+    return voices;
+  }
+
+  // ===== FIBONACCI PULLBACK MANAGEMENT =====
+  // Track selected Fib level and settings for each symbol during a scan
+  let _fibonacciSettings = {
+    selectedLevels: [0.382, 0.618],  // Default levels to use
+    entryOffsetPct: 0,                // Entry offset %
+    stopLossPct: 2.0,                 // Stop loss as % of move
+    targetProfitPct: 2.0,             // Target as % of move
+    enabled: true                     // Whether to use Fib for auto-orders
+  };
+
+  // Load Fibonacci settings from localStorage
+  function _loadFibonacciSettings() {
+    try {
+      const saved = localStorage.getItem('fibonacciSettings');
+      if (saved) {
+        const loaded = JSON.parse(saved);
+        _fibonacciSettings = { ..._fibonacciSettings, ...loaded };
+      }
+    } catch (e) {
+      console.warn('Failed to load Fibonacci settings:', e);
+    }
+  }
+
+  // Save Fibonacci settings to localStorage
+  function _saveFibonacciSettings() {
+    try {
+      localStorage.setItem('fibonacciSettings', JSON.stringify(_fibonacciSettings));
+      console.log('Fibonacci settings saved');
+    } catch (e) {
+      console.warn('Failed to save Fibonacci settings:', e);
+    }
+  }
+
+  // Calculate order prices for a specific Fib level
+  function calculateFibonacciOrderPrices(prevClose, highOfDay, level, entryOffset=0, stopLossPct=2, targetProfitPct=2) {
+    const move = highOfDay - prevClose;
+    if (move <= 0) return null; // No uptrend
+    
+    const pullback = move * level;
+    const baseEntry = highOfDay - pullback;
+    const entry = baseEntry * (1 + entryOffset / 100.0);
+    
+    const stopDistance = move * (stopLossPct / 100.0);
+    const stopLoss = entry - stopDistance;
+    
+    const targetDistance = move * (targetProfitPct / 100.0);
+    const target = entry + targetDistance;
+    
+    const risk = entry - stopLoss;
+    const reward = target - entry;
+    
+    return {
+      level: level,
+      entry: Math.round(entry * 10000) / 10000,
+      stopLoss: Math.round(stopLoss * 10000) / 10000,
+      target: Math.round(target * 10000) / 10000,
+      risk: Math.round(risk * 10000) / 10000,
+      reward: Math.round(reward * 10000) / 10000,
+      riskRewardRatio: reward > 0 ? Math.round((reward / risk) * 100) / 100 : 0
+    };
+  }
+
+  // Display Fibonacci levels for a stock in an expanded section
+  function displayFibonacciLevels(symbol, fibData) {
+    if (!fibData || !fibData.fibonacciLevels || Object.keys(fibData.fibonacciLevels).length === 0) {
+      return '<div style="color:#999;font-size:12px;">No Fibonacci levels (need uptrend: High > Close)</div>';
+    }
+
+    let html = '<div style="background:#f5f5f5;padding:8px;border-radius:4px;font-size:12px;">';
+    html += '<table style="width:100%;border-collapse:collapse;">';
+    html += '<tr style="background:#e8f4f8;font-weight:bold;">';
+    html += '<th style="padding:4px;border:1px solid #ddd;text-align:center;">Level</th>';
+    html += '<th style="padding:4px;border:1px solid #ddd;text-align:right;">Entry</th>';
+    html += '<th style="padding:4px;border:1px solid #ddd;text-align:right;">Stop</th>';
+    html += '<th style="padding:4px;border:1px solid #ddd;text-align:right;">Target</th>';
+    html += '<th style="padding:4px;border:1px solid #ddd;text-align:center;">R:R</th>';
+    html += '</tr>';
+
+    for (const levelKey in fibData.fibonacciLevels) {
+      const level = fibData.fibonacciLevels[levelKey];
+      const prices = calculateFibonacciOrderPrices(
+        fibData.prevClose,
+        fibData.highOfDay,
+        level.level,
+        _fibonacciSettings.entryOffsetPct,
+        _fibonacciSettings.stopLossPct,
+        _fibonacciSettings.targetProfitPct
+      );
+
+      if (prices) {
+        html += '<tr>';
+        html += `<td style="padding:4px;border:1px solid #ddd;text-align:center;"><strong>${(level.level * 100).toFixed(1)}%</strong></td>`;
+        html += `<td style="padding:4px;border:1px solid #ddd;text-align:right;color:#0066cc;"><strong>${prices.entry.toFixed(3)}</strong></td>`;
+        html += `<td style="padding:4px;border:1px solid #ddd;text-align:right;color:#cc0000;">${prices.stopLoss.toFixed(3)}</td>`;
+        html += `<td style="padding:4px;border:1px solid #ddd;text-align:right;color:#00aa00;">${prices.target.toFixed(3)}</td>`;
+        html += `<td style="padding:4px;border:1px solid #ddd;text-align:center;">${prices.riskRewardRatio}:1</td>`;
+        html += '</tr>';
+      }
+    }
+
+    html += '</table>';
+    html += '<div style="margin-top:6px;font-size:11px;color:#666;">';
+    html += `Move: ${fibData.fibonacciMove.toFixed(3)} | Prev Close: ${fibData.prevClose.toFixed(3)} | High: ${fibData.highOfDay.toFixed(3)}`;
+    html += '</div>';
+    html += '</div>';
+    return html;
+  }
+
+  // Initialize Fibonacci settings on page load
+  _loadFibonacciSettings();
+
+  // Initialize TTS voice on page load
+  function _initializeTTSVoice() {
+    // Wait for voices to load (sometimes takes a moment)
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length === 0) {
+      // Voices not loaded yet, retry after a short delay
+      setTimeout(_initializeTTSVoice, 100);
+      return;
+    }
+    
+    // Get the preferred voice (should be female by default)
+    const selectedVoice = _getPreferredVoice();
+    console.log('TTS Initialized - Preference: ' + _preferredVoiceGender + ' | Selected Voice: ' + (selectedVoice ? selectedVoice.name : 'System Default'));
+  }
+
+  // Try to initialize voices when page loads
+  _initializeTTSVoice();
 </script>
 
 
@@ -1557,6 +2175,9 @@ function renderResultsFromBackend(response) {
 
     // Store scan stock data globally for multi-level order reference
     window._scanStockData = {};
+    
+    // Clear headline cache at start of each new scan cycle
+    _clearHeadlineCache();
 
     // warnings
     if ("warning" in response && response.warning && Object.keys(response.warning).length > 0) {
@@ -1683,6 +2304,21 @@ function renderResultsFromBackend(response) {
                     if ("cross50SMA_pctFromSMA" in dta) headerCols.push({ key: "cross50SMA_pctFromSMA", label: "% from 50", vrKey: "cross50SMA" });
                     if ("cross200SMA_value" in dta) headerCols.push({ key: "cross200SMA_value", label: "200 SMA", vrKey: "cross200SMA_val" });
                     if ("cross200SMA_pctFromSMA" in dta) headerCols.push({ key: "cross200SMA_pctFromSMA", label: "% from 200", vrKey: "cross200SMA" });
+                    
+                    // Price/Volume monitoring columns
+                    if ("pctChange" in dta) headerCols.push({ key: "pctChange", label: "% Chg", vrKey: "pctChange" });
+                    if ("volumeSum" in dta) headerCols.push({ key: "volumeSum", label: "Vol Sum", raw: true, vrKey: "volumeSum" });
+                    if ("nearKeyLevel" in dta) headerCols.push({ key: "nearKeyLevel", label: "Key Level", vrKey: "keyLevel" });
+                    
+                    // SMA Crossover columns
+                    if ("sma200BullishCrossover" in dta) headerCols.push({ key: "sma200BullishCrossover", label: "200 SMA Cross", vrKey: "sma200Crossover" });
+                    
+                    // OBV Analysis columns
+                    if ("obvTrend" in dta) headerCols.push({ key: "obvTrend", label: "OBV Trend" });
+                    if ("obvStrength" in dta) headerCols.push({ key: "obvStrength", label: "OBV Strength" });
+                    if ("obvAboveMA" in dta) headerCols.push({ key: "obvAboveMA", label: "OBV>MA", vrKey: "obvAboveMovingAverage" });
+                    if ("obvMomentum" in dta) headerCols.push({ key: "obvMomentum", label: "OBV Mom %" });
+                    if ("obvSignal" in dta) headerCols.push({ key: "obvSignal", label: "OBV Signal" });
 
                     // pivot primary
                     const pivotPrimary = [];
@@ -1765,8 +2401,76 @@ function renderResultsFromBackend(response) {
                 const decision = Number.isFinite(np) ? (np > 0 ? "UP" : np < 0 ? "DOWN" : "UNCHANGE") : "UNCHANGE";
                 const rowClass = dta.signal === "yes" ? `content${tableId} yescondition` : `content${tableId}`;
                 const _keywordRowStyle = dta.newsKeywordMatch ? " style='background:#fef9e7'" : "";
+                
+                // Check if near key level and apply blue highlighting
+                let keyLevelStyle = "";
+                if (dta.variableResults && dta.variableResults["keyLevel"]) {
+                    keyLevelStyle = " style='background:#d6eaf8;color:#000;font-weight:600'";
+                    // Play sound if enabled
+                    try {
+                        const playSound = document.querySelector('input[name="PlayKeyLevelSound"]');
+                        if (playSound && playSound.checked) {
+                            playBeepKeyLevel();
+                        }
+                    } catch(e) {
+                        console.warn("Key level sound playback error:", e);
+                    }
+                }
 
-                txt1 += `<tr class='${rowClass}'${_keywordRowStyle}>`;
+                // Check if 200 SMA bullish crossover and apply orange highlighting
+                let sma200CrossoverStyle = "";
+                if (dta.variableResults && dta.variableResults["sma200Crossover"]) {
+                    sma200CrossoverStyle = " style='background:#ffe5cc;color:#000;font-weight:700'";
+                    // Play sound if enabled
+                    try {
+                        const playSound = document.querySelector('input[name="PlaySound200SMA"]');
+                        if (playSound && playSound.checked) {
+                            playBeep200SMABullishCrossover();
+                        }
+                    } catch(e) {
+                        console.warn("200 SMA crossover sound playback error:", e);
+                    }
+                }
+
+                // Check OBV analysis and apply highlighting + sounds
+                let obvStyle = "";
+                if (dta.obvAnalysis && dta.obvAnalysis.signal) {
+                    const signal = dta.obvAnalysis.signal;
+                    
+                    if (signal === "strong_bullish") {
+                        // Purple for strong bullish OBV
+                        obvStyle = " style='background:#e6d5f0;color:#000;font-weight:700'";
+                        try {
+                            const enableAudio = document.querySelector('input[name="EnableOBVAudio"]');
+                            if (enableAudio && enableAudio.checked) {
+                                playBeepOBVBullish();
+                            }
+                        } catch(e) {
+                            console.warn("OBV bullish sound error:", e);
+                        }
+                    } else if (signal === "bullish") {
+                        // Light purple for bullish OBV
+                        obvStyle = " style='background:#f0e6ff;color:#000;font-weight:600'";
+                    } else if (signal === "strong_bearish") {
+                        // Light red for strong bearish OBV
+                        obvStyle = " style='background:#ffe6e6;color:#000;font-weight:700'";
+                        try {
+                            const enableAudio = document.querySelector('input[name="EnableOBVAudio"]');
+                            if (enableAudio && enableAudio.checked) {
+                                playBeepOBVBearish();
+                            }
+                        } catch(e) {
+                            console.warn("OBV bearish sound error:", e);
+                        }
+                    } else if (signal === "bearish") {
+                        // Very light red for bearish OBV
+                        obvStyle = " style='background:#fff0f0;color:#000;font-weight:600'";
+                    }
+                }
+
+                // Apply style in priority: OBV > sma200Crossover > keyLevel > newsKeyword
+                let appliedStyle = obvStyle || sma200CrossoverStyle || keyLevelStyle || _keywordRowStyle;
+                txt1 += `<tr class='${rowClass}'${appliedStyle}>`;
 
                 const headerCols = groupHeaderCols || [];
                 const pivotPrimary = groupPivotPrimary || [];
@@ -1818,6 +2522,8 @@ function renderResultsFromBackend(response) {
                     if (col.key === "symbol") {
                         const displayVal = (v === null || v === undefined || v === "") ? "n.d" : v;
                         cellMap[col.key] = `<td class='${stickyClass}' data-col='${col.key}'${cellStyle} style='white-space:nowrap'>${displayVal} <span class='news-arrow-sym' title='Toggle news (${_newsCount})' style='cursor:pointer;color:${_newsArrowColor};font-size:11px;margin-left:4px' onclick="event.stopPropagation();var el=document.getElementById('${_newsRowId}');var arrows=el.parentNode.querySelectorAll('.news-arrow');if(el.style.display==='none'){el.style.display='table-row';this.innerHTML='&#9650;';arrows.forEach(function(a){a.innerHTML='&#9650;'})}else{el.style.display='none';this.innerHTML='&#9660;';arrows.forEach(function(a){a.innerHTML='&#9660;'})}">&#9660;</span></td>`;
+                    } else if (col.key === "marketCap" || col.key === "marketCap1") {
+                        cellMap[col.key] = `<td class='${stickyClass}' data-col='${col.key}'${cellStyle}>${fmt(v, 1)}</td>`;
                     } else if (col.raw) {
                         cellMap[col.key] = `<td class='${stickyClass}' data-col='${col.key}'${cellStyle}>${(v === null || v === undefined || v === "") ? "n.d" : v}</td>`;
                     } else {
@@ -2026,10 +2732,37 @@ function renderResultsFromBackend(response) {
             }
         }
 
-        // TTS: read matched keyword headlines aloud if enabled
+        // TTS: read matched keyword headlines aloud if enabled AND within time window
         {
             const readAloud = document.querySelector('.NewsReadAloud');
             if (readAloud && readAloud.value === 'on') {
+                // Get time window settings
+                const withinValueInput = document.querySelector('.NewsReadAloudWithinValue');
+                const timeUnitSelect = document.querySelector('.NewsReadAloudTimeUnit');
+                let withinMinutes = 0;
+                
+                if (withinValueInput && timeUnitSelect) {
+                    try {
+                        const withinValue = parseInt(withinValueInput.value) || 0;
+                        const timeUnit = (timeUnitSelect.value || 'minutes').toLowerCase();
+                        
+                        if (withinValue > 0) {
+                            if (timeUnit === 'hours') {
+                                withinMinutes = withinValue * 60;
+                            } else if (timeUnit === 'days') {
+                                withinMinutes = withinValue * 1440;
+                            } else {
+                                withinMinutes = withinValue;
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("Error parsing read aloud time window:", e);
+                    }
+                }
+                
+                const now = Date.now();
+                const cutoffTime = withinMinutes > 0 ? now - (withinMinutes * 60 * 1000) : 0;
+                
                 for (const groupKey in msg) {
                     const rows = Array.isArray(msg[groupKey])
                         ? msg[groupKey]
@@ -2038,17 +2771,65 @@ function renderResultsFromBackend(response) {
                         const matched = dta.matchedKeywordHeadlines || [];
                         const sym = dta.symbol || dta.cusip || "";
                         for (const hl of matched) {
-                            readHeadlineAloud(sym + ": " + hl);
+                            // Check if headline is within time window
+                            let shouldRead = true;
+                            if (withinMinutes > 0 && dta.newsHeadlines && Array.isArray(dta.newsHeadlines)) {
+                                // Find the full headline object to get timestamp
+                                const fullHeadline = dta.newsHeadlines.find(h => 
+                                    (h.headline || "").trim() === hl.trim()
+                                );
+                                if (fullHeadline) {
+                                    const headlineTime = fullHeadline.parsedTime ? new Date(fullHeadline.parsedTime).getTime() : now;
+                                    shouldRead = headlineTime >= cutoffTime;
+                                }
+                            }
+                            
+                            if (shouldRead) {
+                                readHeadlineAloud(sym + ": " + hl);
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Auto-read all news headlines (not just keyword matches) if enabled
+        // Auto-read all news headlines (not just keyword matches) if enabled AND within time window
         {
             const autoReadAllNews = document.querySelector('.NewsAutoReadAll');
-            if (autoReadAllNews && autoReadAllNews.value === 'on') {
+            // Debug: log the element and its value
+            if (autoReadAllNews) {
+                console.log("NewsAutoReadAll element found, value:", autoReadAllNews.value);
+            }
+            
+            if (autoReadAllNews && (autoReadAllNews.value === 'on' || autoReadAllNews.value === 'True')) {
+                console.log("Auto-read all news is enabled, processing headlines...");
+                // Get time window settings (same as Read Headlines Aloud)
+                const withinValueInput = document.querySelector('.NewsReadAloudWithinValue');
+                const timeUnitSelect = document.querySelector('.NewsReadAloudTimeUnit');
+                let withinMinutes = 0;
+                
+                if (withinValueInput && timeUnitSelect) {
+                    try {
+                        const withinValue = parseInt(withinValueInput.value) || 0;
+                        const timeUnit = (timeUnitSelect.value || 'minutes').toLowerCase();
+                        
+                        if (withinValue > 0) {
+                            if (timeUnit === 'hours') {
+                                withinMinutes = withinValue * 60;
+                            } else if (timeUnit === 'days') {
+                                withinMinutes = withinValue * 1440;
+                            } else {
+                                withinMinutes = withinValue;
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("Error parsing read aloud time window:", e);
+                    }
+                }
+                
+                const now = Date.now();
+                const cutoffTime = withinMinutes > 0 ? now - (withinMinutes * 60 * 1000) : 0;
+                
                 for (const groupKey in msg) {
                     const rows = Array.isArray(msg[groupKey])
                         ? msg[groupKey]
@@ -2057,12 +2838,29 @@ function renderResultsFromBackend(response) {
                         const allHeadlines = dta.newsHeadlines || [];
                         const sym = dta.symbol || dta.cusip || "";
                         if (allHeadlines.length > 0) {
-                            // Read symbol first
-                            readHeadlineAloud("News for " + sym);
-                            // Then read each headline
+                            // Filter headlines by time window and read symbol once for the group
+                            const headlinesToRead = [];
                             for (const hl of allHeadlines) {
                                 const headline = hl.headline || "";
                                 if (headline.trim()) {
+                                    // Check if headline is within time window
+                                    let shouldRead = true;
+                                    if (withinMinutes > 0) {
+                                        const headlineTime = hl.parsedTime ? new Date(hl.parsedTime).getTime() : now;
+                                        shouldRead = headlineTime >= cutoffTime;
+                                    }
+                                    
+                                    if (shouldRead) {
+                                        headlinesToRead.push(headline);
+                                    }
+                                }
+                            }
+                            
+                            // Only read symbol and headlines if we have any to read
+                            if (headlinesToRead.length > 0) {
+                                console.log("Reading headlines for symbol:", sym, "Count:", headlinesToRead.length);
+                                readHeadlineAloud("News for " + sym);
+                                for (const headline of headlinesToRead) {
                                     readHeadlineAloud(headline);
                                 }
                             }
@@ -2113,6 +2911,9 @@ function renderResultsFromBackend(response) {
         // Initialize control bar & drag-drop for this table
         _buildControlBar();
         _initDragReorder(tableId);
+
+        // Initialize sorting for this table
+        _initTableSorting(tableId, msg);
 
         tableId += 1;
     } // end for each etf
@@ -2468,6 +3269,163 @@ function _initDragReorder(tableId) {
         })(ths[i], i);
     }
 }
+
+/* ================================================================
+   TABLE SORTING: Handle column clicks to sort rows
+   - Prioritizes rows meeting all criteria (signal === "yes")
+   - Then sorts by most recent news
+   - Then sorts by clicked column (numeric or alphabetic)
+   ================================================================ */
+
+// Global state for table sorting
+window._tablesSortState = {};
+
+function _initTableSorting(tableId, groupData) {
+    // Store original data for this table
+    window._tablesSortState[tableId] = {
+        originalData: JSON.parse(JSON.stringify(groupData)),
+        sortColumn: null,
+        sortAscending: true
+    };
+
+    // Add click handlers to all headers
+    const thead = document.querySelector(`#responsive-data-table-${tableId} thead`);
+    if (!thead) return;
+
+    const ths = thead.querySelectorAll('th');
+    for (let i = 0; i < ths.length; i++) {
+        const th = ths[i];
+        const colKey = th.getAttribute('data-col');
+        
+        // Skip non-sortable columns
+        if (colKey === '_placeOrder' || colKey === '_news' || colKey === 'netPosition') continue;
+        
+        // Add pointer cursor to indicate it's clickable
+        th.style.cursor = 'pointer';
+        th.title = `Click to sort by ${th.textContent}`;
+        
+        // Add click handler
+        th.addEventListener('click', function(e) {
+            e.stopPropagation();
+            _sortTable(tableId, colKey);
+        });
+    }
+}
+
+function _sortTable(tableId, sortColumn) {
+    const state = window._tablesSortState[tableId];
+    if (!state) return;
+
+    // Toggle ascending/descending if clicking same column
+    if (state.sortColumn === sortColumn) {
+        state.sortAscending = !state.sortAscending;
+    } else {
+        state.sortColumn = sortColumn;
+        state.sortAscending = true;
+    }
+
+    // Get all rows from the table body
+    const table = document.querySelector(`#responsive-data-table-${tableId}`);
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr:not(.news-row)'));
+
+    // Extract data and sort
+    const rowsData = [];
+    for (let row of rows) {
+        // Get symbol from first cell for matching original data
+        const symbolCell = row.querySelector('td:first-child');
+        const symbol = symbolCell ? symbolCell.textContent.trim().split(/\s+/)[0] : '';
+        rowsData.push({ element: row, symbol: symbol });
+    }
+
+    // Sort by priority:
+    // 1. Rows meeting all criteria (signal === "yes")
+    // 2. Most recent news
+    // 3. Selected column value
+    rowsData.sort((a, b) => {
+        const origData = state.originalData;
+        let aData = null, bData = null;
+
+        // Find original data for each row
+        for (const groupKey in origData) {
+            const group = origData[groupKey];
+            if (Array.isArray(group)) {
+                aData = aData || group.find(d => d.symbol === a.symbol);
+                bData = bData || group.find(d => d.symbol === b.symbol);
+            } else {
+                for (const key in group) {
+                    if (Array.isArray(group[key])) {
+                        aData = aData || group[key].find(d => d.symbol === a.symbol);
+                        bData = bData || group[key].find(d => d.symbol === b.symbol);
+                    }
+                }
+            }
+        }
+
+        // Priority 1: Rows meeting all criteria (signal === "yes") come first
+        const aSignal = aData ? (aData.signal === "yes" ? 1 : 0) : 0;
+        const bSignal = bData ? (bData.signal === "yes" ? 1 : 0) : 0;
+        if (aSignal !== bSignal) return bSignal - aSignal;
+
+        // Priority 2: Most recent news
+        const aTime = aData?.latestNewsTime || "";
+        const bTime = bData?.latestNewsTime || "";
+        if (aTime && bTime && aTime !== bTime) {
+            const cmp = bTime.localeCompare(aTime);
+            if (cmp !== 0) return cmp;
+        } else if (aTime && !bTime) return -1;
+        else if (!aTime && bTime) return 1;
+
+        // Priority 3: Sort by clicked column
+        let aVal = aData ? aData[sortColumn] : "";
+        let bVal = bData ? bData[sortColumn] : "";
+
+        // Handle null/undefined
+        if (aVal == null) aVal = "";
+        if (bVal == null) bVal = "";
+
+        // Try numeric comparison first
+        const aNum = parseFloat(aVal);
+        const bNum = parseFloat(bVal);
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+            return state.sortAscending ? (aNum - bNum) : (bNum - aNum);
+        }
+
+        // String comparison
+        const aStr = String(aVal).toLowerCase();
+        const bStr = String(bVal).toLowerCase();
+        const cmp = aStr.localeCompare(bStr);
+        return state.sortAscending ? cmp : -cmp;
+    });
+
+    // Update visual indicators on headers
+    const thead = table.querySelector('thead');
+    const allThs = thead.querySelectorAll('th');
+    allThs.forEach(th => {
+        const indicator = th.querySelector('.sort-indicator');
+        if (indicator) indicator.remove();
+        th.style.fontWeight = 'normal';
+    });
+
+    // Add indicator to active column
+    const activeTh = thead.querySelector(`th[data-col="${sortColumn}"]`);
+    if (activeTh) {
+        activeTh.style.fontWeight = 'bold';
+        const arrow = state.sortAscending ? '▲' : '▼';
+        const span = document.createElement('span');
+        span.className = 'sort-indicator';
+        span.textContent = ' ' + arrow;
+        span.style.fontSize = '0.8em';
+        span.style.color = '#0969da';
+        activeTh.appendChild(span);
+    }
+
+    // Re-insert sorted rows
+    for (let item of rowsData) {
+        tbody.appendChild(item.element);
+    }
+}
+
 </script>
 <!-- ============ END COLUMN MANAGEMENT JS ============ -->
 
@@ -2912,17 +3870,47 @@ function addButtonBuy (nelm, idtouse) {
     html += '</div>';
     html += '</div>'; // end manual section
     
-    // Fibonacci Entry Section
+    // Fibonacci Entry Section - Enhanced
     html += '<div class="oe-entry-fib-section" style="display:none;">';
-    html += '<div class="oe-row">';
-    html += '  <div class="oe-field"><label class="oe-label">Entry at Fib Level</label><select class="oe-select oe-fib-entry-level" onchange="_oeCalcFromFib()"><option value="">-- Select Level --</option><option value="38.2">38.2%</option><option value="50">50%</option><option value="61.8">61.8%</option></select></div>';
-    html += '  <div class="oe-field"><label class="oe-label">Entry Offset %</label><input type="number" step="0.1" value="0" class="oe-input oe-fib-entry-offset" onchange="_oeCalcFromFib()"></div>';
-    html += '  <div class="oe-field"><label class="oe-label">Entry Level Value</label><input type="number" step="0.01" class="oe-input oe-fib-entry-val" readonly style="background:#f6f8fa;"></div>';
+    html += '<div style="background:#f6f8fa;padding:12px;border-radius:6px;margin-bottom:12px;border-left:3px solid #0969da;">';
+    html += '  <strong style="color:#0969da;">Fibonacci Pullback Calculator</strong>';
     html += '</div>';
+    
+    // Move calculation inputs
     html += '<div class="oe-row">';
+    html += '  <div class="oe-field"><label class="oe-label">Swing High ($)</label><input type="number" step="0.01" value="" class="oe-input oe-fib-high" placeholder="e.g., 2.50" onchange="_oeCalcFibLevels()"></div>';
+    html += '  <div class="oe-field"><label class="oe-label">Swing Low ($)</label><input type="number" step="0.01" value="" class="oe-input oe-fib-low" placeholder="e.g., 1.00" onchange="_oeCalcFibLevels()"></div>';
+    html += '  <div class="oe-field"><label class="oe-label">Move Size ($)</label><input type="number" step="0.01" class="oe-input oe-fib-move" readonly style="background:#f6f8fa;"></div>';
+    html += '</div>';
+    
+    // Fibonacci levels display
+    html += '<div style="background:#fff;border:1px solid #d0d7de;border-radius:6px;padding:10px;margin:10px 0;font-size:13px;">';
+    html += '  <div style="font-weight:600;margin-bottom:8px;color:#1f2328;">Pullback Levels from High</div>';
+    html += '  <div class="oe-fib-levels-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));gap:8px;">';
+    html += '    <div><label style="font-size:12px;color:#57606a;"><input type="radio" name="oe_fib_level" value="0.236" onchange="_oeCalcFibEntry()"> <strong>23.6%</strong> = <span class="oe-fib-23-6">--</span></label></div>';
+    html += '    <div><label style="font-size:12px;color:#57606a;"><input type="radio" name="oe_fib_level" value="0.382" onchange="_oeCalcFibEntry()"> <strong>38.2%</strong> = <span class="oe-fib-38-2">--</span></label></div>';
+    html += '    <div><label style="font-size:12px;color:#57606a;"><input type="radio" name="oe_fib_level" value="0.50" onchange="_oeCalcFibEntry()"> <strong>50.0%</strong> = <span class="oe-fib-50-0">--</span></label></div>';
+    html += '    <div><label style="font-size:12px;color:#57606a;"><input type="radio" name="oe_fib_level" value="0.618" onchange="_oeCalcFibEntry()"> <strong>61.8%</strong> = <span class="oe-fib-61-8">--</span></label></div>';
+    html += '    <div><label style="font-size:12px;color:#57606a;"><input type="radio" name="oe_fib_level" value="0.786" onchange="_oeCalcFibEntry()"> <strong>78.6%</strong> = <span class="oe-fib-78-6">--</span></label></div>';
+    html += '  </div>';
+    html += '</div>';
+    
+    // Entry calculation
+    html += '<div class="oe-row">';
+    html += '  <div class="oe-field"><label class="oe-label">Entry Offset %</label><input type="number" step="0.01" value="0" class="oe-input oe-fib-entry-offset" onchange="_oeCalcFibEntry()"></div>';
     html += '  <div class="oe-field"><label class="oe-label">Calculated Entry</label><input type="number" step="0.01" class="oe-input oe-fib-entry-price" readonly style="background:#f6f8fa;" onchange="_oeRecalcStopTarget()"></div>';
-    html += '  <div class="oe-field oe-bracket-field"><label class="oe-label">Target at Fib %</label><input type="number" step="0.1" value="0" class="oe-input oe-fib-target-offset" onchange="_oeCalcFromFib()"></div>';
-    html += '  <div class="oe-field oe-bracket-field"><label class="oe-label">Stop at Fib %</label><input type="number" step="0.1" value="0" class="oe-input oe-fib-stop-offset" onchange="_oeCalcFromFib()"></div>';
+    html += '</div>';
+    
+    // Stop and Target percentages
+    html += '<div class="oe-row oe-bracket-field">';
+    html += '  <div class="oe-field"><label class="oe-label">Stop Loss % from Entry</label><input type="number" step="0.01" value="1" class="oe-input oe-fib-stop-pct" onchange="_oeCalcFibEntry()"></div>';
+    html += '  <div class="oe-field"><label class="oe-label">Target % from Entry</label><input type="number" step="0.01" value="2" class="oe-input oe-fib-target-pct" onchange="_oeCalcFibEntry()"></div>';
+    html += '</div>';
+    
+    // Final prices
+    html += '<div class="oe-row oe-bracket-field">';
+    html += '  <div class="oe-field"><label class="oe-label">Final Stop Price</label><input type="number" step="0.01" class="oe-input oe-fib-stop-price" readonly style="background:#f6f8fa;"></div>';
+    html += '  <div class="oe-field"><label class="oe-label">Final Target Price</label><input type="number" step="0.01" class="oe-input oe-fib-target-price" readonly style="background:#f6f8fa;"></div>';
     html += '</div>';
     html += '</div>'; // end fib section
     
@@ -3382,55 +4370,99 @@ function _oeToggleEntryMode() {
 }
 
 function _oeCalcFromFib() {
+    // Legacy function - kept for backward compatibility
+    // The new function is _oeCalcFibLevels and _oeCalcFibEntry
+    _oeCalcFibLevels();
+}
+
+function _oeCalcFibLevels() {
     try {
-        var sym = window._mlCurrentSymbol || '';
-        var data = (window._scanStockData && window._scanStockData[sym]) ? window._scanStockData[sym] : null;
-        if (!data) {
-            console.warn('No scan data found for', sym);
+        var high = parseFloat(document.querySelector('.oe-fib-high').value) || 0;
+        var low = parseFloat(document.querySelector('.oe-fib-low').value) || 0;
+        
+        if (high <= 0 || low <= 0 || high <= low) {
+            // Invalid range
+            document.querySelector('.oe-fib-move').value = '';
+            document.querySelector('.oe-fib-23-6').textContent = '--';
+            document.querySelector('.oe-fib-38-2').textContent = '--';
+            document.querySelector('.oe-fib-50-0').textContent = '--';
+            document.querySelector('.oe-fib-61-8').textContent = '--';
+            document.querySelector('.oe-fib-78-6').textContent = '--';
             return;
         }
         
-        // Get the selected Fibonacci level and offset
-        var fibLevel = document.querySelector('.oe-fib-entry-level').value;
+        var moveSize = high - low;
+        document.querySelector('.oe-fib-move').value = moveSize.toFixed(2);
+        
+        // Calculate all 5 Fibonacci pullback levels from the high
+        // Level = High - (Move Size × Fib Ratio)
+        var fib236 = (high - (moveSize * 0.236)).toFixed(2);
+        var fib382 = (high - (moveSize * 0.382)).toFixed(2);
+        var fib500 = (high - (moveSize * 0.50)).toFixed(2);
+        var fib618 = (high - (moveSize * 0.618)).toFixed(2);
+        var fib786 = (high - (moveSize * 0.786)).toFixed(2);
+        
+        document.querySelector('.oe-fib-23-6').textContent = fib236;
+        document.querySelector('.oe-fib-38-2').textContent = fib382;
+        document.querySelector('.oe-fib-50-0').textContent = fib500;
+        document.querySelector('.oe-fib-61-8').textContent = fib618;
+        document.querySelector('.oe-fib-78-6').textContent = fib786;
+        
+        // Calculate entry price with selected level
+        _oeCalcFibEntry();
+    } catch(e) {
+        console.error('_oeCalcFibLevels error:', e);
+    }
+}
+
+function _oeCalcFibEntry() {
+    try {
+        // Get selected Fibonacci level
+        var selectedLevel = document.querySelector('input[name="oe_fib_level"]:checked');
+        if (!selectedLevel) return;
+        
+        var fibLevel = parseFloat(selectedLevel.value);
+        var high = parseFloat(document.querySelector('.oe-fib-high').value) || 0;
+        var moveSize = parseFloat(document.querySelector('.oe-fib-move').value) || 0;
+        
+        if (moveSize <= 0) return;
+        
+        // Calculate pullback entry at selected Fibonacci level
+        var fibLevelPrice = high - (moveSize * fibLevel);
+        
+        // Apply entry offset percentage
         var entryOffset = parseFloat(document.querySelector('.oe-fib-entry-offset').value) || 0;
-        var targetOffset = parseFloat(document.querySelector('.oe-fib-target-offset').value) || 0;
-        var stopOffset = parseFloat(document.querySelector('.oe-fib-stop-offset').value) || 0;
+        var entryPrice = fibLevelPrice * (1 + entryOffset / 100.0);
         
-        // Map level names to data keys
-        var levelMap = {
-            '38.2': 'fib38',
-            '50': 'fib50',
-            '61.8': 'fib618'
-        };
+        // Get stop and target percentages
+        var stopPct = parseFloat(document.querySelector('.oe-fib-stop-pct').value) || 1;
+        var targetPct = parseFloat(document.querySelector('.oe-fib-target-pct').value) || 2;
         
-        var dataKey = levelMap[fibLevel];
-        if (!dataKey || !data[dataKey]) {
-            console.warn('Fibonacci level data not available:', fibLevel);
-            return;
+        // Calculate stop and target based on entry price
+        var side = document.querySelector('.longshortside') ? document.querySelector('.longshortside').value : 'long';
+        var stopPrice, targetPrice;
+        
+        if (side === 'long') {
+            stopPrice = entryPrice * (1 - stopPct / 100.0);
+            targetPrice = entryPrice * (1 + targetPct / 100.0);
+        } else {
+            stopPrice = entryPrice * (1 + stopPct / 100.0);
+            targetPrice = entryPrice * (1 - targetPct / 100.0);
         }
         
-        var fibValue = parseFloat(data[dataKey]) || 0;
-        if (fibValue <= 0) return;
-        
-        // Update fib value display
-        document.querySelector('.oe-fib-entry-val').value = fibValue.toFixed(2);
-        
-        // Calculate entry price: fib level +/- offset%
-        var entryPrice = fibValue * (1 + entryOffset / 100.0);
+        // Update all calculated fields
         document.querySelector('.oe-fib-entry-price').value = entryPrice.toFixed(2);
+        document.querySelector('.oe-fib-stop-price').value = stopPrice.toFixed(2);
+        document.querySelector('.oe-fib-target-price').value = targetPrice.toFixed(2);
+        
+        // Also update the manual entry/stop/target fields
         document.querySelector('.pricelimit').value = entryPrice.toFixed(2);
-        
-        // Calculate target: entry +/- target offset%
-        var targetPrice = entryPrice * (1 + targetOffset / 100.0);
-        document.querySelector('.resistencelimit').value = targetPrice.toFixed(2);
-        
-        // Calculate stop: entry +/- stop offset%
-        var stopPrice = entryPrice * (1 + stopOffset / 100.0);
         document.querySelector('.supportlimit').value = stopPrice.toFixed(2);
+        document.querySelector('.resistencelimit').value = targetPrice.toFixed(2);
         
         _oeCalcSharesFromDollars();
     } catch(e) {
-        console.error('_oeCalcFromFib error:', e);
+        console.error('_oeCalcFibEntry error:', e);
     }
 }
 
@@ -3442,10 +4474,13 @@ function _oeGetSettings() {
         orderType: document.querySelector('.bracketLimit') ? document.querySelector('.bracketLimit').value : 'bracket',
         side: document.querySelector('.longshortside') ? document.querySelector('.longshortside').value : 'long',
         entryMode: document.querySelector('.oe-entry-mode') ? document.querySelector('.oe-entry-mode').value : 'manual',
-        fibEntryLevel: document.querySelector('.oe-fib-entry-level') ? document.querySelector('.oe-fib-entry-level').value : '',
+        // Enhanced Fibonacci fields
+        fibHigh: document.querySelector('.oe-fib-high') ? document.querySelector('.oe-fib-high').value : '',
+        fibLow: document.querySelector('.oe-fib-low') ? document.querySelector('.oe-fib-low').value : '',
+        fibLevel: document.querySelector('input[name="oe_fib_level"]:checked') ? document.querySelector('input[name="oe_fib_level"]:checked').value : '0.382',
         fibEntryOffset: document.querySelector('.oe-fib-entry-offset') ? document.querySelector('.oe-fib-entry-offset').value : '0',
-        fibTargetOffset: document.querySelector('.oe-fib-target-offset') ? document.querySelector('.oe-fib-target-offset').value : '0',
-        fibStopOffset: document.querySelector('.oe-fib-stop-offset') ? document.querySelector('.oe-fib-stop-offset').value : '0',
+        fibStopPct: document.querySelector('.oe-fib-stop-pct') ? document.querySelector('.oe-fib-stop-pct').value : '1',
+        fibTargetPct: document.querySelector('.oe-fib-target-pct') ? document.querySelector('.oe-fib-target-pct').value : '2',
         stopLossPct: document.querySelector('.stoplosslimit') ? document.querySelector('.stoplosslimit').value : '1',
         stopPct: document.querySelector('.oe-pct-support') ? document.querySelector('.oe-pct-support').value : '1',
         targetPct: document.querySelector('.oe-pct-resist') ? document.querySelector('.oe-pct-resist').value : '1',
@@ -3466,10 +4501,13 @@ function _oeApplySettings(s, entryPrice) {
     if (s.orderType) { var el = document.querySelector('.bracketLimit'); if (el) { el.value = s.orderType; _oeToggleBracket(); } }
     if (s.side) { var el = document.querySelector('.longshortside'); if (el) el.value = s.side; }
     if (s.entryMode) { var el = document.querySelector('.oe-entry-mode'); if (el) { el.value = s.entryMode; _oeToggleEntryMode(); } }
-    if (s.fibEntryLevel) { var el = document.querySelector('.oe-fib-entry-level'); if (el) el.value = s.fibEntryLevel; }
+    // Apply enhanced Fibonacci fields
+    if (s.fibHigh) { var el = document.querySelector('.oe-fib-high'); if (el) el.value = s.fibHigh; }
+    if (s.fibLow) { var el = document.querySelector('.oe-fib-low'); if (el) el.value = s.fibLow; }
+    if (s.fibLevel) { var el = document.querySelector('input[name="oe_fib_level"][value="' + s.fibLevel + '"]'); if (el) el.checked = true; }
     if (s.fibEntryOffset) { var el = document.querySelector('.oe-fib-entry-offset'); if (el) el.value = s.fibEntryOffset; }
-    if (s.fibTargetOffset) { var el = document.querySelector('.oe-fib-target-offset'); if (el) el.value = s.fibTargetOffset; }
-    if (s.fibStopOffset) { var el = document.querySelector('.oe-fib-stop-offset'); if (el) el.value = s.fibStopOffset; }
+    if (s.fibStopPct) { var el = document.querySelector('.oe-fib-stop-pct'); if (el) el.value = s.fibStopPct; }
+    if (s.fibTargetPct) { var el = document.querySelector('.oe-fib-target-pct'); if (el) el.value = s.fibTargetPct; }
     if (s.stopLossPct) { var el = document.querySelector('.stoplosslimit'); if (el) el.value = s.stopLossPct; }
     if (s.stopPct) { var el = document.querySelector('.oe-pct-support'); if (el) el.value = s.stopPct; }
     if (s.targetPct) { var el = document.querySelector('.oe-pct-resist'); if (el) el.value = s.targetPct; }
@@ -3479,7 +4517,10 @@ function _oeApplySettings(s, entryPrice) {
     if (s.tif) { var el = document.querySelector('.oe-tif'); if (el) el.value = s.tif; }
     if (s.session) { var el = document.querySelector('.oe-session'); if (el) el.value = s.session; }
     _oeToggleQtyMode();
-    if (s.entryMode === 'fibonacci') _oeCalcFromFib();
+    if (s.entryMode === 'fibonacci') {
+        _oeCalcFibLevels();
+        setTimeout(_oeCalcFibEntry, 50);
+    }
     if (s.multiLevel) _mlApplySettings(s.multiLevel);
     if (entryPrice) _oeRecalcStopTarget();
 }
@@ -3642,6 +4683,37 @@ function _aoToggleQtyMode() {
     var dollarEls = document.querySelectorAll(".ao-qty-dollars-field");
     for (var i = 0; i < sharesEls.length; i++) sharesEls[i].style.display = (mode === "shares") ? "" : "none";
     for (var i = 0; i < dollarEls.length; i++) dollarEls[i].style.display = (mode === "dollars") ? "" : "none";
+    if (mode === "dollars") _aoCalcSharesFromDollars();
+}
+
+function _aoCalcSharesFromDollars() {
+    var dollarEl = document.getElementById("ao_dollar_amt");
+    var sharesEl = document.getElementById("ao_dollar_shares");
+    if (!dollarEl || !sharesEl) return;
+    var dollars = parseFloat(dollarEl.value) || 0;
+    
+    // Note: Actual price will be calculated during auto-trade execution based on
+    // the entry price at the time of the signal. This is just a preview.
+    // When auto-trade executes, it will use:
+    // - Last price (from current data)
+    // - Or calculated price based on Price Mode (Bid +/-, Ask +/-, etc.)
+    // Then it will calculate actual shares: Math.floor(dollars / actualEntryPrice)
+    sharesEl.value = 0;
+    sharesEl.title = "Will be calculated during auto-trade execution based on actual entry price";
+}
+
+function _aoOpenSettings() {
+    // Open/toggle settings panel without requiring Enable checkbox
+    var body = document.getElementById("ao_body");
+    if (body) {
+        var isHidden = body.style.display === "none";
+        body.style.display = isHidden ? "" : "none";
+        // Optional: Add visual feedback
+        if (!isHidden) {
+            body.style.opacity = "0.7";
+            setTimeout(function() { body.style.opacity = "1"; }, 100);
+        }
+    }
 }
 
 function _aoTogglePricePct() {
@@ -3680,6 +4752,12 @@ function _aoLog(msg) {
 
 // Get all auto-order settings as an object
 function _aoGetSettings() {
+    // Gather Fibonacci levels
+    var fibLevels = [];
+    document.querySelectorAll('.fib_level_check:checked').forEach(function(cb) {
+        fibLevels.push(parseFloat(cb.value));
+    });
+    
     return {
         enabled: document.getElementById("ao_enabled") ? document.getElementById("ao_enabled").checked : false,
         startHour: parseInt(document.getElementById("ao_start_hour").value) || 9,
@@ -3704,6 +4782,12 @@ function _aoGetSettings() {
         tif: document.getElementById("ao_tif").value || "DAY",
         session: document.getElementById("ao_session").value || "regular",
         maxPerSym: parseInt(document.getElementById("ao_max_per_sym").value) || 1,
+        // Fibonacci settings
+        fibEnabled: document.getElementById("fib_enabled") ? document.getElementById("fib_enabled").checked : false,
+        fibLevels: fibLevels,
+        fibEntryOffset: parseFloat(document.getElementById("fib_entry_offset").value) || 0,
+        fibStopLossPct: parseFloat(document.getElementById("fib_stop_loss_pct").value) || 2,
+        fibTargetPct: parseFloat(document.getElementById("fib_target_pct").value) || 2,
     };
 }
 
@@ -3735,6 +4819,28 @@ function _aoApplySettings(s) {
     _set("ao_tif", s.tif || "DAY");
     _set("ao_session", s.session || "regular");
     _set("ao_max_per_sym", s.maxPerSym || "1");
+    
+    // Apply Fibonacci settings
+    _chk("fib_enabled", s.fibEnabled);
+    _set("fib_entry_offset", s.fibEntryOffset != null ? s.fibEntryOffset : 0);
+    _set("fib_stop_loss_pct", s.fibStopLossPct != null ? s.fibStopLossPct : 2);
+    _set("fib_target_pct", s.fibTargetPct != null ? s.fibTargetPct : 2);
+    
+    // Restore Fibonacci levels
+    document.querySelectorAll('.fib_level_check').forEach(function(cb) {
+        cb.checked = false;
+    });
+    if (s.fibLevels && Array.isArray(s.fibLevels)) {
+        s.fibLevels.forEach(function(lvl) {
+            var cb = document.querySelector('.fib_level_check[value="' + lvl + '"]');
+            if (cb) cb.checked = true;
+        });
+    } else {
+        // Default: 0.382 and 0.618
+        document.querySelector('.fib_level_check[value="0.382"]').checked = true;
+        document.querySelector('.fib_level_check[value="0.618"]').checked = true;
+    }
+    
     _aoTogglePanel();
     _aoToggleStockList();
     _aoTogglePricing();
@@ -5428,7 +6534,669 @@ function updateCurrentTime() {
 updateCurrentTime();
 setInterval(updateCurrentTime, 1000);
 
+// ============================================================================
+// Position Management System
+// ============================================================================
+
+let _positionMonitoringActive = true;
+let _positionMonitorInterval = null;
+
+/**
+ * Load and display all open positions
+ */
+async function _pmLoadPositions() {
+    try {
+        const response = await fetch('/positions/list', { method: 'GET' });
+        const data = await response.json();
+        
+        if (!data.positions || !Array.isArray(data.positions)) {
+            console.log('No positions to display');
+            return;
+        }
+        
+        _pmRenderPositionTable(data.positions, data.summary);
+    } catch (e) {
+        console.error('Failed to load positions:', e);
+    }
+}
+
+/**
+ * Render positions in a table format
+ */
+function _pmRenderPositionTable(positions, summary) {
+    let html = `
+        <div id="position-monitor-panel" style="
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        ">
+            <div style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 12px;
+                border-bottom: 2px solid #007bff;
+                padding-bottom: 10px;
+            ">
+                <h3 style="margin: 0; color: #333;">📊 Open Positions (${positions.length})</h3>
+                <button 
+                    class="btn btn-sm btn-info" 
+                    onclick="_pmRefreshPositions()"
+                    style="padding: 5px 12px; font-size: 12px;"
+                >
+                    🔄 Refresh
+                </button>
+            </div>
+    `;
+    
+    // Summary stats
+    if (summary) {
+        html += `
+            <div style="
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 12px;
+                margin-bottom: 15px;
+                font-size: 13px;
+            ">
+                <div style="background: #fff; padding: 10px; border-radius: 4px; border-left: 3px solid #007bff;">
+                    <div style="color: #666; font-size: 11px;">Total Cost</div>
+                    <div style="font-weight: bold; color: #333;">$${summary.total_cost.toFixed(2)}</div>
+                </div>
+                <div style="background: #fff; padding: 10px; border-radius: 4px; border-left: 3px solid #17a2b8;">
+                    <div style="color: #666; font-size: 11px;">Current Value</div>
+                    <div style="font-weight: bold; color: #333;">$${summary.total_value.toFixed(2)}</div>
+                </div>
+                <div style="background: #fff; padding: 10px; border-radius: 4px; border-left: 3px solid #${summary.unrealized_pnl >= 0 ? '28a745' : 'dc3545'};">
+                    <div style="color: #666; font-size: 11px;">Unrealized P&L</div>
+                    <div style="font-weight: bold; color: #${summary.unrealized_pnl >= 0 ? '28a745' : 'dc3545'};">
+                        $${summary.unrealized_pnl.toFixed(2)} (${summary.unrealized_pnl_percent.toFixed(2)}%)
+                    </div>
+                </div>
+                <div style="background: #fff; padding: 10px; border-radius: 4px; border-left: 3px solid #ffc107;">
+                    <div style="color: #666; font-size: 11px;">Qty Open</div>
+                    <div style="font-weight: bold; color: #333;">${summary.total_quantity}</div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Positions table
+    html += `
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <thead>
+                <tr style="background: #e9ecef; border-bottom: 2px solid #dee2e6;">
+                    <th style="padding: 8px; text-align: left; color: #555;">Symbol</th>
+                    <th style="padding: 8px; text-align: right; color: #555;">Entry</th>
+                    <th style="padding: 8px; text-align: right; color: #555;">Current</th>
+                    <th style="padding: 8px; text-align: right; color: #555;">Qty</th>
+                    <th style="padding: 8px; text-align: right; color: #555;">Age</th>
+                    <th style="padding: 8px; text-align: right; color: #555;">P&L</th>
+                    <th style="padding: 8px; text-align: right; color: #555;">% Gain</th>
+                    <th style="padding: 8px; text-align: center; color: #555;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    positions.forEach(pos => {
+        const entryTime = new Date(pos.entry_time);
+        const now = new Date();
+        const ageMs = now - entryTime;
+        const ageSec = Math.floor(ageMs / 1000);
+        let ageStr;
+        if (ageSec < 60) ageStr = ageSec + 's';
+        else if (ageSec < 3600) ageStr = Math.floor(ageSec / 60) + 'm';
+        else if (ageSec < 86400) ageStr = Math.floor(ageSec / 3600) + 'h';
+        else ageStr = Math.floor(ageSec / 86400) + 'd';
+        
+        const pnl = (pos.current_price - pos.entry_price) * pos.quantity_remaining;
+        const pnlPercent = ((pos.current_price - pos.entry_price) / pos.entry_price) * 100;
+        const gainColor = pnl >= 0 ? '#28a745' : '#dc3545';
+        
+        html += `
+            <tr style="border-bottom: 1px solid #dee2e6; background: ${pnl >= 0 ? '#f0f8f5' : '#fef5f5'};">
+                <td style="padding: 8px; font-weight: bold; color: #333;">${pos.symbol}</td>
+                <td style="padding: 8px; text-align: right;">$${pos.entry_price.toFixed(2)}</td>
+                <td style="padding: 8px; text-align: right; font-weight: bold;">${pos.current_price > 0 ? '$' + pos.current_price.toFixed(2) : 'N/A'}</td>
+                <td style="padding: 8px; text-align: right;">${pos.quantity_remaining}</td>
+                <td style="padding: 8px; text-align: right; font-size: 11px; color: #666;">${ageStr}</td>
+                <td style="padding: 8px; text-align: right; font-weight: bold; color: ${gainColor};">$${pnl.toFixed(2)}</td>
+                <td style="padding: 8px; text-align: right; font-weight: bold; color: ${gainColor};">${pnlPercent.toFixed(2)}%</td>
+                <td style="padding: 8px; text-align: center;">
+                    <button 
+                        class="btn btn-xs btn-danger" 
+                        onclick="_pmExitPosition('${pos.symbol}', ${pos.order_id}, ${pos.quantity_remaining}, ${pos.current_price}, 'manual')"
+                        style="padding: 3px 8px; font-size: 11px;"
+                    >
+                        Exit All
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += `
+            </tbody>
+        </table>
+        </div>
+    `;
+    
+    // Insert or update position panel
+    let container = document.getElementById('position-monitor-panel');
+    if (!container) {
+        container = document.createElement('div');
+        const mainContent = document.getElementById('daniel') || document.getElementById('customAllform');
+        if (mainContent) {
+            mainContent.insertAdjacentHTML('afterbegin', html);
+        }
+    } else {
+        container.outerHTML = html;
+    }
+}
+
+/**
+ * Refresh positions display
+ */
+function _pmRefreshPositions() {
+    _pmLoadPositions();
+}
+
+/**
+ * Execute an exit on a position
+ */
+async function _pmExitPosition(symbol, orderId, quantity, currentPrice, trigger) {
+    if (!confirm(`Exit ${quantity} shares of ${symbol} at $${currentPrice.toFixed(2)}?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/positions/exit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                symbol: symbol,
+                order_id: orderId,
+                quantity: 0,  // Full exit
+                exit_price: currentPrice,
+                trigger: trigger
+            })
+        });
+        
+        const data = await response.json();
+        if (response.ok) {
+            alert(`Position closed: ${symbol} ${quantity}@$${currentPrice.toFixed(2)}`);
+            _pmLoadPositions();  // Reload
+        } else {
+            alert('Failed to execute exit: ' + (data.error || 'Unknown error'));
+        }
+    } catch (e) {
+        console.error('Failed to execute exit:', e);
+        alert('Error executing exit');
+    }
+}
+
+/**
+ * Evaluate exit conditions for a symbol
+ */
+async function _pmEvaluateExits(symbol, marketData) {
+    try {
+        const response = await fetch('/positions/evaluate-exits', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                symbol: symbol,
+                market_data: marketData
+            })
+        });
+        
+        const data = await response.json();
+        if (response.ok) {
+            return data.exit_recommendations || [];
+        }
+    } catch (e) {
+        console.error('Failed to evaluate exits:', e);
+    }
+    return [];
+}
+
+/**
+ * Start position monitoring loop
+ */
+function _pmStartMonitoring() {
+    if (_positionMonitorInterval) {
+        return;  // Already running
+    }
+    
+    _positionMonitoringActive = true;
+    
+    _positionMonitorInterval = setInterval(async () => {
+        if (!_positionMonitoringActive) {
+            return;
+        }
+        
+        try {
+            // Load and display positions
+            const response = await fetch('/positions/list', { method: 'GET' });
+            const data = await response.json();
+            
+            if (data.positions && data.positions.length > 0) {
+                _pmRenderPositionTable(data.positions, data.summary);
+            }
+            
+            // Also check for gap alerts
+            _loadAndDisplayGaps();
+        } catch (e) {
+            console.error('Position monitoring error:', e);
+        }
+    }, 5000);  // Update every 5 seconds
+    
+    console.log('Position monitoring started');
+}
+
+/**
+ * Stop position monitoring loop
+ */
+function _pmStopMonitoring() {
+    _positionMonitoringActive = false;
+    if (_positionMonitorInterval) {
+        clearInterval(_positionMonitorInterval);
+        _positionMonitorInterval = null;
+    }
+    console.log('Position monitoring stopped');
+}
+
+// ============================================================================
+// Gap Detection Monitoring
+// ============================================================================
+
+// Track gap state for alert triggering
+let _gapMonitoringActive = false;
+let _gapMonitorInterval = null;
+let _previousGapState = {}; // Track previous scan to detect state changes
+
+function _playGapAlert(gapType = 'downside') {
+    // Play different sounds for upside vs downside gaps approaching
+    try {
+        if (gapType === 'downside') {
+            // Use TTS for downside gap alert (distinctive sound)
+            const utterance = new SpeechSynthesisUtterance('Downside gap alert');
+            const voices = window.speechSynthesis.getVoices();
+            const femaleVoice = voices.find(voice => voice.name.includes('Female') || voice.name.includes('female'));
+            if (femaleVoice) {
+                utterance.voice = femaleVoice;
+            }
+            utterance.pitch = 1.2;
+            utterance.rate = 1.2;
+            window.speechSynthesis.speak(utterance);
+        } else {
+            // Upside gap alert with different pitch
+            const utterance = new SpeechSynthesisUtterance('Upside gap');
+            const voices = window.speechSynthesis.getVoices();
+            const femaleVoice = voices.find(voice => voice.name.includes('Female') || voice.name.includes('female'));
+            if (femaleVoice) {
+                utterance.voice = femaleVoice;
+            }
+            utterance.pitch = 0.8;
+            utterance.rate = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
+    } catch (e) {
+        console.log('Gap alert sound failed:', e);
+    }
+}
+
+function _displayGapAlert(gap) {
+    // Create toast notification for gap alert
+    try {
+        const toast = document.createElement('div');
+        const color = gap.direction === 'downside' ? '#ffb6c1' : '#87ceeb';
+        toast.style.cssText = `
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: ${color};
+            color: #000;
+            padding: 12px 16px;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            z-index: 10000;
+            font-size: 13px;
+            max-width: 300px;
+            word-wrap: break-word;
+        `;
+        
+        const gapPct = (gap.gap_percent || 0).toFixed(2);
+        const distPct = (gap.percent_to_close || 0).toFixed(1);
+        
+        toast.innerHTML = `<strong>${gap.direction.toUpperCase()} Gap Alert</strong><br/>
+            Gap: ${gapPct}% | ${distPct}% to close | Price: $${gap.current_price?.toFixed(2) || 'N/A'}`;
+        
+        document.body.appendChild(toast);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 5000);
+    } catch (e) {
+        console.log('Toast display failed:', e);
+    }
+}
+
+function _loadAndDisplayGaps() {
+    try {
+        const scanResults = JSON.parse(localStorage.getItem('scanResults') || '{}');
+        
+        if (!scanResults.results || scanResults.results.length === 0) {
+            return;
+        }
+        
+        let gapalerts = [];
+        let downsideGapsApproaching = [];
+        
+        // Check each symbol's gaps
+        for (const result of scanResults.results) {
+            if (!result.gaps) continue;
+            
+            const symbol = result.symbol || 'UNKNOWN';
+            const currentPrice = result.close || 0;
+            
+            // Check downside gaps approaching (within proximity)
+            if (result.gaps.approaching_downside && Array.isArray(result.gaps.approaching_downside)) {
+                for (const gap of result.gaps.approaching_downside) {
+                    const gapKey = `${symbol}-${gap.prev_close}-${gap.curr_open}`;
+                    const gapState = {
+                        key: gapKey,
+                        symbol: symbol,
+                        direction: 'downside',
+                        gap_percent: gap.gap_percent,
+                        percent_to_close: gap.percent_to_close,
+                        current_price: currentPrice,
+                        prev_close: gap.prev_close,
+                        curr_open: gap.curr_open
+                    };
+                    
+                    gapalerts.push(gapState);
+                    downsideGapsApproaching.push(gapKey);
+                    
+                    // Check if this gap is newly approaching (state change)
+                    if (!_previousGapState[gapKey]) {
+                        // New downside gap alert!
+                        _previousGapState[gapKey] = true;
+                        _playGapAlert('downside');
+                        _displayGapAlert(gapState);
+                        console.log(`Gap Alert: ${symbol} downside gap approaching!`);
+                    }
+                }
+            }
+            
+            // Check upside gaps approaching
+            if (result.gaps.approaching_upside && Array.isArray(result.gaps.approaching_upside)) {
+                for (const gap of result.gaps.approaching_upside) {
+                    const gapKey = `${symbol}-${gap.prev_close}-${gap.curr_open}`;
+                    const gapState = {
+                        key: gapKey,
+                        symbol: symbol,
+                        direction: 'upside',
+                        gap_percent: gap.gap_percent,
+                        percent_to_close: gap.percent_to_close,
+                        current_price: currentPrice,
+                        prev_close: gap.prev_close,
+                        curr_open: gap.curr_open
+                    };
+                    
+                    gapalerts.push(gapState);
+                    
+                    // Check if this gap is newly approaching
+                    if (!_previousGapState[gapKey]) {
+                        _previousGapState[gapKey] = true;
+                        _playGapAlert('upside');
+                        _displayGapAlert(gapState);
+                        console.log(`Gap Alert: ${symbol} upside gap approaching!`);
+                    }
+                }
+            }
+        }
+        
+        // Update display
+        const gapAlertDiv = document.getElementById('gapAlertContainer');
+        const gapPanel = document.getElementById('gapAlertPanel');
+        
+        if (gapAlertDiv && gapPanel) {
+            if (gapalerts.length === 0) {
+                gapAlertDiv.innerHTML = '<p style="color: #999; font-size: 12px;">No gaps approaching</p>';
+                gapPanel.style.display = 'none';
+            } else {
+                gapPanel.style.display = 'block';
+                let html = '<div style="font-size: 12px;">';
+                for (const alert of gapalerts) {
+                    const bgColor = alert.direction === 'downside' ? '#fff0f5' : '#f0f8ff';
+                    const borderColor = alert.direction === 'downside' ? '#ffb6c1' : '#87ceeb';
+                    html += `
+                        <div style="background: ${bgColor}; border-left: 3px solid ${borderColor}; padding: 6px; margin: 3px 0; border-radius: 2px;">
+                            <strong>${alert.symbol}</strong> - ${alert.direction.toUpperCase()} Gap<br/>
+                            Size: ${alert.gap_percent?.toFixed(2) || 'N/A'}% | 
+                            ${alert.percent_to_close?.toFixed(1) || 'N/A'}% to close
+                        </div>
+                    `;
+                }
+                html += '</div>';
+                gapAlertDiv.innerHTML = html;
+            }
+        }
+        
+        // Clean up old gaps from state that are no longer approaching
+        const currentGapKeys = new Set(gapalerts.map(g => g.key));
+        for (const key of Object.keys(_previousGapState)) {
+            if (!currentGapKeys.has(key)) {
+                delete _previousGapState[key];
+            }
+        }
+        
+    } catch (e) {
+        console.log('Gap display error:', e);
+    }
+}
+
+// ============================================================================
+// Stock Exclusion List Management
+// ============================================================================
+
+async function _excludeRefreshList() {
+    try {
+        const response = await fetch('/exclude/list', { method: 'GET' });
+        const data = await response.json();
+        
+        if (data.ok) {
+            const display = document.getElementById('excludeListDisplay');
+            const count = document.getElementById('excludeCount');
+            
+            if (data.excluded.length === 0) {
+                display.innerHTML = '<div style="color: #999; text-align: center;">No stocks excluded</div>';
+            } else {
+                let html = '<div style="display: flex; flex-wrap: wrap; gap: 6px;">';
+                for (const symbol of data.excluded) {
+                    html += `
+                        <div style="
+                            background: #f0f0f0;
+                            border: 1px solid #ddd;
+                            border-radius: 3px;
+                            padding: 4px 8px;
+                            display: flex;
+                            align-items: center;
+                            gap: 6px;
+                            font-size: 11px;
+                        ">
+                            <strong>${symbol}</strong>
+                            <button onclick="_excludeRemoveStock('${symbol}')" style="
+                                background: #dc3545;
+                                color: white;
+                                border: none;
+                                border-radius: 2px;
+                                padding: 2px 6px;
+                                cursor: pointer;
+                                font-size: 10px;
+                            ">✕</button>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+                display.innerHTML = html;
+            }
+            
+            count.textContent = data.count;
+        }
+    } catch (e) {
+        console.error('Failed to refresh exclude list:', e);
+    }
+}
+
+async function _excludeAddStock() {
+    try {
+        const input = document.getElementById('excludeSymbolInput');
+        const symbol = input.value.trim().toUpperCase();
+        
+        if (!symbol) {
+            alert('Please enter a stock symbol');
+            return;
+        }
+        
+        const response = await fetch('/exclude/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbol: symbol })
+        });
+        
+        const data = await response.json();
+        if (data.ok) {
+            input.value = '';
+            _excludeRefreshList();
+            console.log(`Added ${symbol} to exclusion list`);
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (e) {
+        console.error('Failed to add stock:', e);
+        alert('Error adding stock');
+    }
+}
+
+async function _excludeRemoveStock(symbol) {
+    try {
+        const response = await fetch('/exclude/remove', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbol: symbol })
+        });
+        
+        const data = await response.json();
+        if (data.ok) {
+            _excludeRefreshList();
+            console.log(`Removed ${symbol} from exclusion list`);
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (e) {
+        console.error('Failed to remove stock:', e);
+        alert('Error removing stock');
+    }
+}
+
+async function _excludeImportCSV(event) {
+    try {
+        const fileInput = document.getElementById('excludeCSVInput');
+        const file = fileInput.files[0];
+        
+        if (!file) return;
+        
+        const formData = new FormData();
+        formData.append('csvfile', file);
+        
+        const response = await fetch('/exclude/import-csv', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        if (data.ok) {
+            _excludeRefreshList();
+            alert(`Imported ${data.count} stocks to exclusion list`);
+            fileInput.value = '';
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (e) {
+        console.error('Failed to import CSV:', e);
+        alert('Error importing CSV');
+    }
+}
+
+function _excludeOpenImport() {
+    document.getElementById('excludeCSVInput').click();
+}
+
+async function _excludeExportCSV() {
+    try {
+        const response = await fetch('/exclude/export-csv', { method: 'GET' });
+        
+        if (response.ok) {
+            // Create blob and download
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'excluded_stocks.csv';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            console.log('Exported excluded stocks to CSV');
+        } else {
+            alert('Error exporting CSV');
+        }
+    } catch (e) {
+        console.error('Failed to export CSV:', e);
+        alert('Error exporting CSV');
+    }
+}
+
+async function _excludeClearAll() {
+    try {
+        if (!confirm('Are you sure you want to clear all excluded stocks?')) {
+            return;
+        }
+        
+        const response = await fetch('/exclude/clear', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        if (data.ok) {
+            _excludeRefreshList();
+            alert('Cleared all excluded stocks');
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (e) {
+        console.error('Failed to clear exclude list:', e);
+        alert('Error clearing list');
+    }
+}
+
+// Auto-start position monitoring on page load
+document.addEventListener('DOMContentLoaded', function() {
+    _pmStartMonitoring();
+    _pmLoadPositions();
+    _excludeRefreshList();  // Load exclude list on page load
+});
+
 window.addEventListener("beforeunload", function () {
+    _pmStopMonitoring();
     if (window.navigator.sendBeacon) {
         const payload = {
             tab_unique_id: _bg_unique_id

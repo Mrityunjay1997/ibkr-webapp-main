@@ -19,6 +19,7 @@ from wtforms import (
     SelectField,
     BooleanField,
     RadioField,
+    FloatField,
 )
 from wtforms.validators import DataRequired
 
@@ -108,6 +109,17 @@ class Parameters(FlaskForm):
         ("withinPercentBelow", "Within % Below"),
         ("withinPercentEither", "Within Either %"),
         ("Not used", "disabled"),
+    ]
+
+    TIMEFRAME_CHOICES = [
+        ("1 min", "1 min"),
+        ("2 min", "2 min"),
+        ("5 min", "5 min"),
+        ("15 min", "15 min"),
+        ("1 hour", "1 hour"),
+        ("1 day", "1 day"),
+        ("1 week", "1 week"),
+        ("1 month", "1 month"),
     ]
 
     ComparisonFastSMA = SelectField(
@@ -216,6 +228,34 @@ class Parameters(FlaskForm):
     )
 
     PivotPoint1 = SelectField(
+        "Programming Language",
+        choices=[
+            ("PP", "Pivot Point"),
+            ("R1", "Resistance 1"),
+            ("R2", "Resistance 2"),
+            ("R3", "Resistance 3"),
+            ("S1", "Support 1"),
+            ("S2", "Support 2"),
+            ("S3", "Support 3"),
+            ("Not used", "disabled"),
+        ],
+    )
+
+    PivotPoint2 = SelectField(
+        "Programming Language",
+        choices=[
+            ("PP", "Pivot Point"),
+            ("R1", "Resistance 1"),
+            ("R2", "Resistance 2"),
+            ("R3", "Resistance 3"),
+            ("S1", "Support 1"),
+            ("S2", "Support 2"),
+            ("S3", "Support 3"),
+            ("Not used", "disabled"),
+        ],
+    )
+
+    PivotPoint3 = SelectField(
         "Programming Language",
         choices=[
             ("PP", "Pivot Point"),
@@ -341,7 +381,7 @@ class Parameters(FlaskForm):
 
     FibPullback_tf = SelectField(
         "Fib Pullback TF",
-        choices=[],
+        choices=TIMEFRAME_CHOICES,
         default="1 day",
     )
 
@@ -375,7 +415,7 @@ class Parameters(FlaskForm):
 
     GapPullback_tf = SelectField(
         "Gap Pullback TF",
-        choices=[],
+        choices=TIMEFRAME_CHOICES,
         default="1 min",
     )
 
@@ -428,21 +468,19 @@ class Parameters(FlaskForm):
         "Programming Language",
         choices=_STANDARD_COMPARISON_CHOICES,
     )
+    ComparisonPivotPoint2 = SelectField(
+        "Programming Language",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+    ComparisonPivotPoint3 = SelectField(
+        "Programming Language",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
 
     PercentagePivotPoint = DecimalField("Percentage PivotPoint")
     PercentagePivotPoint1 = DecimalField("Percentage PivotPoint1")
-
-    # ------------------------------------------------------------------
-    # Time frame choices (used by global and per-indicator selects)
-    # ------------------------------------------------------------------
-    TIMEFRAME_CHOICES = [
-        ("1 min", "1 min"),
-        ("2 min", "2 min"),
-        ("5 min", "5 min"),
-        ("15 min", "15 min"),
-        ("1 hour", "1 hour"),
-        ("1 day", "1 day"),
-    ]
+    PercentagePivotPoint2 = DecimalField("Percentage PivotPoint2")
+    PercentagePivotPoint3 = DecimalField("Percentage PivotPoint3")
 
     # ------------------------------------------------------------------
     # Global time frame selector (renamed label)
@@ -450,6 +488,36 @@ class Parameters(FlaskForm):
     addFrequency = SelectField(
         "Time Frame",
         choices=TIMEFRAME_CHOICES,
+    )
+
+    # ------------------------------------------------------------------
+    # Extended Hours / After-Hours Trading Configuration
+    # ------------------------------------------------------------------
+    EnableExtendedHours = BooleanField(
+        "Enable Extended Hours Trading (Pre-Market + After-Hours)",
+        default=False,
+        render_kw={
+            "title": "Include pre-market (4am-9:30am ET) and after-hours (4pm-8pm ET) data in analysis. "
+                     "Extended hours: 4pm-8pm ET. Overnight: 8pm ET - 4am ET next day"
+        }
+    )
+
+    IncludeOvernightData = BooleanField(
+        "Include Overnight Data (8pm-4am ET)",
+        default=False,
+        render_kw={
+            "title": "Include overnight trading data from 8pm Eastern to 4am Eastern (next day). "
+                     "Some stocks trade actively during these hours in after-hours market"
+        }
+    )
+
+    ExtendedHoursVolumeWeight = DecimalField(
+        "Extended Hours Volume Weight",
+        default=1.0,
+        render_kw={
+            "title": "Multiplier for volume calculations during extended hours (1.0 = same as regular hours, 0.5 = half weight)",
+            "min": 0.1, "max": 2.0, "step": 0.1
+        }
     )
 
     # ------------------------------------------------------------------
@@ -498,6 +566,8 @@ class Parameters(FlaskForm):
     DownGap_tf = SelectField("Down Gap Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     FibGap_tf = SelectField("Fibonacci Gap Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     Pivot_tf = SelectField("Pivot Point Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    Pivot_tf2 = SelectField("Pivot 2 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    Pivot_tf3 = SelectField("Pivot 3 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
 
     # ------------------------------------------------------------------
     # Price level comparisons
@@ -568,6 +638,7 @@ class Parameters(FlaskForm):
     ComparisonMarketCap = SelectField(
         "Market Cap",
         choices=_STANDARD_COMPARISON_CHOICES,
+        default="Not used",
     )
 
     # ------------------------------------------------------------------
@@ -723,6 +794,21 @@ class Parameters(FlaskForm):
         ],
         default="off",
     )
+    # Read Headlines Aloud time window configuration
+    NewsReadAloudWithinValue = IntegerField(
+        "Read Aloud Within (0=all)",
+        default=0,
+        render_kw={"title": "Time window for reading headlines aloud (0 = read all headlines)"}
+    )
+    NewsReadAloudTimeUnit = SelectField(
+        "Time Unit",
+        choices=[
+            ("minutes", "Minutes"),
+            ("hours", "Hours"),
+            ("days", "Days"),
+        ],
+        default="minutes",
+    )
     NewsAutoReadAll = SelectField(
         "Auto-Read All News",
         choices=[
@@ -731,6 +817,177 @@ class Parameters(FlaskForm):
         ],
         default="off",
         render_kw={"title": "Automatically read all news headlines aloud after results are returned"}
+    )
+
+    # News provider selection
+    NewsProviders = StringField(
+        "Preferred News Providers",
+        default="",
+        render_kw={
+            "placeholder": "e.g. BZ, FLY, DJNL, DJ-N, MT, GS (leave blank for all)",
+            "title": "Comma-separated provider codes to include. Leave blank to use all subscribed providers."
+        }
+    )
+
+    # ------------------------------------------------------------------
+    # Gap Detection Configuration
+    # ------------------------------------------------------------------
+    
+    GapDetectionEnabled = BooleanField(
+        "Enable Gap Detection",
+        default=False,
+        render_kw={"title": "Scan for open/unfilled gaps"}
+    )
+    
+    GapLookbackDays = IntegerField(
+        "Gap Lookback Period (days)",
+        default=60,
+        render_kw={"title": "Number of days to look back for gaps", "min": 5, "max": 252}
+    )
+    
+    GapMinimumPercent = FloatField(
+        "Minimum Gap Size (%)",
+        default=2.0,
+        render_kw={"title": "Only track gaps larger than this %", "min": 0.1, "max": 20.0, "step": 0.1}
+    )
+    
+    GapProximityPercent = FloatField(
+        "Gap Closing Proximity (%)",
+        default=50.0,
+        render_kw={"title": "Alert when within X% of filling the gap", "min": 10, "max": 100, "step": 5}
+    )
+    
+    GapDownsideAlertSound = BooleanField(
+        "Alert on Downside Gap Approach",
+        default=True,
+        render_kw={"title": "Play sound when downside gap is being filled"}
+    )
+
+    # ------------------------------------------------------------------
+    # Stock Exclusion List
+    # ------------------------------------------------------------------
+    
+    ExcludeStocksList = StringField(
+        "Exclude Stocks (comma-separated)",
+        default="",
+        render_kw={
+            "placeholder": "e.g. XYZ, ABC, DEF (leave blank for none)",
+            "title": "Comma-separated list of stock symbols to exclude from scans"
+        }
+    )
+    
+    EnableStockExclusion = BooleanField(
+        "Enable Stock Exclusion",
+        default=False,
+        render_kw={"title": "Check to exclude the listed stocks from scanner"}
+    )
+
+    # ------------------------------------------------------------------
+    # % Change and Volume Monitoring
+    # ------------------------------------------------------------------
+    
+    EnablePctChangeMonitor = BooleanField(
+        "Enable % Change Monitoring",
+        default=False,
+        render_kw={"title": "Monitor stocks by % price change over time period"}
+    )
+    
+    PctChangeThreshold = FloatField(
+        "% Change Threshold",
+        default=3.0,
+        render_kw={"title": "Alert on price changes above this % (e.g., 3.0 = 3%)", "min": 0.1, "max": 50.0, "step": 0.1}
+    )
+    
+    PctChangeLookbackMinutes = IntegerField(
+        "Lookback Period (minutes)",
+        default=5,
+        render_kw={"title": "Check % change over last X minutes", "min": 1, "max": 1440}
+    )
+    
+    EnableVolumeMonitor = BooleanField(
+        "Enable Volume Monitoring",
+        default=False,
+        render_kw={"title": "Monitor stocks by volume over time period"}
+    )
+    
+    VolumeLookbackMinutes = IntegerField(
+        "Volume Lookback (minutes)",
+        default=5,
+        render_kw={"title": "Calculate volume for last X minutes", "min": 1, "max": 1440}
+    )
+    
+    VolumeThreshold = IntegerField(
+        "Volume Threshold (min)",
+        default=50000,
+        render_kw={"title": "Alert when volume in period exceeds this amount", "min": 1000}
+    )
+    
+    EnableKeyLevelDetection = BooleanField(
+        "Enable Key Level Detection",
+        default=False,
+        render_kw={"title": "Highlight stocks near key support/resistance/pivot levels"}
+    )
+    
+    KeyLevelProximityPercent = FloatField(
+        "Key Level Proximity %",
+        default=1.0,
+        render_kw={"title": "Highlight when within X% of key level", "min": 0.1, "max": 5.0, "step": 0.1}
+    )
+    
+    PlayKeyLevelSound = BooleanField(
+        "Play Sound on Key Level Hit",
+        default=True,
+        render_kw={"title": "Play custom sound when stock approaches key level"}
+    )
+
+    # ------------------------------------------------------------------
+    # 200 SMA BULLISH CROSSOVER DETECTION
+    # ------------------------------------------------------------------
+    
+    Enable200SMABullishCrossover = BooleanField(
+        "Enable 200 SMA Bullish Crossover Detection",
+        default=False,
+        render_kw={"title": "Detect when stock crosses above 200 SMA from below"}
+    )
+    
+    PlaySound200SMA = BooleanField(
+        "Play Sound on 200 SMA Bullish Crossover",
+        default=True,
+        render_kw={"title": "Play custom sound when bullish 200 SMA crossover detected"}
+    )
+
+    # ------------------------------------------------------------------
+    # ON BALANCE VOLUME (OBV) ANALYSIS
+    # ------------------------------------------------------------------
+    
+    EnableOBVAnalysis = BooleanField(
+        "Enable OBV Analysis",
+        default=False,
+        render_kw={"title": "Analyze On Balance Volume strength and trend"}
+    )
+    
+    OBVTrendPeriod = IntegerField(
+        "OBV Trend Period (bars)",
+        default=20,
+        render_kw={"title": "Lookback period for OBV trend analysis", "min": 5, "max": 200, "step": 5}
+    )
+    
+    OBVMovingAveragePeriod = IntegerField(
+        "OBV Moving Average Period",
+        default=10,
+        render_kw={"title": "Period for OBV moving average comparison", "min": 3, "max": 50, "step": 1}
+    )
+    
+    OBVStrengthThreshold = FloatField(
+        "OBV Strength Threshold (%)",
+        default=15.0,
+        render_kw={"title": "Minimum % change in OBV to consider 'strong'", "min": 1.0, "max": 100.0, "step": 1.0}
+    )
+    
+    EnableOBVAudio = BooleanField(
+        "Play Sound on Strong OBV Changes",
+        default=True,
+        render_kw={"title": "Alert when OBV shows strong rising/declining momentum"}
     )
 
     # ------------------------------------------------------------------

@@ -878,6 +878,173 @@ def watchlists_delete():
 
 
 # -------------------------------------------------------------------------
+# Stock Exclusion List Management
+# -------------------------------------------------------------------------
+
+@app.route("/exclude/list", methods=["GET"])
+def exclude_list():
+    """Get the list of excluded stocks."""
+    try:
+        excluded = IBAPI.get_excluded_stocks()
+        return jsonify({
+            "ok": True,
+            "excluded": sorted(list(excluded)),
+            "count": len(excluded)
+        }), 200
+    except Exception as e:
+        logger.exception("Failed to get excluded stocks list: %s", e)
+        return jsonify({"error": "failed to get list"}), 500
+
+
+@app.route("/exclude/add", methods=["POST"])
+def exclude_add():
+    """Add a stock symbol to the exclusion list."""
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"error": "JSON payload required"}), 400
+        
+        symbol = payload.get("symbol", "").strip().upper()
+        if not symbol:
+            return jsonify({"error": "symbol required"}), 400
+        
+        success = IBAPI.add_excluded_stock(symbol)
+        if success:
+            excluded = IBAPI.get_excluded_stocks()
+            return jsonify({
+                "ok": True,
+                "message": f"Added {symbol} to exclusion list",
+                "excluded": sorted(list(excluded)),
+                "count": len(excluded)
+            }), 200
+        else:
+            return jsonify({"error": "failed to save"}), 500
+    except Exception as e:
+        logger.exception("Failed to add excluded stock: %s", e)
+        return jsonify({"error": "failed to add stock"}), 500
+
+
+@app.route("/exclude/remove", methods=["POST"])
+def exclude_remove():
+    """Remove a stock symbol from the exclusion list."""
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"error": "JSON payload required"}), 400
+        
+        symbol = payload.get("symbol", "").strip().upper()
+        if not symbol:
+            return jsonify({"error": "symbol required"}), 400
+        
+        success = IBAPI.remove_excluded_stock(symbol)
+        if success:
+            excluded = IBAPI.get_excluded_stocks()
+            return jsonify({
+                "ok": True,
+                "message": f"Removed {symbol} from exclusion list",
+                "excluded": sorted(list(excluded)),
+                "count": len(excluded)
+            }), 200
+        else:
+            return jsonify({"error": "failed to save"}), 500
+    except Exception as e:
+        logger.exception("Failed to remove excluded stock: %s", e)
+        return jsonify({"error": "failed to remove stock"}), 500
+
+
+@app.route("/exclude/import-csv", methods=["POST"])
+def exclude_import_csv():
+    """Import excluded stocks from a CSV file."""
+    try:
+        if "csvfile" not in request.files:
+            return jsonify({"error": "csvfile required"}), 400
+        
+        file = request.files["csvfile"]
+        if file.filename == "":
+            return jsonify({"error": "empty file"}), 400
+        
+        # Read CSV and extract symbols
+        from io import TextIOWrapper
+        text_stream = TextIOWrapper(file.stream, encoding="utf-8")
+        reader = csv.reader(text_stream, delimiter=",")
+        
+        symbols = []
+        for i, row in enumerate(reader):
+            if i == 0:  # Skip header if present
+                if row and row[0].lower() in ["symbol", "ticker", "stock"]:
+                    continue
+            if row and row[0].strip():
+                symbols.append(row[0].strip().upper())
+        
+        if not symbols:
+            return jsonify({"error": "no symbols found in CSV"}), 400
+        
+        # Save to exclusion list
+        success = IBAPI.save_excluded_stocks(symbols)
+        if success:
+            excluded = IBAPI.get_excluded_stocks()
+            return jsonify({
+                "ok": True,
+                "message": f"Imported {len(symbols)} stocks to exclusion list",
+                "excluded": sorted(list(excluded)),
+                "count": len(excluded)
+            }), 200
+        else:
+            return jsonify({"error": "failed to save"}), 500
+    except Exception as e:
+        logger.exception("Failed to import excluded stocks: %s", e)
+        return jsonify({"error": "failed to import"}), 500
+
+
+@app.route("/exclude/export-csv", methods=["GET"])
+def exclude_export_csv():
+    """Export excluded stocks as a CSV file."""
+    try:
+        from io import StringIO
+        from flask import send_file
+        
+        excluded = sorted(list(IBAPI.get_excluded_stocks()))
+        
+        # Create CSV content
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Symbol"])
+        for symbol in excluded:
+            writer.writerow([symbol])
+        
+        # Send as download
+        output.seek(0)
+        return send_file(
+            StringIO(output.getvalue()),
+            mimetype="text/csv",
+            as_attachment=True,
+            download_name="excluded_stocks.csv"
+        )
+    except Exception as e:
+        logger.exception("Failed to export excluded stocks: %s", e)
+        return jsonify({"error": "failed to export"}), 500
+
+
+@app.route("/exclude/clear", methods=["POST"])
+def exclude_clear():
+    """Clear the entire exclusion list."""
+    try:
+        success = IBAPI.save_excluded_stocks([])
+        if success:
+            return jsonify({
+                "ok": True,
+                "message": "Cleared exclusion list",
+                "excluded": [],
+                "count": 0
+            }), 200
+        else:
+            return jsonify({"error": "failed to clear"}), 500
+    except Exception as e:
+        logger.exception("Failed to clear excluded stocks: %s", e)
+        return jsonify({"error": "failed to clear"}), 500
+
+
+# -------------------------------------------------------------------------
 # Order Presets
 # -------------------------------------------------------------------------
 
@@ -1015,6 +1182,133 @@ def order_presets_delete():
     except Exception as e:
         logger.exception("Failed to delete order preset: %s", e)
         return jsonify({"error": "failed to delete order preset"}), 500
+
+
+# -------------------------------------------------------------------------
+# Position Management - Track filled orders and manage exits
+# -------------------------------------------------------------------------
+
+@app.route("/positions/list", methods=["GET"])
+def positions_list():
+    """Get all open positions and summary"""
+    try:
+        from ibkr_signal_engine import IBapi
+        # Create temporary IBAPI instance to access position manager
+        api = IBapi()
+        summary = api.position_manager.get_all_positions()
+        return jsonify({
+            "positions": [p.to_dict() for p in summary],
+            "summary": api.position_manager.get_positions_summary()
+        }), 200
+    except Exception as e:
+        logger.exception("Failed to list positions: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/positions/add", methods=["POST"])
+def positions_add():
+    """Add a filled position to tracking (called when order fills)"""
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"error": "JSON payload required"}), 400
+        
+        from position_manager import Position
+        from ibkr_signal_engine import IBapi
+        
+        api = IBapi()
+        pos = Position(
+            symbol=payload['symbol'],
+            entry_price=float(payload['entry_price']),
+            quantity=int(payload['quantity']),
+            entry_time=datetime.now(),
+            order_id=int(payload['order_id']),
+            side=payload.get('side', 'long')
+        )
+        
+        api.position_manager.add_position(pos)
+        return jsonify({"ok": True, "position": pos.to_dict()}), 200
+    
+    except Exception as e:
+        logger.exception("Failed to add position: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/positions/update-price", methods=["POST"])
+def positions_update_price():
+    """Update current market price for a symbol"""
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"error": "JSON payload required"}), 400
+        
+        from ibkr_signal_engine import IBapi
+        api = IBapi()
+        
+        symbol = payload.get('symbol')
+        current_price = float(payload.get('current_price'))
+        
+        api.position_manager.update_position_prices(symbol, current_price)
+        return jsonify({"ok": True}), 200
+    
+    except Exception as e:
+        logger.exception("Failed to update position price: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/positions/evaluate-exits", methods=["POST"])
+def positions_evaluate_exits():
+    """Evaluate exit conditions for a symbol"""
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"error": "JSON payload required"}), 400
+        
+        from ibkr_signal_engine import IBapi
+        api = IBapi()
+        
+        symbol = payload.get('symbol')
+        market_data = payload.get('market_data', {})
+        
+        recommendations = api.position_manager.evaluate_exits(symbol, market_data)
+        return jsonify({"exit_recommendations": recommendations}), 200
+    
+    except Exception as e:
+        logger.exception("Failed to evaluate exits: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/positions/exit", methods=["POST"])
+def positions_exit():
+    """Execute partial or full position exit"""
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"error": "JSON payload required"}), 400
+        
+        from ibkr_signal_engine import IBapi
+        api = IBapi()
+        
+        symbol = payload['symbol']
+        order_id = int(payload['order_id'])
+        quantity = int(payload.get('quantity', 0))
+        exit_price = float(payload['exit_price'])
+        trigger = payload.get('trigger', 'manual')
+        
+        # If quantity is 0 or matches position size, do full exit
+        if quantity == 0:
+            success = api.position_manager.execute_full_exit(symbol, order_id, exit_price, trigger)
+        else:
+            success = api.position_manager.execute_partial_exit(symbol, order_id, quantity, exit_price, trigger)
+        
+        if success:
+            return jsonify({"ok": True}), 200
+        else:
+            return jsonify({"error": "Failed to execute exit"}), 400
+    
+    except Exception as e:
+        logger.exception("Failed to execute exit: %s", e)
+        return jsonify({"error": str(e)}), 500
 
 
 # -------------------------------------------------------------------------

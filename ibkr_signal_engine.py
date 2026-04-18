@@ -25,6 +25,7 @@ from indicators import (
     EMAIndicator,
     OBVIndicator,
     ATRIndicator,
+    GapAnalyzer,
     # pivot_points,
     last_value
 )
@@ -145,6 +146,348 @@ def relative_volume(data: pd.DataFrame, lookback: int) -> float:
     )
 
 
+def calculate_pct_change(data: pd.DataFrame, lookback_bars: int = 5) -> float:
+    """
+    Calculate % change over the last `lookback_bars` bars.
+    Returns: (current_close - open_of_lookback) / open_of_lookback * 100
+    """
+    if data is None or len(data) < lookback_bars:
+        return 0.0
+    
+    try:
+        current_close = float(data["close"].iloc[-1])
+        lookback_open = float(data["open"].iloc[-lookback_bars])
+        if lookback_open <= 0:
+            return 0.0
+        pct_change = ((current_close - lookback_open) / lookback_open) * 100.0
+        return float(pct_change)
+    except (ValueError, KeyError, IndexError):
+        return 0.0
+
+
+def calculate_volume_sum(data: pd.DataFrame, lookback_bars: int = 5) -> float:
+    """
+    Calculate total volume over the last `lookback_bars` bars.
+    """
+    if data is None or len(data) < lookback_bars:
+        return 0.0
+    
+    try:
+        return float(np.sum(data["volume"].iloc[-lookback_bars:]))
+    except (ValueError, KeyError, IndexError):
+        return 0.0
+
+
+def detect_nearby_key_levels(data: dict, proximity_pct: float = 1.0) -> bool:
+    """
+    Detect if current price is near any key support/resistance/pivot levels.
+    
+    Args:
+        data: Dictionary with stock data (close, Pivot, etc.)
+        proximity_pct: How close (in %) to consider "near" a level
+    
+    Returns:
+        True if near a key level, False otherwise
+    """
+    if not data or "close" not in data:
+        return False
+    
+    try:
+        current = float(data.get("close", 0))
+        if current <= 0:
+            return False
+        
+        # Define key levels to check
+        key_levels = []
+        
+        # Pivot point levels
+        if "Pivot" in data and isinstance(data["Pivot"], dict):
+            for level_name in ["PP", "S1", "S2", "S3", "R1", "R2", "R3"]:
+                if level_name in data["Pivot"]:
+                    try:
+                        val = float(data["Pivot"][level_name])
+                        if val > 0:
+                            key_levels.append(val)
+                    except (ValueError, TypeError):
+                        pass
+        
+        # SMA levels
+        for sma_key in ["smaFast", "smaMedium", "smaSlow"]:
+            if sma_key in data:
+                try:
+                    val = float(data[sma_key])
+                    if val > 0:
+                        key_levels.append(val)
+                except (ValueError, TypeError):
+                    pass
+        
+        # Support and resistance
+        if "lowOfDay" in data:
+            try:
+                val = float(data["lowOfDay"])
+                if val > 0:
+                    key_levels.append(val)
+            except (ValueError, TypeError):
+                pass
+        
+        if "highOfDay" in data:
+            try:
+                val = float(data["highOfDay"])
+                if val > 0:
+                    key_levels.append(val)
+            except (ValueError, TypeError):
+                pass
+        
+        # Check proximity to each key level
+        proximity_threshold = current * (proximity_pct / 100.0)
+        for level in key_levels:
+            distance = abs(current - level)
+            if distance <= proximity_threshold:
+                return True
+        
+        return False
+    except Exception as e:
+        logger.warning(f"Error in detect_nearby_key_levels: {e}")
+        return False
+
+
+def detect_200sma_bullish_crossover(data: dict, hist_data=None) -> bool:
+    """
+    Detect if stock crossed above 200 SMA from below (bullish crossover).
+    Requires: yesterday's close < 200 SMA AND today's close > 200 SMA
+    
+    Args:
+        data: Dictionary with current stock data (close, smaSlow, prevClose, etc.)
+        hist_data: Optional historical DataFrame with OHLC and SMA data
+    
+    Returns:
+        True if bullish 200 SMA crossover detected, False otherwise
+    """
+    if not data:
+        return False
+    
+    try:
+        current_close = float(data.get("close", 0))
+        sma_200 = float(data.get("smaSlow", 0))
+        prev_close = float(data.get("prevClose", 0))
+        
+        # Basic validation
+        if current_close <= 0 or sma_200 <= 0 or prev_close <= 0:
+            return False
+        
+        # Condition 1: Current close ABOVE 200 SMA
+        is_above_today = current_close > sma_200
+        
+        # Condition 2: Previous close BELOW 200 SMA
+        is_below_yesterday = prev_close < sma_200
+        
+        # Both conditions must be true for a bullish crossover
+        crossover_detected = is_above_today and is_below_yesterday
+        
+        return crossover_detected
+    except Exception as e:
+        logger.warning(f"Error in detect_200sma_bullish_crossover: {e}")
+        return False
+
+
+def calculate_obv_momentum(data: pd.DataFrame, lookback: int = 20) -> tuple:
+    """
+    Calculate OBV momentum (trend direction and strength).
+    
+    Args:
+        data: DataFrame with 'volume' and 'close' columns
+        lookback: Number of bars to analyze for momentum
+    
+    Returns:
+        Tuple of (trend, strength_pct, current_obv, obv_ma)
+        trend: "rising", "declining", or "neutral"
+        strength_pct: Absolute % change in OBV
+        current_obv: Current OBV value
+        obv_ma: OBV moving average
+    """
+    if data is None or len(data) < lookback:
+        return ("neutral", 0.0, 0.0, 0.0)
+    
+    try:
+        # Calculate OBV: cumulative sum of signed volume
+        # +volume when close > prev close, -volume when close < prev close
+        obv = np.zeros(len(data))
+        obv[0] = data.iloc[0]['volume']
+        
+        for i in range(1, len(data)):
+            close_diff = data.iloc[i]['close'] - data.iloc[i-1]['close']
+            if close_diff > 0:
+                obv[i] = obv[i-1] + data.iloc[i]['volume']
+            elif close_diff < 0:
+                obv[i] = obv[i-1] - data.iloc[i]['volume']
+            else:
+                obv[i] = obv[i-1]
+        
+        current_obv = float(obv[-1])
+        lookback_obv = float(obv[-lookback])
+        
+        # Calculate momentum percentage
+        if lookback_obv != 0:
+            momentum_pct = ((current_obv - lookback_obv) / abs(lookback_obv)) * 100.0
+        else:
+            momentum_pct = 0.0
+        
+        # Determine trend direction
+        if momentum_pct > 2.0:
+            trend = "rising"
+        elif momentum_pct < -2.0:
+            trend = "declining"
+        else:
+            trend = "neutral"
+        
+        # Calculate simple moving average of OBV
+        obv_ma = float(np.mean(obv[-lookback:]))
+        
+        return (trend, abs(momentum_pct), current_obv, obv_ma)
+    except Exception as e:
+        logger.warning(f"Error calculating OBV momentum: {e}")
+        return ("neutral", 0.0, 0.0, 0.0)
+
+
+def calculate_obv_vs_moving_average(data: pd.DataFrame, ma_period: int = 10) -> tuple:
+    """
+    Compare OBV to its moving average to determine strength relative to trend.
+    
+    Args:
+        data: DataFrame with 'volume' and 'close' columns
+        ma_period: Period for OBV moving average
+    
+    Returns:
+        Tuple of (is_above_ma, distance_pct, obv_value, obv_ma_value)
+        is_above_ma: True if OBV > its MA
+        distance_pct: % distance between OBV and MA
+        obv_value: Current OBV
+        obv_ma_value: Current OBV MA
+    """
+    if data is None or len(data) < ma_period:
+        return (False, 0.0, 0.0, 0.0)
+    
+    try:
+        # Calculate OBV
+        obv = np.zeros(len(data))
+        obv[0] = data.iloc[0]['volume']
+        
+        for i in range(1, len(data)):
+            close_diff = data.iloc[i]['close'] - data.iloc[i-1]['close']
+            if close_diff > 0:
+                obv[i] = obv[i-1] + data.iloc[i]['volume']
+            elif close_diff < 0:
+                obv[i] = obv[i-1] - data.iloc[i]['volume']
+            else:
+                obv[i] = obv[i-1]
+        
+        current_obv = float(obv[-1])
+        
+        # Calculate OBV moving average
+        obv_ma = float(np.mean(obv[-ma_period:]))
+        
+        # Determine if above or below MA
+        is_above = current_obv > obv_ma
+        
+        # Calculate distance as percentage
+        if obv_ma != 0:
+            distance_pct = abs((current_obv - obv_ma) / abs(obv_ma)) * 100.0
+        else:
+            distance_pct = 0.0
+        
+        return (is_above, distance_pct, current_obv, obv_ma)
+    except Exception as e:
+        logger.warning(f"Error calculating OBV vs MA: {e}")
+        return (False, 0.0, 0.0, 0.0)
+
+
+def detect_obv_strength(data: dict, hist_data=None, trend_period: int = 20, 
+                       ma_period: int = 10, strength_threshold: float = 15.0) -> dict:
+    """
+    Comprehensive OBV strength analysis combining trend and MA comparison.
+    
+    Args:
+        data: Stock data dictionary
+        hist_data: Historical DataFrame with OHLC data
+        trend_period: Lookback for trend analysis
+        ma_period: Period for OBV MA
+        strength_threshold: Minimum % change to consider "strong" (default 15%)
+    
+    Returns:
+        Dictionary with OBV analysis:
+        {
+            'trend': 'rising'|'declining'|'neutral',
+            'strength': 'strong'|'moderate'|'weak',
+            'momentum_pct': float,
+            'above_ma': bool,
+            'ma_distance_pct': float,
+            'is_strong_volume': bool,
+            'signal': 'strong_bullish'|'bullish'|'neutral'|'bearish'|'strong_bearish'
+        }
+    """
+    if hist_data is None or not isinstance(hist_data, pd.DataFrame) or hist_data.empty or len(hist_data) < max(trend_period, ma_period):
+        return {
+            'trend': 'neutral',
+            'strength': 'weak',
+            'momentum_pct': 0.0,
+            'above_ma': False,
+            'ma_distance_pct': 0.0,
+            'is_strong_volume': False,
+            'signal': 'neutral'
+        }
+    
+    try:
+        # Get momentum analysis
+        trend, momentum_pct, obv_val, obv_ma = calculate_obv_momentum(hist_data, trend_period)
+        
+        # Get MA comparison
+        is_above_ma, ma_distance_pct, current_obv, ma_val = calculate_obv_vs_moving_average(hist_data, ma_period)
+        
+        # Determine strength level
+        if momentum_pct >= strength_threshold:
+            strength = "strong"
+        elif momentum_pct >= strength_threshold / 2:
+            strength = "moderate"
+        else:
+            strength = "weak"
+        
+        # Determine if volume is strong (above MA and rising)
+        is_strong_vol = is_above_ma and trend == "rising"
+        
+        # Create composite signal
+        if trend == "rising" and is_above_ma and strength == "strong":
+            signal = "strong_bullish"
+        elif trend == "rising" and is_above_ma:
+            signal = "bullish"
+        elif trend == "declining" and not is_above_ma and strength == "strong":
+            signal = "strong_bearish"
+        elif trend == "declining" and not is_above_ma:
+            signal = "bearish"
+        else:
+            signal = "neutral"
+        
+        return {
+            'trend': trend,
+            'strength': strength,
+            'momentum_pct': momentum_pct,
+            'above_ma': is_above_ma,
+            'ma_distance_pct': ma_distance_pct,
+            'is_strong_volume': is_strong_vol,
+            'signal': signal
+        }
+    except Exception as e:
+        logger.warning(f"Error in detect_obv_strength: {e}")
+        return {
+            'trend': 'neutral',
+            'strength': 'weak',
+            'momentum_pct': 0.0,
+            'above_ma': False,
+            'ma_distance_pct': 0.0,
+            'is_strong_volume': False,
+            'signal': 'neutral'
+        }
+
+
 def print_instance(instance: object) -> Dict[str, Any]:
     """
     Extract attributes of the first attribute found inside `instance`.
@@ -247,6 +590,10 @@ class IBapi(EWrapper, EClient):
         self.contract_cache = {}  # symbol -> Contract
         self._load_contract_cache_from_disk()
 
+        # Position management
+        from position_manager import PositionManager
+        self.position_manager = PositionManager()
+
         # ---------------------------
         # Scanner related containers
         # ---------------------------
@@ -289,6 +636,78 @@ class IBapi(EWrapper, EClient):
         self._fundamental_data = {}   # reqId -> {"MKTCAP": float, ...}
         self._fundamental_done = {}   # reqId -> bool
         self._fundamental_lock = threading.Lock()
+
+    # =========================================================================
+    # Stock Exclusion List Management
+    # =========================================================================
+    
+    def get_excluded_stocks(self) -> set:
+        """
+        Load excluded stocks from JSON file.
+        Returns: set of uppercase stock symbols to exclude
+        """
+        try:
+            exclude_path = self.config.watchlists_dir / "excluded_stocks.json"
+            if exclude_path.exists():
+                with exclude_path.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    return set(s.upper() for s in data.get("excluded", []))
+        except Exception as e:
+            logger.warning(f"Failed to load excluded stocks: {e}")
+        return set()
+    
+    def save_excluded_stocks(self, symbols: list) -> bool:
+        """
+        Save excluded stocks to JSON file.
+        Args: symbols - list of stock symbols
+        Returns: True if successful, False otherwise
+        """
+        try:
+            exclude_path = self.config.watchlists_dir / "excluded_stocks.json"
+            exclude_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            data = {
+                "excluded": [s.upper() for s in symbols],
+                "last_updated": str(time.time())
+            }
+            
+            with exclude_path.open("w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            
+            logger.info(f"Saved {len(symbols)} excluded stocks")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save excluded stocks: {e}")
+            return False
+    
+    def add_excluded_stock(self, symbol: str) -> bool:
+        """
+        Add a stock symbol to the exclusion list.
+        Returns: True if successful
+        """
+        excluded = self.get_excluded_stocks()
+        if symbol.upper() not in excluded:
+            excluded.add(symbol.upper())
+            return self.save_excluded_stocks(list(excluded))
+        return True
+    
+    def remove_excluded_stock(self, symbol: str) -> bool:
+        """
+        Remove a stock symbol from the exclusion list.
+        Returns: True if successful
+        """
+        excluded = self.get_excluded_stocks()
+        if symbol.upper() in excluded:
+            excluded.discard(symbol.upper())
+            return self.save_excluded_stocks(list(excluded))
+        return True
+    
+    def is_stock_excluded(self, symbol: str) -> bool:
+        """
+        Check if a stock symbol is in the exclusion list.
+        Returns: True if excluded, False otherwise
+        """
+        return symbol.upper() in self.get_excluded_stocks()
 
     def _to_dict(self, obj):
         if obj is None:
@@ -1065,11 +1484,30 @@ class IBapi(EWrapper, EClient):
         # ------------------------------------------------------------------
         # Determine an appropriate 'timeperiod' string for IB's reqHistoricalData
         # The goal is to request enough history to cover `lookback_window` bars at chosen gran.
-        # For intraday minute bars we approximate 390 trading minutes/day.
+        # For intraday minute bars we approximate 390 trading minutes/day (regular hours).
+        # With extended hours enabled, add ~2 hours pre-market + ~4 hours after-hours = +360 minutes
         # ------------------------------------------------------------------
+        
+        # Check if extended hours are enabled (affects bar count per day)
+        enable_extended = form.get("EnableExtendedHours", False)
+        include_overnight = form.get("IncludeOvernightData", False)
+        
         if bar_seconds < 3600:
             # intraday minute-based bars
-            minutes_per_trading_day = 390  # conservative approximation (US regular session)
+            minutes_per_trading_day = 390  # US regular session (9:30 AM - 4 PM ET)
+            
+            # Add extra minutes for extended hours if enabled
+            if enable_extended:
+                # Pre-market: 4 AM - 9:30 AM = 5.5 hours = 330 minutes
+                # After-hours: 4 PM - 8 PM = 4 hours = 240 minutes
+                # Total extra: 570 minutes
+                minutes_per_trading_day += 570
+            
+            if include_overnight:
+                # Overnight: 8 PM - 4 AM next day = 8 hours = 480 minutes
+                # (Note: this is typically very low volume but still calculated)
+                minutes_per_trading_day += 480
+            
             bars_per_day = (minutes_per_trading_day * 60) / bar_seconds
             # avoid division by zero and ensure at least 1 bar/day
             if bars_per_day < 1:
@@ -1079,8 +1517,23 @@ class IBapi(EWrapper, EClient):
                 days_needed = 1
             timeperiod = f"{days_needed} D"
         elif ib_bar_size == "1 hour":
-            # estimate ~6.5 trading hours/day -> ~6.5 hourly bars per trading day
+            # estimate ~6.5 trading hours/day for regular hours
             bars_per_day = 6.5
+
+            # Add extra hours for extended hours if enabled
+            if enable_extended:
+                # Pre-market: ~5.5 hours, After-hours: ~4 hours
+                bars_per_day += 9.5
+
+            if include_overnight:
+                # Overnight: ~8 hours
+                bars_per_day += 8
+
+            days_needed = int(math.ceil(float(lookback_window) / bars_per_day))
+            if days_needed < 1:
+                days_needed = 1
+            timeperiod = f"{days_needed} D"
+            
             days_needed = int(math.ceil(float(lookback_window) / bars_per_day))
             if days_needed < 1:
                 days_needed = 1
@@ -1118,6 +1571,15 @@ class IBapi(EWrapper, EClient):
         self._hist_semaphore.acquire()
         try:
             try:
+                # Determine if extended hours should be included
+                # useRTH = 1 means Regular Trading Hours only (9:30 AM - 4 PM EST)
+                # useRTH = 0 means include pre-market (4 AM - 9:30 AM) and after-hours (4 PM - 8 PM) and overnight
+                enable_extended = form.get("EnableExtendedHours", False)
+                include_overnight = form.get("IncludeOvernightData", False)
+                
+                # If extended hours or overnight data is requested, include all hours (useRTH=0)
+                useRTH = 0 if (enable_extended or include_overnight) else 1
+                
                 self.reqHistoricalData(
                     idreqHistDt,
                     contract,
@@ -1126,7 +1588,7 @@ class IBapi(EWrapper, EClient):
                     ib_bar_size,
                     "TRADES",
                     0,
-                    1,
+                    useRTH,
                     False,
                     [],
                 )
@@ -1470,15 +1932,46 @@ class IBapi(EWrapper, EClient):
             except Exception:
                 rv_lookback = 5
 
-            # Definition: relativeVolume = today's cumulative volume / average daily volume (last N days)
-            avg_daily = _avg_daily_volume(rv_lookback)
-            if avg_daily and not np.isnan(avg_daily) and avg_daily > 0:
-                rel_vol = today_cum_volume / avg_daily if not np.isnan(today_cum_volume) else float(np.nan)
-            else:
-                # fallback: last bar vs average bar volume
-                avg_bar = float(result_full["volume"].iloc[-rv_lookback:].mean()) if result_full.shape[
-                                                                                         0] >= 1 else float(np.nan)
+            # Detect if we're using intraday bars (multiple bars per day) or daily bars
+            # For intraday: compare volume at current time to average volume at that same time on previous days
+            # For daily: use today's cumulative volume / avg daily volume
+            is_intraday_data = result_full.shape[0] > 1 and len(unique_dates) > 1 and result_full.shape[0] / max(1,
+                                                                                                 len(unique_dates)) > 1.5
+
+            if is_intraday_data:
+                # Time-of-day adjusted RVOL for intraday bars
+                # Extract time from the last bar (current bar)
+                current_bar_time = result_full.index[-1].time()
+                
+                # Find all bars at this same time (across all days in history)
+                same_time_mask = result_full.index.time == current_bar_time
+                same_time_volumes = result_full.loc[same_time_mask, "volume"]
+                
+                # If we have multiple bars at this time, use them; otherwise fall back to recent bars
+                if len(same_time_volumes) > 1:
+                    # Average the previous occurrences at this time (exclude the current/last bar)
+                    avg_bar = float(same_time_volumes.iloc[:-1].mean()) if len(same_time_volumes) > 1 else float(np.nan)
+                else:
+                    # Not enough historical samples at this time slot
+                    # Fall back to: last bar volume / average of recent previous bars
+                    if result_full.shape[0] > rv_lookback:
+                        avg_bar = float(result_full["volume"].iloc[-(rv_lookback+1):-1].mean()) if result_full.shape[0] > rv_lookback else float(np.nan)
+                    else:
+                        avg_bar = float(result_full["volume"].iloc[:-1].mean()) if result_full.shape[0] > 1 else float(np.nan)
+                
                 rel_vol = last_bar_volume / avg_bar if avg_bar and avg_bar > 0 else float(np.nan)
+            else:
+                # Daily or longer timeframe: use today's cumulative volume / avg daily volume
+                avg_daily = _avg_daily_volume(rv_lookback)
+                if avg_daily and not np.isnan(avg_daily) and avg_daily > 0:
+                    rel_vol = today_cum_volume / avg_daily if not np.isnan(today_cum_volume) else float(np.nan)
+                else:
+                    # fallback: last bar vs average of PREVIOUS bars
+                    if result_full.shape[0] > rv_lookback:
+                        avg_bar = float(result_full["volume"].iloc[-(rv_lookback+1):-1].mean()) if result_full.shape[0] > rv_lookback else float(np.nan)
+                    else:
+                        avg_bar = float(result_full["volume"].iloc[:-1].mean()) if result_full.shape[0] > 1 else float(np.nan)
+                    rel_vol = last_bar_volume / avg_bar if avg_bar and avg_bar > 0 else float(np.nan)
 
             indicators["relativeVolume"] = rel_vol
 
@@ -1487,15 +1980,33 @@ class IBapi(EWrapper, EClient):
                     rv_lookback1 = int(form.get("RelativeVolume1", rv_lookback))
                 except Exception:
                     rv_lookback1 = rv_lookback
-                avg_daily1 = _avg_daily_volume(rv_lookback1)
-                if avg_daily1 and not np.isnan(avg_daily1) and avg_daily1 > 0:
-                    # we compare today's cum volume to avg_daily1
-                    rel_vol1 = today_cum_volume / avg_daily1 if not np.isnan(today_cum_volume) else float(np.nan)
-                else:
-                    avg_bar1 = float(result_full["volume"].iloc[-rv_lookback1:].mean()) if result_full.shape[
-                                                                                               0] >= 1 else float(
-                        np.nan)
+                
+                if is_intraday_data:
+                    # Time-of-day adjusted RVOL for "between" comparison
+                    current_bar_time = result_full.index[-1].time()
+                    same_time_mask = result_full.index.time == current_bar_time
+                    same_time_volumes = result_full.loc[same_time_mask, "volume"]
+                    
+                    if len(same_time_volumes) > 1:
+                        avg_bar1 = float(same_time_volumes.iloc[:-1].mean()) if len(same_time_volumes) > 1 else float(np.nan)
+                    else:
+                        if result_full.shape[0] > rv_lookback1:
+                            avg_bar1 = float(result_full["volume"].iloc[-(rv_lookback1+1):-1].mean()) if result_full.shape[0] > rv_lookback1 else float(np.nan)
+                        else:
+                            avg_bar1 = float(result_full["volume"].iloc[:-1].mean()) if result_full.shape[0] > 1 else float(np.nan)
+                    
                     rel_vol1 = last_bar_volume / avg_bar1 if avg_bar1 and avg_bar1 > 0 else float(np.nan)
+                else:
+                    # Daily or longer timeframe: use today's cumulative volume / avg daily volume
+                    avg_daily1 = _avg_daily_volume(rv_lookback1)
+                    if avg_daily1 and not np.isnan(avg_daily1) and avg_daily1 > 0:
+                        rel_vol1 = today_cum_volume / avg_daily1 if not np.isnan(today_cum_volume) else float(np.nan)
+                    else:
+                        if result_full.shape[0] > rv_lookback1:
+                            avg_bar1 = float(result_full["volume"].iloc[-(rv_lookback1+1):-1].mean()) if result_full.shape[0] > rv_lookback1 else float(np.nan)
+                        else:
+                            avg_bar1 = float(result_full["volume"].iloc[:-1].mean()) if result_full.shape[0] > 1 else float(np.nan)
+                        rel_vol1 = last_bar_volume / avg_bar1 if avg_bar1 and avg_bar1 > 0 else float(np.nan)
                 indicators["relativeVolume1"] = rel_vol1
 
         # --- Price level (last close) ---
@@ -1852,9 +2363,23 @@ class IBapi(EWrapper, EClient):
                     pp_name1 = form.get("PivotPoint1", pp_name)
                     val1 = pivots.get(pp_name1, P)
                     indicators["Pivot1"] = {pp_name1: val1}
+                
+                # Store second pivot point
+                if form.get("PivotPoint2") and form.get("PivotPoint2") != "Not used":
+                    pp_name2 = form.get("PivotPoint2", pp_name)
+                    val2 = pivots.get(pp_name2, P)
+                    indicators["Pivot2"] = {pp_name2: val2}
+                
+                # Store third pivot point
+                if form.get("PivotPoint3") and form.get("PivotPoint3") != "Not used":
+                    pp_name3 = form.get("PivotPoint3", pp_name)
+                    val3 = pivots.get(pp_name3, P)
+                    indicators["Pivot3"] = {pp_name3: val3}
             except Exception:
                 indicators["Pivot"] = {}
                 indicators["Pivot1"] = {}
+                indicators["Pivot2"] = {}
+                indicators["Pivot3"] = {}
 
         # --- Cross 50 SMA (daily) ---
         if form.get("ComparisonCross50SMA", "Not used") != "Not used":
@@ -2314,6 +2839,21 @@ class IBapi(EWrapper, EClient):
         return indicators
 
     def buySellSignalCheck(self, data, form):
+        """
+        Evaluate all configured signal conditions against the current indicators.
+        
+        Note: If EnableExtendedHours is checked, the indicators and moving averages are 
+        calculated using pre-market and after-hours data (4 AM - 8 PM ET).
+        If IncludeOvernightData is checked, overnight data (8 PM - 4 AM ET) is also included.
+        This affects all technical indicators, volume calculations, and price levels.
+        
+        Args:
+            data: Indicators dictionary with computed values (see getIndicators)
+            form: Form data with all configured conditions and parameters
+            
+        Returns:
+            Tuple[bool, dict]: (overall_condition, variable_results)
+        """
         condition = True
         counting_ = 0
         variable_results = {}  # track pass/fail per variable
@@ -2492,16 +3032,19 @@ class IBapi(EWrapper, EClient):
         # MARKET CAP (in millions)
         # -------------------------
         mktcap_condition = None
+        mktcap_comp_mode = form.get("ComparisonMarketCap", "Not used")
+        mktcap_threshold = float(form.get("PercentageMarketCap", 0))
+        mktcap_value = data.get("marketCap")
 
-        if form.get("ComparisonMarketCap", "Not used") not in _NON_SIMPLE_MODES:
-            if form.get("ComparisonMarketCap") == "greater":
-                mktcap_condition = _safe_compare(data.get("marketCap"), ">", float(form.get("PercentageMarketCap", 0)))
-            elif form.get("ComparisonMarketCap") == "greaterEqual":
-                mktcap_condition = _safe_compare(data.get("marketCap"), ">=", float(form.get("PercentageMarketCap", 0)))
-            elif form.get("ComparisonMarketCap") == "lower":
-                mktcap_condition = _safe_compare(data.get("marketCap"), "<", float(form.get("PercentageMarketCap", 0)))
-            elif form.get("ComparisonMarketCap") == "lowerEqual":
-                mktcap_condition = _safe_compare(data.get("marketCap"), "<=", float(form.get("PercentageMarketCap", 0)))
+        if mktcap_comp_mode not in _NON_SIMPLE_MODES:
+            if mktcap_comp_mode == "greater":
+                mktcap_condition = _safe_compare(mktcap_value, ">", mktcap_threshold)
+            elif mktcap_comp_mode == "greaterEqual":
+                mktcap_condition = _safe_compare(mktcap_value, ">=", mktcap_threshold)
+            elif mktcap_comp_mode == "lower":
+                mktcap_condition = _safe_compare(mktcap_value, "<", mktcap_threshold)
+            elif mktcap_comp_mode == "lowerEqual":
+                mktcap_condition = _safe_compare(mktcap_value, "<=", mktcap_threshold)
 
         elif form.get("ComparisonMarketCap") == "between":
             mktcap_condition = (
@@ -3375,6 +3918,104 @@ class IBapi(EWrapper, EClient):
             variable_results["Pivot"] = bool(pivot_condition)
 
         # -------------------------
+        # PIVOT POINT 2 (Second Pivot)
+        # -------------------------
+        pivot2_condition = None
+        
+        if form.get("ComparisonPivotPoint2") and form.get("ComparisonPivotPoint2") != "Not used" and "Pivot2" in data:
+            pp_name2 = list(data.get("Pivot2", {}).keys())[0] if data.get("Pivot2") else None
+            pivot2 = data.get("Pivot2", {}).get(pp_name2) if pp_name2 else None
+            
+            if pivot2 is not None:
+                if (
+                    form.get("ComparisonPivotPoint2") not in _NON_SIMPLE_MODES
+                    and form.get("pivotPointBool", "value") == "percentage"
+                ):
+                    base2 = pivot2 * (1.0 + float(form.get("PercentagePivotPoint2", 0)) / 100.0)
+                    if form["ComparisonPivotPoint2"] == "greater":
+                        pivot2_condition = _safe_compare(data.get("close"), ">", base2)
+                    elif form["ComparisonPivotPoint2"] == "greaterEqual":
+                        pivot2_condition = _safe_compare(data.get("close"), ">=", base2)
+                    elif form["ComparisonPivotPoint2"] == "lower":
+                        pivot2_condition = _safe_compare(data.get("close"), "<", base2)
+                    elif form["ComparisonPivotPoint2"] == "lowerEqual":
+                        pivot2_condition = _safe_compare(data.get("close"), "<=", base2)
+                
+                elif (
+                    form.get("ComparisonPivotPoint2") not in _NON_SIMPLE_MODES
+                    and form.get("pivotPointBool", "value") == "value"
+                ):
+                    if form["ComparisonPivotPoint2"] == "greater":
+                        pivot2_condition = _safe_compare(pivot2, ">", float(form.get("PercentagePivotPoint2", 0)))
+                    elif form["ComparisonPivotPoint2"] == "greaterEqual":
+                        pivot2_condition = _safe_compare(pivot2, ">=", float(form.get("PercentagePivotPoint2", 0)))
+                    elif form["ComparisonPivotPoint2"] == "lower":
+                        pivot2_condition = _safe_compare(float(form.get("PercentagePivotPoint2", 0)), "<", pivot2)
+                    elif form["ComparisonPivotPoint2"] == "lowerEqual":
+                        pivot2_condition = _safe_compare(float(form.get("PercentagePivotPoint2", 0)), "<=", pivot2)
+                
+                elif form.get("ComparisonPivotPoint2") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+                    threshold = float(form.get("PercentagePivotPoint2", 5.0))
+                    pivot2_condition = _within_percent_check(
+                        pivot2, data.get("close"),
+                        form["ComparisonPivotPoint2"], threshold
+                    )
+            
+            if pivot2_condition is not None:
+                condition = condition and pivot2_condition
+                counting_ += 1
+                variable_results["Pivot2"] = bool(pivot2_condition)
+
+        # -------------------------
+        # PIVOT POINT 3 (Third Pivot)
+        # -------------------------
+        pivot3_condition = None
+        
+        if form.get("ComparisonPivotPoint3") and form.get("ComparisonPivotPoint3") != "Not used" and "Pivot3" in data:
+            pp_name3 = list(data.get("Pivot3", {}).keys())[0] if data.get("Pivot3") else None
+            pivot3 = data.get("Pivot3", {}).get(pp_name3) if pp_name3 else None
+            
+            if pivot3 is not None:
+                if (
+                    form.get("ComparisonPivotPoint3") not in _NON_SIMPLE_MODES
+                    and form.get("pivotPointBool", "value") == "percentage"
+                ):
+                    base3 = pivot3 * (1.0 + float(form.get("PercentagePivotPoint3", 0)) / 100.0)
+                    if form["ComparisonPivotPoint3"] == "greater":
+                        pivot3_condition = _safe_compare(data.get("close"), ">", base3)
+                    elif form["ComparisonPivotPoint3"] == "greaterEqual":
+                        pivot3_condition = _safe_compare(data.get("close"), ">=", base3)
+                    elif form["ComparisonPivotPoint3"] == "lower":
+                        pivot3_condition = _safe_compare(data.get("close"), "<", base3)
+                    elif form["ComparisonPivotPoint3"] == "lowerEqual":
+                        pivot3_condition = _safe_compare(data.get("close"), "<=", base3)
+                
+                elif (
+                    form.get("ComparisonPivotPoint3") not in _NON_SIMPLE_MODES
+                    and form.get("pivotPointBool", "value") == "value"
+                ):
+                    if form["ComparisonPivotPoint3"] == "greater":
+                        pivot3_condition = _safe_compare(pivot3, ">", float(form.get("PercentagePivotPoint3", 0)))
+                    elif form["ComparisonPivotPoint3"] == "greaterEqual":
+                        pivot3_condition = _safe_compare(pivot3, ">=", float(form.get("PercentagePivotPoint3", 0)))
+                    elif form["ComparisonPivotPoint3"] == "lower":
+                        pivot3_condition = _safe_compare(float(form.get("PercentagePivotPoint3", 0)), "<", pivot3)
+                    elif form["ComparisonPivotPoint3"] == "lowerEqual":
+                        pivot3_condition = _safe_compare(float(form.get("PercentagePivotPoint3", 0)), "<=", pivot3)
+                
+                elif form.get("ComparisonPivotPoint3") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+                    threshold = float(form.get("PercentagePivotPoint3", 5.0))
+                    pivot3_condition = _within_percent_check(
+                        pivot3, data.get("close"),
+                        form["ComparisonPivotPoint3"], threshold
+                    )
+            
+            if pivot3_condition is not None:
+                condition = condition and pivot3_condition
+                counting_ += 1
+                variable_results["Pivot3"] = bool(pivot3_condition)
+
+        # -------------------------
         # RELATIVE VOLUME
         # -------------------------
         relative_volume_condition = None
@@ -3961,13 +4602,14 @@ class IBapi(EWrapper, EClient):
             variable_results["news"] = bool(news_condition)
 
         # -------------------------
-        # NEWS KEYWORD SCAN
+        # NEWS KEYWORD SCAN (filter headlines by keywords independently, regardless of signal)
         # -------------------------
         news_keyword_match = None
         matched_keyword_headlines = []
 
+        # Apply keyword filtering REGARDLESS of whether News signal is enabled
         keywords_raw = form.get("NewsKeywords", "").strip()
-        if keywords_raw and form.get("ComparisonNews", "Not used") != "Not used":
+        if keywords_raw:
             keywords = [k.strip().lower() for k in keywords_raw.split(",") if k.strip()]
             if keywords:
                 headlines = data.get("newsHeadlines", [])
@@ -4000,6 +4642,275 @@ class IBapi(EWrapper, EClient):
         data["variableResults"] = variable_results
         data["passCount"] = sum(1 for v in variable_results.values() if v)
         data["totalCount"] = counting_
+
+        # -------------------------
+        # FIBONACCI PULLBACK CALCULATIONS
+        # -------------------------
+        # Calculate Fibonacci pullback levels if we have prevClose and highOfDay
+        try:
+            prev_close = data.get("prevClose")
+            high_of_day = data.get("highOfDay")
+            
+            if prev_close is not None and high_of_day is not None:
+                prev_close = float(prev_close)
+                high_of_day = float(high_of_day)
+                
+                if high_of_day > prev_close:  # Only calculate if there's an uptrend
+                    from indicators import FibonacciCalculator
+                    
+                    fib_calc = FibonacciCalculator(prev_close, high_of_day)
+                    fib_levels = fib_calc.calculate_levels()
+                    
+                    # Store Fibonacci data in the result
+                    data["fibonacciLevels"] = fib_levels
+                    data["fibonacciMove"] = round(high_of_day - prev_close, 4)
+                else:
+                    # No uptrend to calculate pullback
+                    data["fibonacciLevels"] = {}
+                    data["fibonacciMove"] = 0.0
+        except Exception as e:
+            logger.warning(f"Fibonacci calculation failed: {e}")
+            data["fibonacciLevels"] = {}
+            data["fibonacciMove"] = 0.0
+        
+        # -------- Gap Detection --------
+        try:
+            if form.GapDetectionEnabled:
+                current_price = data.get("close")
+                lookback_days = form.GapLookbackDays
+                min_gap_percent = form.GapMinimumPercent
+                proximity_percent = form.GapProximityPercent
+                
+                # Get historical data for gap analysis
+                symbol = data.get("symbol")
+                historical_data = []
+                
+                # Try to get historical data from internal data structure
+                if symbol in self.HistoricalDt:
+                    hist_bars = self.HistoricalDt[symbol]
+                    for bar in hist_bars:
+                        if hasattr(bar, 'open') and hasattr(bar, 'close'):
+                            historical_data.append({
+                                'date': str(bar.date) if hasattr(bar, 'date') else '',
+                                'open': float(bar.open),
+                                'close': float(bar.close),
+                                'high': float(bar.high) if hasattr(bar, 'high') else float(bar.close),
+                                'low': float(bar.low) if hasattr(bar, 'low') else float(bar.close),
+                            })
+                
+                if historical_data and current_price:
+                    current_price = float(current_price)
+                    
+                    # Analyze gaps
+                    gap_analyzer = GapAnalyzer(lookback_days=lookback_days, min_gap_percent=min_gap_percent)
+                    all_gaps = gap_analyzer.detect_gaps(historical_data)
+                    
+                    # Identify which gaps are still open
+                    gaps_status = gap_analyzer.identify_open_gaps(all_gaps['all_gaps'], current_price)
+                    
+                    # Find gaps being filled
+                    approaching = gap_analyzer.find_approaching_gaps(
+                        gaps_status['open_gaps'],
+                        current_price,
+                        proximity_percent=proximity_percent
+                    )
+                    
+                    # Store gap data in results
+                    data["gaps"] = {
+                        "all_detected": [g for g in all_gaps['all_gaps']],
+                        "open_gaps": gaps_status['open_gaps'],
+                        "upside_gaps": gaps_status['upside_gaps'],
+                        "downside_gaps": gaps_status['downside_gaps'],
+                        "approaching_gaps": approaching['approaching'],
+                        "closest_gap": approaching['closest_gap'],
+                        "approaching_downside": approaching['approaching_downside'],
+                        "approaching_upside": approaching['approaching_upside'],
+                    }
+                else:
+                    data["gaps"] = {
+                        "all_detected": [],
+                        "open_gaps": [],
+                        "upside_gaps": [],
+                        "downside_gaps": [],
+                        "approaching_gaps": [],
+                        "closest_gap": None,
+                        "approaching_downside": [],
+                        "approaching_upside": [],
+                    }
+            else:
+                data["gaps"] = {
+                    "all_detected": [],
+                    "open_gaps": [],
+                    "upside_gaps": [],
+                    "downside_gaps": [],
+                    "approaching_gaps": [],
+                    "closest_gap": None,
+                    "approaching_downside": [],
+                    "approaching_upside": [],
+                }
+        except Exception as e:
+            logger.warning(f"Gap detection failed: {e}")
+            data["gaps"] = {
+                "all_detected": [],
+                "open_gaps": [],
+                "upside_gaps": [],
+                "downside_gaps": [],
+                "approaching_gaps": [],
+                "closest_gap": None,
+                "approaching_downside": [],
+                "approaching_upside": [],
+            }
+
+        # -------------------------
+        # % CHANGE MONITORING
+        # -------------------------
+        pct_change_condition = None
+        if form.get("EnablePctChangeMonitor"):
+            try:
+                lookback_minutes = int(form.get("PctChangeLookbackMinutes", 5))
+                threshold_pct = float(form.get("PctChangeThreshold", 3.0))
+                
+                # Convert minutes to bars (assuming 1-minute bars)
+                lookback_bars = max(1, lookback_minutes)
+                
+                # Get historical data from HistoricalDt
+                symbol = data.get("symbol")
+                if symbol and symbol in self.HistoricalDt:
+                    hist_data = self.HistoricalDt[symbol]
+                    if isinstance(hist_data, pd.DataFrame) and len(hist_data) >= lookback_bars:
+                        pct_change = calculate_pct_change(hist_data, lookback_bars)
+                        pct_change_condition = abs(pct_change) >= threshold_pct
+                        data["pctChange"] = pct_change
+                        data["pctChangeThreshold"] = threshold_pct
+                    else:
+                        pct_change_condition = False
+                        data["pctChange"] = 0.0
+                else:
+                    pct_change_condition = False
+                    data["pctChange"] = 0.0
+            except Exception as e:
+                logger.warning(f"% Change monitoring failed: {e}")
+                pct_change_condition = False
+        
+        if pct_change_condition is not None:
+            variable_results["pctChange"] = bool(pct_change_condition)
+
+        # -------------------------
+        # VOLUME MONITORING
+        # -------------------------
+        volume_monitor_condition = None
+        if form.get("EnableVolumeMonitor"):
+            try:
+                lookback_minutes = int(form.get("VolumeLookbackMinutes", 5))
+                volume_threshold = float(form.get("VolumeThreshold", 50000))
+                
+                # Convert minutes to bars
+                lookback_bars = max(1, lookback_minutes)
+                
+                # Get historical data
+                symbol = data.get("symbol")
+                if symbol and symbol in self.HistoricalDt:
+                    hist_data = self.HistoricalDt[symbol]
+                    if isinstance(hist_data, pd.DataFrame) and len(hist_data) >= lookback_bars:
+                        vol_sum = calculate_volume_sum(hist_data, lookback_bars)
+                        volume_monitor_condition = vol_sum >= volume_threshold
+                        data["volumeSum"] = vol_sum
+                        data["volumeThreshold"] = volume_threshold
+                    else:
+                        volume_monitor_condition = False
+                        data["volumeSum"] = 0.0
+                else:
+                    volume_monitor_condition = False
+                    data["volumeSum"] = 0.0
+            except Exception as e:
+                logger.warning(f"Volume monitoring failed: {e}")
+                volume_monitor_condition = False
+        
+        if volume_monitor_condition is not None:
+            variable_results["volumeSum"] = bool(volume_monitor_condition)
+
+        # -------------------------
+        # KEY LEVEL DETECTION
+        # -------------------------
+        key_level_condition = None
+        if form.get("EnableKeyLevelDetection"):
+            try:
+                proximity_pct = float(form.get("KeyLevelProximityPercent", 1.0))
+                key_level_condition = detect_nearby_key_levels(data, proximity_pct)
+                data["nearKeyLevel"] = key_level_condition
+                data["keyLevelProximity"] = proximity_pct
+            except Exception as e:
+                logger.warning(f"Key level detection failed: {e}")
+                key_level_condition = False
+        
+        if key_level_condition is not None:
+            variable_results["keyLevel"] = bool(key_level_condition)
+
+        # -------------------------
+        # 200 SMA BULLISH CROSSOVER DETECTION
+        # -------------------------
+        sma_200_crossover_condition = None
+        if form.get("Enable200SMABullishCrossover"):
+            try:
+                sma_200_crossover_condition = detect_200sma_bullish_crossover(data)
+                data["sma200BullishCrossover"] = sma_200_crossover_condition
+            except Exception as e:
+                logger.warning(f"200 SMA bullish crossover detection failed: {e}")
+                sma_200_crossover_condition = False
+        
+        if sma_200_crossover_condition is not None:
+            variable_results["sma200Crossover"] = bool(sma_200_crossover_condition)
+
+        # -------------------------
+        # ON BALANCE VOLUME (OBV) ANALYSIS
+        # -------------------------
+        obv_analysis = None
+        if form.get("EnableOBVAnalysis"):
+            try:
+                # Get historical data for OBV calculation
+                symbol = data.get("symbol")
+                hist_data = None
+                
+                if symbol and symbol in self.HistoricalDt:
+                    hist_df = self.HistoricalDt[symbol]
+                    if isinstance(hist_df, pd.DataFrame) and len(hist_df) >= 20:
+                        hist_data = hist_df
+                
+                if hist_data is not None:
+                    trend_period = int(form.get("OBVTrendPeriod", 20))
+                    ma_period = int(form.get("OBVMovingAveragePeriod", 10))
+                    strength_threshold = float(form.get("OBVStrengthThreshold", 15.0))
+                    
+                    obv_analysis = detect_obv_strength(
+                        data, 
+                        hist_data,
+                        trend_period=trend_period,
+                        ma_period=ma_period,
+                        strength_threshold=strength_threshold
+                    )
+                    
+                    # Store OBV analysis results
+                    data["obvAnalysis"] = obv_analysis
+                    data["obvTrend"] = obv_analysis["trend"]
+                    data["obvStrength"] = obv_analysis["strength"]
+                    data["obvMomentum"] = obv_analysis["momentum_pct"]
+                    data["obvAboveMA"] = obv_analysis["above_ma"]
+                    data["obvSignal"] = obv_analysis["signal"]
+                else:
+                    # Not enough data for OBV analysis
+                    obv_analysis = None
+            except Exception as e:
+                logger.warning(f"OBV analysis failed: {e}")
+                obv_analysis = None
+        
+        # Store OBV conditions in variable results
+        if obv_analysis is not None:
+            # Variable 1: OBV Trend & Strength
+            is_bullish_obv = obv_analysis["signal"] in ["strong_bullish", "bullish"]
+            variable_results["obvTrendStrength"] = is_bullish_obv
+            
+            # Variable 2: OBV Above MA (strong relative volume)
+            variable_results["obvAboveMovingAverage"] = obv_analysis["above_ma"]
 
         if self.config.scale_volume_metrics:
             # create copy for Flask so internal logic stays untouched
@@ -4068,21 +4979,39 @@ class IBapi(EWrapper, EClient):
                 time.sleep(0.1)
                 _pw += 0.1
 
-        # Use discovered providers, or fall back to all known IBKR
-        # news provider codes so at least one will match a subscription.
-        if self._subscribed_news_providers:
+        # -------------------------
+        # Determine which news providers to request
+        # -------------------------
+        # Priority:
+        # 1. User-specified providers in NewsProviders field
+        # 2. Discovered subscribed providers from IBKR
+        # 3. Fallback list with diverse providers
+        
+        user_providers = form.get("NewsProviders", "").strip()
+        if user_providers:
+            # User specified preferred providers
+            provider_list = [p.strip().upper() for p in user_providers.split(",") if p.strip()]
+            provider_codes = "+".join(provider_list)
+            logger.info("Using user-specified news providers: %s", provider_codes)
+        elif self._subscribed_news_providers:
+            # Use discovered subscribed providers
             provider_codes = self._subscribed_news_providers
+            logger.info("Using discovered news providers: %s", provider_codes)
         else:
-            # Pass all common provider codes — IB will silently ignore
-            # any the account is not subscribed to and return data from
-            # the ones that match.
-            provider_codes = "BZ+BRFG+BRFUPDN+FLY+DJNL+DJ-N+DJ-RT+MT+CZ+GS+BSW+TWST"
-            logger.info("No subscribed news providers discovered; using fallback codes: %s", provider_codes)
+            # Fall back to comprehensive provider list
+            # Ordered to prioritize non-Dow Jones sources first to improve diversity:
+            # BZ (Benzinga), FLY (Fly), MT (Morningstar), GS, CZ, BSW, BRFG, then DJNL + DJ-N (Dow Jones)
+            # This ensures better provider diversity and avoids DJ-N dominance
+            provider_codes = "BZ+FLY+MT+GS+CZ+BSW+BRFG+DJNL+DJ-N+DJ-RT"
+            logger.info("Using fallback news providers (diversity-first): %s", provider_codes)
 
         end_dt = ""  # now
         start_dt = ""  # open-ended (let maxResults limit it)
 
-        total_to_request = max_headlines + 20  # over-request to allow for filtering
+        # Over-request articles to improve provider diversity
+        # Request 3x more headlines than needed to ensure variety across different providers
+        # This helps overcome DJ-N dominance and get more diverse news sources
+        total_to_request = (max_headlines + 20) * 3  # tripled for better diversity
 
         logger.info(
             "reqHistoricalNews reqId=%s conId=%s providers=%s totalResults=%s",
@@ -4140,6 +5069,25 @@ class IBapi(EWrapper, EClient):
                 continue
             seen_headlines.add(hl_text)
             deduped.append(h)
+
+        # -------------------------
+        # Provider diversity filter: avoid DJ-N dominance
+        # -------------------------
+        # Count providers to ensure variety
+        dj_providers = {"dj-n", "dj-rt", "djnl"}  # Dow Jones variants
+        dj_items = []
+        non_dj_items = []
+        
+        for h in deduped:
+            provider = (h.get("provider") or "").strip().lower()
+            if provider in dj_providers:
+                dj_items.append(h)
+            else:
+                non_dj_items.append(h)
+        
+        # Reorder: non-DJ first, then DJ (limits DJ to max 30% of final results)
+        max_dj_allowed = max(1, int(max_headlines * 0.30))
+        deduped = non_dj_items + dj_items[:max_dj_allowed]
 
         # Limit to max requested
         deduped = deduped[:max_headlines]
@@ -4752,7 +5700,26 @@ class IBapi(EWrapper, EClient):
 
         self.conIds = data.get("conId", [None] * len(self.cusip))[0:50]
 
+        # Load form-based exclusion list (if enabled)
+        form_excluded = set()
+        if form.get("EnableStockExclusion"):
+            exclude_str = form.get("ExcludeStocksList", "")
+            if exclude_str:
+                form_excluded = {s.upper().strip() for s in exclude_str.split(",") if s.strip()}
+        
+        # Load file-based exclusion list
+        file_excluded = self.get_excluded_stocks()
+        
+        # Combine both lists
+        all_excluded = form_excluded | file_excluded
+
         for cusip, conId, m in zip(self.cusip, self.conIds, mainTickers):
+            
+            # Check if stock is excluded
+            symbol_to_check = str(m).upper() if m else ""
+            if symbol_to_check in all_excluded:
+                logger.info(f"Skipping excluded stock: {m}")
+                continue
 
             time.sleep(11 / 50)
 

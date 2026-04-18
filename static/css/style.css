@@ -1509,6 +1509,46 @@ ul {
   gap: 4px;
 }
 
+/* ===== Fibonacci Calculator ===== */
+.oe-entry-fib-section {
+  background: #f6f9fc;
+  border: 1px solid #d6e4f0;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.oe-fib-levels-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  background: #fff;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #e1e4e8;
+}
+
+.oe-fib-levels-grid label {
+  padding: 6px;
+  border-radius: 4px;
+  transition: background .15s;
+  cursor: pointer;
+}
+
+.oe-fib-levels-grid input[type="radio"] {
+  margin-right: 4px;
+  cursor: pointer;
+}
+
+.oe-fib-levels-grid label:hover {
+  background: #f0f2f5;
+}
+
+.oe-fib-levels-grid input[type="radio"]:checked + strong {
+  color: #0969da;
+  font-weight: 700;
+}
+
 /* ===== Multi-Level Order Builder ===== */
 .ml-section {
   border: 1px solid #d6e4f0;
