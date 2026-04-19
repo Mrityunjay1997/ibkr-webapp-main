@@ -148,6 +148,53 @@ def safe_last_two_dates(folder: str):
         return []
 
 
+def apply_result_filters(results_list: list, form: dict) -> list:
+    """
+    Filter scan results based on enabled filter checkboxes.
+    
+    Only returns stocks that meet ALL checked filter criteria.
+    If no filters are enabled, returns all results unchanged.
+    
+    Args:
+        results_list: List of stock result dicts from sendToFlaskIB
+        form: Form data dict with filter checkbox states
+    
+    Returns:
+        Filtered list of stock results
+    """
+    from ibkr_signal_engine import apply_result_filters as backend_filter
+    
+    # If no results, return empty
+    if not results_list:
+        return []
+    
+    # Check if any filter is enabled
+    filter_keys = [
+        'filterVWAP', 'filterFastSMA', 'filterMediumSMA', 'filterSlowSMA',
+        'filterRSI', 'filterFastEMA', 'filterSlowEMA', 'filterOBV', 'filterATR',
+        'filterAverageVolume', 'filterRelativeVolume', 'filterPrevClose',
+        'filterLowOfDay', 'filterHighOfDay', 'filterCross50SMA', 'filterCross200SMA',
+        'filterBreakHigh', 'filterPullbackPct', 'filterPullbackPct2',
+        'filterFibPullback', 'filterGapPullback', 'filterPivotPoint',
+        'filterUpGap', 'filterDownGap', 'filterNewsKeyword', 'filterMarketCap',
+        'filterVolume'
+    ]
+    
+    any_enabled = any(form.get(k, False) for k in filter_keys)
+    
+    # If no filters enabled, return all results
+    if not any_enabled:
+        return results_list
+    
+    # Filter results: keep only stocks that pass all enabled filters
+    filtered = []
+    for stock_data in results_list:
+        if backend_filter(stock_data, form):
+            filtered.append(stock_data)
+    
+    return filtered
+
+
 def run_gc():
     if cfg.cache_garbage_collection:
         gc.collect()
@@ -365,7 +412,9 @@ def something():
                     myresult = casa.IntersectionDifferece(etfDict)
                     etf__ = etfDict.split(".")[0]
                     IBAPI.getFinalResult(myresult, myform)
-                    sendToHtml[etf__] = {etfDict: list(IBAPI.sendToFlaskIB.copy().values())}
+                    # Apply filters to results
+                    filtered_results = apply_result_filters(list(IBAPI.sendToFlaskIB.copy().values()), myform)
+                    sendToHtml[etf__] = {etfDict: filtered_results}
                     time.sleep(5)
                 except Exception as e:
                     logger.exception(f"Error processing ETF {etfDict}: {e}")
@@ -373,7 +422,9 @@ def something():
             IBAPI.addFrequency = myform.get("addFrequency")
             myresult = dataProcessing()
             IBAPI.getFinalResult(myresult, myform)
-            sendToHtml["All ETF tickers"] = {"All ETF tickers": list(IBAPI.sendToFlaskIB.copy().values())}
+            # Apply filters to results
+            filtered_results = apply_result_filters(list(IBAPI.sendToFlaskIB.copy().values()), myform)
+            sendToHtml["All ETF tickers"] = {"All ETF tickers": filtered_results}
 
     # Branch B: CSV file posted
     elif len(request.files) == 1:
@@ -392,7 +443,9 @@ def something():
         myresult = convertCSV(reader)
 
         IBAPI.getFinalResult(myresult, myform)
-        sendToHtml["CSV"] = {"Custom Tickers": list(IBAPI.sendToFlaskIB.copy().values())}
+        # Apply filters to results
+        filtered_results = apply_result_filters(list(IBAPI.sendToFlaskIB.copy().values()), myform)
+        sendToHtml["CSV"] = {"Custom Tickers": filtered_results}
 
     # Branch C: JSON posted with custom instruments
     elif request.json is not None:
@@ -401,7 +454,9 @@ def something():
         IBAPI.addFrequency = myform.get("addFrequency")
         myresult = processingData["securities"]
         IBAPI.getFinalResult(myresult, myform)
-        sendToHtml["CSV"] = {"Custom Tickers": list(IBAPI.sendToFlaskIB.copy().values())}
+        # Apply filters to results
+        filtered_results = apply_result_filters(list(IBAPI.sendToFlaskIB.copy().values()), myform)
+        sendToHtml["CSV"] = {"Custom Tickers": filtered_results}
         time.sleep(5)
 
     try:

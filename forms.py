@@ -1002,6 +1002,41 @@ class Parameters(FlaskForm):
         ],
     )
 
+    # ------------------------------------------------------------------
+    # Result Filtering - Include only stocks meeting checked indicators
+    # When a checkbox is enabled, only stocks where that indicator 
+    # meets the configured condition will be returned.
+    # Leave all unchecked to return all results (default behavior).
+    # ------------------------------------------------------------------
+
+    filterVWAP = BooleanField("Filter by VWAP", default=False)
+    filterFastSMA = BooleanField("Filter by Fast SMA", default=False)
+    filterMediumSMA = BooleanField("Filter by Medium SMA", default=False)
+    filterSlowSMA = BooleanField("Filter by Slow SMA", default=False)
+    filterRSI = BooleanField("Filter by RSI", default=False)
+    filterFastEMA = BooleanField("Filter by Fast EMA", default=False)
+    filterSlowEMA = BooleanField("Filter by Slow EMA", default=False)
+    filterOBV = BooleanField("Filter by OBV", default=False)
+    filterATR = BooleanField("Filter by ATR", default=False)
+    filterAverageVolume = BooleanField("Filter by Average Volume", default=False)
+    filterRelativeVolume = BooleanField("Filter by Relative Volume", default=False)
+    filterPrevClose = BooleanField("Filter by Previous Close", default=False)
+    filterLowOfDay = BooleanField("Filter by Low of Day", default=False)
+    filterHighOfDay = BooleanField("Filter by High of Day", default=False)
+    filterCross50SMA = BooleanField("Filter by Cross 50 SMA", default=False)
+    filterCross200SMA = BooleanField("Filter by Cross 200 SMA", default=False)
+    filterBreakHigh = BooleanField("Filter by Break High", default=False)
+    filterPullbackPct = BooleanField("Filter by Pullback %", default=False)
+    filterPullbackPct2 = BooleanField("Filter by Pullback % 2", default=False)
+    filterFibPullback = BooleanField("Filter by Fib Pullback", default=False)
+    filterGapPullback = BooleanField("Filter by Gap Pullback", default=False)
+    filterPivotPoint = BooleanField("Filter by Pivot Point", default=False)
+    filterUpGap = BooleanField("Filter by Up Gap", default=False)
+    filterDownGap = BooleanField("Filter by Down Gap", default=False)
+    filterNewsKeyword = BooleanField("Filter by News Keywords", default=False)
+    filterMarketCap = BooleanField("Filter by Market Cap", default=False)
+    filterVolume = BooleanField("Filter by Volume", default=False)
+
     submit = SubmitField("Submit")
 
 

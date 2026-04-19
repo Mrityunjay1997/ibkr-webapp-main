@@ -95,14 +95,20 @@ def _normalize_market_cap(value):
     """
     Normalize market cap value to millions.
     
-    Handles values with suffixes like '1.15m' (millions), '1.92b' (billions).
+    Handles multiple formats:
+    - Direct numeric values (assumed to be in millions from IBKR)
+    - Values with suffixes like '1.15m' (millions), '1.92b' (billions)
+    - Semicolon-delimited format from IBKR fundamental data
+    
     Returns the value in millions as a float, or None if parsing fails.
     
     Examples:
-      - "100" -> 100.0 (already in millions)
+      - 100 -> 100.0 (already in millions)
+      - "100" -> 100.0 (string format, already in millions)
       - "1500m" or "1500M" -> 1500.0 (millions)
       - "2.5b" or "2.5B" -> 2500.0 (convert billions to millions)
       - "1.15m" -> 1.15 (already in millions)
+      - 50000000 -> 50.0 (in dollars, convert to millions)
     """
     if value is None:
         return None
@@ -111,21 +117,45 @@ def _normalize_market_cap(value):
         # Convert to string and strip whitespace
         val_str = str(value).strip().lower()
         
+        # Handle empty string
+        if not val_str or val_str == "":
+            return None
+        
         # Check for billion suffix
         if val_str.endswith('b'):
             # Extract number and convert billions to millions
             numeric = float(val_str[:-1])
             return numeric * 1000.0
         
-        # Check for million suffix (or no suffix - already in millions)
+        # Check for million suffix
         if val_str.endswith('m'):
             # Extract number (already in millions)
             return float(val_str[:-1])
         
-        # No suffix - assume it's already in millions
-        return float(val_str)
+        # Check for million as part of compound (e.g., "1500 m" or "1500m")
+        if 'm' in val_str:
+            # Extract the numeric part before 'm'
+            numeric_str = val_str.split('m')[0].strip()
+            try:
+                return float(numeric_str)
+            except ValueError:
+                pass
+        
+        # Pure numeric value
+        numeric = float(val_str)
+        
+        # If the value is very large (likely in dollars), convert to millions
+        # IBKR returns MKTCAP typically in millions already, but if it's returned
+        # in dollars (very large number), divide by 1 million
+        # Heuristic: if > 1 billion (1,000,000,000), it's likely in dollars
+        if numeric > 1000000000:
+            return numeric / 1000000.0  # Convert from dollars to millions
+        
+        # Otherwise assume it's already in millions
+        return numeric
     
     except (ValueError, TypeError, AttributeError):
+        logger.debug("Failed to normalize market cap value: %s", value)
         return None
 
 
@@ -176,6 +206,239 @@ def calculate_volume_sum(data: pd.DataFrame, lookback_bars: int = 5) -> float:
         return float(np.sum(data["volume"].iloc[-lookback_bars:]))
     except (ValueError, KeyError, IndexError):
         return 0.0
+
+
+def apply_result_filters(stock_data: dict, form: dict) -> bool:
+    """
+    Check if a stock result meets all enabled filter criteria.
+    
+    Args:
+        stock_data: Dict containing stock indicator values and variableResults
+        form: Form data dict with filter checkbox states (filterVWAP, filterRSI, etc.)
+    
+    Returns:
+        True if stock meets ALL enabled filters, False otherwise.
+        If no filters are enabled, returns True (include all).
+    """
+    
+    # Track if any filters are enabled
+    any_filter_enabled = False
+    
+    # Helper to evaluate if an indicator meets its configured condition
+    def check_indicator_condition(indicator_value, indicator_key, comparison_key, value_key, value_key1=None):
+        """Check if indicator meets the configured comparison condition."""
+        if indicator_value is None:
+            return False
+        
+        # Ensure indicator_value is numeric
+        try:
+            indicator_value = float(indicator_value)
+        except (ValueError, TypeError):
+            return False
+        
+        comparison = form.get(comparison_key, "Not used")
+        if comparison == "Not used":
+            return True  # If not configured, consider it "met"
+        
+        # Get comparison thresholds
+        threshold = form.get(value_key)
+        threshold1 = form.get(value_key1) if value_key1 else None
+        
+        if threshold in (None, ""):
+            return True
+        
+        try:
+            threshold = float(threshold) if threshold else 0
+            threshold1 = float(threshold1) if threshold1 else threshold
+        except (ValueError, TypeError):
+            return True
+        
+        # Evaluate based on comparison operator
+        try:
+            if comparison == "greater":
+                return indicator_value > threshold
+            elif comparison == "greaterEqual":
+                return indicator_value >= threshold
+            elif comparison == "lower":
+                return indicator_value < threshold
+            elif comparison == "lowerEqual":
+                return indicator_value <= threshold
+            elif comparison == "between":
+                return threshold <= indicator_value <= threshold1
+            elif comparison == "withinPercentAbove":
+                return _within_percent_check(threshold, indicator_value, "withinPercentAbove", abs(threshold1 - threshold) if threshold1 else 0)
+            elif comparison == "withinPercentBelow":
+                return _within_percent_check(threshold, indicator_value, "withinPercentBelow", abs(threshold1 - threshold) if threshold1 else 0)
+            elif comparison == "withinPercentEither":
+                return _within_percent_check(threshold, indicator_value, "withinPercentEither", abs(threshold1 - threshold) if threshold1 else 0)
+            else:
+                return True
+        except Exception as e:
+            logger.debug("Error evaluating condition %s: %s", comparison_key, e)
+            return False
+    
+    # Check each filter
+    if form.get("filterVWAP", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("vwap"), "vwap", "ComparisonVWAP", "VWAP", "PercentageVWAP"):
+            return False
+    
+    if form.get("filterFastSMA", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("smaFast"), "smaFast", "ComparisonFastSMA", "FastSMA", "PercentageFastSMA"):
+            return False
+    
+    if form.get("filterMediumSMA", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("smaMedium"), "smaMedium", "ComparisonMediumSMA", "MediumSMA", "PercentageMediumSMA"):
+            return False
+    
+    if form.get("filterSlowSMA", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("smaSlow"), "smaSlow", "ComparisonSlowSMA", "SlowSMA", "PercentageSlowSMA"):
+            return False
+    
+    if form.get("filterRSI", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("rsi"), "rsi", "ComparisonRSI", "RSI", "PercentageRSI"):
+            return False
+    
+    if form.get("filterFastEMA", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("emaFast"), "emaFast", "ComparisonFastEMA", "FastEMA", "PercentageFastEMA"):
+            return False
+    
+    if form.get("filterSlowEMA", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("emaSlow"), "emaSlow", "ComparisonSlowEMA", "SlowEMA", "PercentageSlowEMA"):
+            return False
+    
+    if form.get("filterOBV", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("obv"), "obv", "ComparisonOBV", "OBV", "PercentageOBV"):
+            return False
+    
+    if form.get("filterATR", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("atr"), "atr", "ComparisonATR", "ATR", "PercentageATR"):
+            return False
+    
+    if form.get("filterAverageVolume", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("averageVolume"), "averageVolume", "ComparisonAverageVolume", "AverageVolume"):
+            return False
+    
+    if form.get("filterRelativeVolume", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("relativeVolume"), "relativeVolume", "ComparisonRelativeVolume", "RelativeVolume"):
+            return False
+    
+    if form.get("filterPrevClose", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("prevClose"), "prevClose", "ComparisonPrevClose", "PrevClose", "PercentagePrevClose"):
+            return False
+    
+    if form.get("filterLowOfDay", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("lowOfDay"), "lowOfDay", "ComparisonLowOfDay", "LowOfDay", "PercentageLowOfDay"):
+            return False
+    
+    if form.get("filterHighOfDay", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("highOfDay"), "highOfDay", "ComparisonHighOfDay", "HighOfDay", "PercentageHighOfDay"):
+            return False
+    
+    # Cross SMA filters - check variableResults
+    if form.get("filterCross50SMA", False):
+        any_filter_enabled = True
+        variable_results = stock_data.get("variableResults", {})
+        # Check for "cross 50 SMA" in variable results or check the cross50SMA_either field
+        if not (variable_results.get("cross50SMA_either") or stock_data.get("cross50SMA_either")):
+            return False
+    
+    if form.get("filterCross200SMA", False):
+        any_filter_enabled = True
+        variable_results = stock_data.get("variableResults", {})
+        # Check for "cross 200 SMA" in variable results or check the cross200SMA_either field
+        if not (variable_results.get("cross200SMA_either") or stock_data.get("cross200SMA_either")):
+            return False
+    
+    if form.get("filterBreakHigh", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("breakHigh"), "breakHigh", "ComparisonBreakHigh", "BreakHigh", "PercentageBreakHigh"):
+            return False
+    
+    if form.get("filterPullbackPct", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("pullbackPct"), "pullbackPct", "ComparisonPullbackPct", "PullbackPct", "PercentagePullbackPct"):
+            return False
+    
+    if form.get("filterPullbackPct2", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("pullbackPct2"), "pullbackPct2", "ComparisonPullbackPct2", "PullbackPct2", "PercentagePullbackPct2"):
+            return False
+    
+    if form.get("filterFibPullback", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("fibPullback"), "fibPullback", "ComparisonFibPullback", "FibPullback", "PercentageFibPullback"):
+            return False
+    
+    if form.get("filterGapPullback", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("gapPullback"), "gapPullback", "ComparisonGapPullback", "GapPullback", "PercentageGapPullback"):
+            return False
+    
+    # Pivot Point filter
+    if form.get("filterPivotPoint", False):
+        any_filter_enabled = True
+        variable_results = stock_data.get("variableResults", {})
+        if not variable_results.get("Pivot", False):
+            return False
+    
+    # Up/Down Gap filters
+    if form.get("filterUpGap", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("upGap"), "upGap", "ComparisonUpGap", "UpGap", "PercentageUpGap"):
+            return False
+    
+    if form.get("filterDownGap", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("downGap"), "downGap", "ComparisonDownGap", "DownGap", "PercentageDownGap"):
+            return False
+    
+    # News Keywords filter
+    if form.get("filterNewsKeyword", False):
+        any_filter_enabled = True
+        variable_results = stock_data.get("variableResults", {})
+        if not variable_results.get("newsKeyword", False):
+            return False
+    
+    # Market Cap filter
+    if form.get("filterMarketCap", False):
+        any_filter_enabled = True
+        market_cap = stock_data.get("marketCap")
+        
+        # If market cap is missing, try to get it from comparison conditions
+        if market_cap is None:
+            # Market cap might not have been fetched; stock fails this filter
+            logger.debug("Stock %s missing market cap data for filter", stock_data.get("symbol", "unknown"))
+            return False
+        
+        if not check_indicator_condition(market_cap, "marketCap", "ComparisonMarketCap", "MarketCap", "PercentageMarketCap"):
+            return False
+    
+    # Volume filter
+    if form.get("filterVolume", False):
+        any_filter_enabled = True
+        if not check_indicator_condition(stock_data.get("volumeIndicator"), "volumeIndicator", "ComparisonVolume", "Volume"):
+            return False
+    
+    # If no filters were enabled, return True (include all results)
+    if not any_filter_enabled:
+        return True
+    
+    # Stock passed all enabled filters
+    return True
 
 
 def detect_nearby_key_levels(data: dict, proximity_pct: float = 1.0) -> bool:
@@ -920,20 +1183,36 @@ class IBapi(EWrapper, EClient):
         """
         Callback for string-based tick data.
 
-        tickType 47 = FUNDAMENTAL_RATIOS — semicolon-delimited key=value pairs
+        tickType 47 = FUNDAMENTAL_RATIOS (generic ticks like 258) — semicolon-delimited key=value pairs
         containing MKTCAP (market cap in millions), among other fields.
+        
+        Format from IB: "key1=value1;key2=value2;..." (e.g., "MKTCAP=1234.5;PER=15.2")
         """
+        # Handle FUNDAMENTAL_RATIOS (tick type 47, used for generic ticks like 258)
         if tick_type == 47 and value:
             try:
                 ratios = {}
+                # Split by semicolon to get key=value pairs
                 for pair in value.split(";"):
                     if "=" in pair:
                         k, v = pair.split("=", 1)
-                        ratios[k.strip()] = v.strip()
+                        k_clean = k.strip()
+                        v_clean = v.strip()
+                        ratios[k_clean] = v_clean
+                        
+                        # Log extraction of MKTCAP specifically for debugging
+                        if k_clean == "MKTCAP":
+                            logger.debug("Received MKTCAP tick: %s -> %s", k_clean, v_clean)
+                
                 with self._fundamental_lock:
                     self._fundamental_data[req_id] = ratios
                     self._fundamental_done[req_id] = True
-            except Exception:
+                    
+                # Log all keys for debugging
+                if ratios:
+                    logger.debug("Fundamental data received (reqId=%s): keys=%s", req_id, list(ratios.keys()))
+            except Exception as e:
+                logger.debug("Error parsing fundamental data (reqId=%s): %s", req_id, e)
                 with self._fundamental_lock:
                     self._fundamental_done[req_id] = True
 
@@ -3033,8 +3312,12 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         mktcap_condition = None
         mktcap_comp_mode = form.get("ComparisonMarketCap", "Not used")
-        mktcap_threshold = float(form.get("PercentageMarketCap", 0))
         mktcap_value = data.get("marketCap")
+        
+        try:
+            mktcap_threshold = float(form.get("PercentageMarketCap", 0))
+        except (ValueError, TypeError):
+            mktcap_threshold = 0
 
         if mktcap_comp_mode not in _NON_SIMPLE_MODES:
             if mktcap_comp_mode == "greater":
@@ -5422,12 +5705,20 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         # Market cap is requested via reqMktData with "258" tag to get fundamental ratios.
         # This provides near-real-time market cap data (not historical/lag).
+        # Request market cap if:
+        # 1. ComparisonMarketCap is configured, OR
+        # 2. filterMarketCap checkbox is enabled
         # The normalization function _normalize_market_cap() handles various formats:
         # - "1500m" or "1500M" -> 1500 (millions)
         # - "2.5b" or "2.5B" -> 2500 (billions converted to millions)
         # - "100" -> 100 (already in millions)
         _mktcap_value = None
-        if form.get("ComparisonMarketCap", "Not used") != "Not used":
+        should_fetch_mktcap = (
+            form.get("ComparisonMarketCap", "Not used") != "Not used" or 
+            form.get("filterMarketCap", False)
+        )
+        
+        if should_fetch_mktcap:
             with self.Locking:
                 self.idInc += 1
                 mktcap_req_id = self.idInc
@@ -5437,13 +5728,15 @@ class IBapi(EWrapper, EClient):
                 self._fundamental_done[mktcap_req_id] = False
 
             try:
+                # Request generic tick 258 (FUNDAMENTAL_RATIOS) which includes MKTCAP
                 self.reqMktData(mktcap_req_id, contract, "258", False, False, [])
-            except Exception:
-                logger.debug("reqMktData(258) failed for %s", m, exc_info=True)
+                logger.debug("Requested market cap data (tick 258) for %s (reqId=%s)", m, mktcap_req_id)
+            except Exception as e:
+                logger.debug("reqMktData(258) failed for %s: %s", m, e)
 
-            # wait for tickString callback (up to 3 seconds)
+            # wait for tickString callback (up to 5 seconds for reliable data)
             _waited = 0.0
-            while _waited < 3.0:
+            while _waited < 5.0:
                 with self._fundamental_lock:
                     if self._fundamental_done.get(mktcap_req_id, False):
                         break
@@ -5459,14 +5752,18 @@ class IBapi(EWrapper, EClient):
                 ratios = self._fundamental_data.pop(mktcap_req_id, {})
                 self._fundamental_done.pop(mktcap_req_id, None)
 
-            if "MKTCAP" in ratios:
+            if "MKTCAP" in ratios and ratios["MKTCAP"]:
                 try:
                     # Normalize market cap to millions (handles m/M and b/B suffixes)
                     _mktcap_value = _normalize_market_cap(ratios["MKTCAP"])
-                    if _mktcap_value is not None:
+                    if _mktcap_value is not None and _mktcap_value > 0:
                         logger.info("Market cap for %s: %s -> %.2f million", m, ratios["MKTCAP"], _mktcap_value)
-                except (ValueError, TypeError):
-                    pass
+                    else:
+                        logger.debug("Market cap normalization failed for %s: %s", m, ratios["MKTCAP"])
+                except (ValueError, TypeError) as e:
+                    logger.debug("Market cap parsing error for %s: %s", m, e)
+            else:
+                logger.debug("No MKTCAP in fundamental data for %s. Available keys: %s", m, list(ratios.keys()))
 
         # -------------------------
         # Determine the per-indicator timeframe plan

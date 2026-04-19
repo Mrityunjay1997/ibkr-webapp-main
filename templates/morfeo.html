@@ -1000,6 +1000,165 @@
                                      Current time: <span id="bg_now">--:--:--</span>
                                 </div>
 
+								<!-- ============ FILTER RESULTS SECTION ============ -->
+								<div style="margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 5px; border-left: 4px solid #007bff;">
+									<h4 style="margin: 0 0 15px 0; color: #333; font-weight: bold;">
+										✓ Filter Results by Indicators
+									</h4>
+									<p style="margin: 0 0 10px 0; font-size: 12px; color: #666;">
+										Check the boxes below to return ONLY stocks that meet ALL selected criteria. Leave unchecked to show all results.
+									</p>
+									<table style="width: 100%; font-size: 13px;">
+										<tbody>
+											<tr>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterVWAP(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">VWAP</span>
+													</label>
+												</td>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterFastSMA(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">Fast SMA</span>
+													</label>
+												</td>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterMediumSMA(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">Medium SMA</span>
+													</label>
+												</td>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterSlowSMA(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">Slow SMA</span>
+													</label>
+												</td>
+											</tr>
+											<tr>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterRSI(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">RSI</span>
+													</label>
+												</td>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterFastEMA(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">Fast EMA</span>
+													</label>
+												</td>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterSlowEMA(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">Slow EMA</span>
+													</label>
+												</td>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterOBV(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">OBV</span>
+													</label>
+												</td>
+											</tr>
+											<tr>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterATR(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">ATR</span>
+													</label>
+												</td>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterAverageVolume(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">Avg Volume</span>
+													</label>
+												</td>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterRelativeVolume(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">Rel Volume</span>
+													</label>
+												</td>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterCross200SMA(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">Cross 200 SMA</span>
+													</label>
+												</td>
+											</tr>
+											<tr>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterCross50SMA(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">Cross 50 SMA</span>
+													</label>
+												</td>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterBreakHigh(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">Break High</span>
+													</label>
+												</td>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterPullbackPct(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">Pullback %</span>
+													</label>
+												</td>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterFibPullback(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">Fib Pullback</span>
+													</label>
+												</td>
+											</tr>
+											<tr>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterGapPullback(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">Gap Pullback</span>
+													</label>
+												</td>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterUpGap(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">Up Gap</span>
+													</label>
+												</td>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterDownGap(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">Down Gap</span>
+													</label>
+												</td>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterNewsKeyword(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">News Keywords</span>
+													</label>
+												</td>
+											</tr>
+											<tr>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterMarketCap(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">Market Cap</span>
+													</label>
+												</td>
+												<td style="padding: 5px 10px;">
+													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
+														{{ Param.filterVolume(class_="filter-checkbox") }}
+														<span style="margin-left: 8px;">Volume</span>
+													</label>
+												</td>
+												<td colspan="2">&nbsp;</td>
+											</tr>
+										</tbody>
+									</table>
+								</div>
+
 						   	</form>
 
 						   	<form name="csvimportdataform" id="csvimportdataform">
