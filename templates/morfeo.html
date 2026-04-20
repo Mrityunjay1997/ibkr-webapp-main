@@ -262,6 +262,7 @@
 											<th class = "headRow">Sign Indicator</th>
 											<th class = "headRow">Amount </th>
 											<th class = "headRow">Percentage / Val</th>
+											<th class = "headRow" style="text-align:center; font-size:0.85rem; width:50px;">Filter</th>
 										</tr>
 									</thead>
 									<tbody>
@@ -285,6 +286,7 @@
 												    </div>
 												{% endfor %}
 											</td>
+											<td style="text-align:center; padding:6px;">{{ Param.filterFastSMA(style="cursor:pointer;") }}</td>
 										</tr>
                                         <tr>
 											<th>{{ Param.MediumSMA.label(class_="LabelHead") }}</th>
@@ -306,6 +308,7 @@
 												    </div>
 												{% endfor %}
 											</td>
+											<td style="text-align:center; padding:6px;">{{ Param.filterMediumSMA(style="cursor:pointer;") }}</td>
 										</tr>
 										<tr>
 											<th>{{ Param.SlowSMA.label(class_="LabelHead") }}</th>
@@ -327,6 +330,7 @@
 												    </div>
 												{% endfor %}
 											</td>
+											<td style="text-align:center; padding:6px;">{{ Param.filterSlowSMA(style="cursor:pointer;") }}</td>
 										</tr>
 										<tr>
 											<th>{{ Param.VWAP.label(class_="LabelHead") }}</th>
@@ -348,6 +352,7 @@
 												    </div>
 												{% endfor %}
 											</td>
+											<td style="text-align:center; padding:6px;">{{ Param.filterVWAP(style="cursor:pointer;") }}</td>
 										</tr>
 										<tr>
 											<td>{{ Param.RSI.label(class_="LabelHead") }}</td>
@@ -369,6 +374,7 @@
 													    </div>
 												{% endfor %}
 											</td>
+											<td style="text-align:center; padding:6px;">{{ Param.filterRSI(style="cursor:pointer;") }}</td>
 										</tr>
 										<tr>
 											<th>{{ Param.FastEMA.label(class_="LabelHead") }}</th>
@@ -390,6 +396,7 @@
 												    </div>
 												{% endfor %}
 											</td>
+											<td style="text-align:center; padding:6px;">{{ Param.filterFastEMA(style="cursor:pointer;") }}</td>
 										</tr>
 										<tr>
 											<th>{{ Param.SlowEMA.label(class_="LabelHead") }}</th>
@@ -411,6 +418,7 @@
 												    </div>
 												{% endfor %}
 											</td>
+											<td style="text-align:center; padding:6px;">{{ Param.filterSlowEMA(style="cursor:pointer;") }}</td>
 										</tr>
 									</tbody>
 								</table>
@@ -423,6 +431,7 @@
 											<th class = "headRow">Sign Indicator</th>
 											<th class = "headRow">Amount </th>
 											<th class = "headRow">Percentage / Val</th>
+											<th class = "headRow" style="text-align:center; font-size:0.85rem; width:50px;">Filter</th>
 										</tr>
 									</thead>
 									<tbody>
@@ -446,6 +455,7 @@
 												    </div>
 												{% endfor %}
 											</td>
+											<td style="text-align:center; padding:6px;">{{ Param.filterOBV(style="cursor:pointer;") }}</td>
 										</tr>
 										<tr>
 											<th>{{ Param.ATR.label(class_="LabelHead") }}</th>
@@ -467,6 +477,7 @@
 												    </div>
 												{% endfor %}
 											</td>
+											<td style="text-align:center; padding:6px;">{{ Param.filterATR(style="cursor:pointer;") }}</td>
 										</tr>
                                         <tr>
                                             <th>{{ Param.PrevClose.label(class_="LabelHead") }}</th>
@@ -488,6 +499,7 @@
                                                     </div>
                                                 {% endfor %}
                                             </td>
+                                            <td style="text-align:center; padding:6px;">{{ Param.filterPrevClose(style="cursor:pointer;") }}</td>
                                         </tr>
                                         <tr>
                                             <th>{{ Param.LowOfDay.label(class_="LabelHead") }}</th>
@@ -509,6 +521,7 @@
                                                     </div>
                                                 {% endfor %}
                                             </td>
+                                            <td style="text-align:center; padding:6px;">{{ Param.filterLowOfDay(style="cursor:pointer;") }}</td>
                                         </tr>
                                         <tr>
                                             <th>{{ Param.HighOfDay.label(class_="LabelHead") }}</th>
@@ -530,6 +543,7 @@
                                                     </div>
                                                 {% endfor %}
                                             </td>
+                                            <td style="text-align:center; padding:6px;">{{ Param.filterHighOfDay(style="cursor:pointer;") }}</td>
                                         </tr>
 										<tr>
 											<td>{{ Param.AverageVolume.label(class_="LabelHead") }}</td>
@@ -551,6 +565,7 @@
 													    </div>
 												{% endfor %}
 											</td>
+											<td style="text-align:center; padding:6px;">{{ Param.filterAverageVolume(style="cursor:pointer;") }}</td>
 										</tr>
 										<tr>
 											<td>{{ Param.RelativeVolume.label(class_="LabelHead") }}</td>
@@ -572,6 +587,7 @@
 													    </div>
 												{% endfor %}
 											</td>
+											<td style="text-align:center; padding:6px;">{{ Param.filterRelativeVolume(style="cursor:pointer;") }}</td>
 										</tr>
 										<tr>
 											<td>{{ Param.Volume.label(class_="LabelHead") }}</td>
@@ -592,6 +608,7 @@
 													</div>
 												{% endfor %}
 											</td>
+											<td style="text-align:center; padding:6px;">{{ Param.filterVolume(style="cursor:pointer;") }}</td>
 										</tr>
 										<!-- tr>
 											<th>Frequency</th>
@@ -747,7 +764,7 @@
 											<td style="padding:10px"><div id="changeMarketCap"><div id="nchangeinput16">{{ Param.MarketCap(class_="MarketCap", value='0') }}</div></div></td>
 											<td style="padding:10px">{{ Param.ComparisonMarketCap(class_="ComparisonMarketCap") }}</td>
 											<td style="padding:10px"><div id="percentageMarketCap"><div id="changeinput16">{{ Param.PercentageMarketCap(class_="PercentageMarketCap", value='0') }}</div></div></td>
-											<td>&nbsp;</td>
+											<td style="text-align:center; padding:6px;">{{ Param.filterMarketCap(style="cursor:pointer;") }}</td>
 										</tr>
 										<tr>
 											<th style="padding:10px">Pivot Point</th>
@@ -901,6 +918,10 @@
 											<td style="padding:10px" colspan="2">{{ Param.PctChangeLookbackMinutes(class_="PctChangeLookbackMinutes", value='5', style="width:80px") }} min</td>
 											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Calculate % change over this time window</span></td>
 										</tr>
+										<tr>
+											<th style="padding:10px">Read Alert on % Change</th>
+											<td style="padding:10px" colspan="4">{{ Param.EnablePctChangeTTS(class_="EnablePctChangeTTS") }}</td>
+										</tr>
 										<tr style="background:#f0f0f0">
 											<th style="padding:10px">Enable Volume Monitoring</th>
 											<td style="padding:10px" colspan="4">{{ Param.EnableVolumeMonitor(class_="EnableVolumeMonitor") }}</td>
@@ -914,6 +935,10 @@
 											<th style="padding:10px">Volume Threshold</th>
 											<td style="padding:10px" colspan="2">{{ Param.VolumeThreshold(class_="VolumeThreshold", value='50000', style="width:100px") }} shares</td>
 											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Alert when volume exceeds this amount</span></td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Read Alert on Volume Spike</th>
+											<td style="padding:10px" colspan="4">{{ Param.EnableVolumeTTS(class_="EnableVolumeTTS") }}</td>
 										</tr>
 										<tr style="background:#f0f0f0">
 											<th style="padding:10px">Enable Key Level Detection</th>
@@ -950,7 +975,7 @@
 										</tr>
 										<tr>
 											<th style="padding:10px">Play Sound on Crossover</th>
-											<td style="padding:10px" colspan="4">{{ Param.PlaySound200SMA(class_="PlaySound200SMA") }}</td>
+											<td style="padding:10px" colspan="4">{{ Param.EnableSMA200TTS(class_="EnableSMA200TTS") }}</td>
 										</tr>
 									</tbody>
 								</table>
@@ -989,7 +1014,7 @@
 										</tr>
 										<tr>
 											<th style="padding:10px">Play Sound on Strong OBV Changes</th>
-											<td style="padding:10px" colspan="4">{{ Param.EnableOBVAudio(class_="EnableOBVAudio") }}</td>
+											<td style="padding:10px" colspan="4">{{ Param.EnableOBVTTS(class_="EnableOBVTTS") }}</td>
 										</tr>
 									</tbody>
 								</table>
@@ -1159,13 +1184,21 @@
 									</table>
 								</div>
 
-						   	</form>
+<div style="margin-top:12px; display:flex; justify-content:flex-end;">
+                                    <div style="display:flex; align-items:center; gap:10px;">
+                                        <button id="run_scan" type="submit" class="btn btn-info badge-soft white-blue">Submit</button>
+                                        <span style="font-size:0.9rem; color:#555; white-space:nowrap;">Use this button to run the scanner again with the current inputs and existing loaded results.</span>
+                                    </div>
+                                </div>
 
-						   	<form name="csvimportdataform" id="csvimportdataform">
-
-							    <input type="file" name="csvfile" id="csvfile" class="form-control-file csvchildren"/>
-							    <button type="submit" name="importdata" id="importdata" class="btn btn-info badge-soft white-blue">Proceed</button>
-							</form>
+                                <div style="margin-top:16px; border:1px solid #ddd; border-radius:8px; background:#fff; padding:14px;">
+                                    <form name="csvimportdataform" id="csvimportdataform" style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+                                        <div style="flex:1 1 240px; min-width:240px;">
+                                            <input type="file" name="csvfile" id="csvfile" class="form-control-file csvchildren" style="width:100%;"/>
+                                        </div>
+                                        <button type="submit" name="importdata" id="importdata" class="btn btn-info badge-soft white-blue">Proceed</button>
+                                    </form>
+                                </div>
 
 							<!-- ============ Stock List Management (after CSV) ============ -->
 							<div id="wl_section">
@@ -1354,27 +1387,42 @@
 												<option value="market">Market</option>
 											</select>
 										</div>
-									</div>
-
-									<!-- Dynamic pricing -->
-									<div class="ao-row" id="ao_pricing_row">
-										<div class="ao-field">
-											<label class="ao-label">Price Mode</label>
-											<select id="ao_price_mode" class="ao-select" onchange="_aoTogglePricePct()">
-												<option value="last" selected>Last Price</option>
-												<option value="bid_minus_pct">Bid - X%</option>
-												<option value="bid_plus_pct">Bid + X%</option>
-												<option value="ask_minus_pct">Ask - X%</option>
-												<option value="ask_plus_pct">Ask + X%</option>
-											</select>
-										</div>
-										<div class="ao-field" id="ao_price_pct_field">
-											<label class="ao-label">Price Offset %</label>
-											<input type="number" id="ao_price_pct" class="ao-input" value="0.5" min="0" step="0.1">
-										</div>
-									</div>
-
-									<!-- Bracket / Stop -->
+                                        <div class="ao-field">
+                                            <label class="ao-chk-label"><input type="checkbox" id="ao_hold_off_market"> Hold off market</label>
+                                        </div>
+										<option value="current" selected>Current Price</option>
+                                        <option value="last">Last Price</option>
+										<option value="vwap">VWAP</option>
+										<option value="pivot_pp">Pivot PP</option>
+										<option value="pivot_s1">Pivot S1</option>
+										<option value="pivot_s2">Pivot S2</option>
+										<option value="pivot_s3">Pivot S3</option>
+										<option value="pivot_r1">Pivot R1</option>
+										<option value="pivot_r2">Pivot R2</option>
+										<option value="pivot_r3">Pivot R3</option>
+										<option value="prevClose">Prev Close (Gap)</option>
+										<option value="smaFast">Fast SMA</option>
+										<option value="smaMedium">Medium SMA</option>
+										<option value="smaSlow">Slow SMA</option>
+										<option value="sma50">50 SMA</option>
+										<option value="sma200">200 SMA</option>
+										<option value="emaFast">Fast EMA</option>
+										<option value="emaSlow">Slow EMA</option>
+										<option value="lowOfDay">Low of Day</option>
+										<option value="highOfDay">High of Day</option>
+										<option value="custom">Custom Price</option>
+									</select>
+								</div>
+								<div class="ao-field" id="ao_price_pct_field">
+									<label class="ao-label">Price Offset %</label>
+									<input type="number" id="ao_price_pct" class="ao-input" value="0.5" min="0" step="0.1">
+								</div>
+								<div class="ao-field" id="ao_custom_price_field" style="display:none;">
+									<label class="ao-label">Custom Price</label>
+									<input type="number" id="ao_custom_price" class="ao-input" value="" min="0" step="0.01">
+															</div>
+				</div>
+<!-- Bracket / Stop -->
 									<div class="ao-section-title">Bracket / Stop</div>
 									<div class="ao-row">
 										<div class="ao-field">
@@ -1523,7 +1571,30 @@
 					    });
 					}
 
-					function openNewsArticleModal(provider, articleId) {
+function cleanNewsArticleText(rawText) {
+                        if (!rawText) return '';
+
+                        var normalized = rawText
+                            .replace(/<br\s*\/?>/gi, '\n')
+                            .replace(/<\/p>/gi, '\n\n')
+                            .replace(/<\/h[1-6]>/gi, '\n\n')
+                            .replace(/<li>/gi, '- ')
+                            .replace(/<\/li>/gi, '\n');
+
+                        var temp = document.createElement('div');
+                        temp.innerHTML = normalized;
+                        var text = temp.textContent || temp.innerText || '';
+
+                        text = text.replace(/\u00A0/g, ' ');
+                        text = text.replace(/\r\n|\r/g, '\n');
+                        text = text.replace(/\n{3,}/g, '\n\n');
+                        text = text.replace(/[ \t]+/g, ' ');
+                        text = text.replace(/^[ \t\n]+|[ \t\n]+$/g, '');
+
+                        return text;
+                    }
+
+                    function openNewsArticleModal(provider, articleId) {
 					    // Show modal with loading state
 					    $('#newsArticleModal').modal('show');
 					    $('#newsArticleContent').html('<div style="text-align:center;color:#888;">Loading article...</div>');
@@ -1540,15 +1611,14 @@
 					        success: function(data) {
 					            var articleText = data.articleText || '';
 					            var articleType = data.articleType || 0;
-
-					            // If HTML article, wrap in styled container; if plain text, escape and wrap in <pre>
+                            var cleanedText = cleanNewsArticleText(articleText);
 					            var displayHtml = '';
 					            if (articleType === 1) {
 					                // HTML content
-					                displayHtml = '<div style="font-size:14px;color:#1f2328;line-height:1.6;">' + articleText + '</div>';
+					                displayHtml = '<div style="font-size:14px;color:#1f2328;line-height:1.6;">' + $('<div/>').text(cleanedText).html() + '</div>';
 					            } else {
 					                // Plain text - escape and use <pre> for formatting
-					                var escaped = $('<div/>').text(articleText).html();
+					                var escaped = $('<div/>').text(cleanedText).html();
 					                displayHtml = '<pre style="font-size:14px;color:#1f2328;line-height:1.6;white-space:pre-wrap;word-wrap:break-word;font-family:\'Segoe UI\', sans-serif;">' + escaped + '</pre>';
 					            }
 
@@ -1648,13 +1718,14 @@
                                 </div>
                                 
                                 <!-- Add/Remove Controls -->
-                                <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
-                                    <input type="text" id="excludeSymbolInput" placeholder="Enter symbol (e.g., XYZ)" style="padding: 6px; border: 1px solid #ccc; border-radius: 3px; flex: 1; min-width: 150px; font-size: 12px;">
+                                <div style="display: flex; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;">
+                                    <input type="text" id="excludeSymbolInput" placeholder="Enter symbol(s), separated by commas or spaces" style="padding: 6px; border: 1px solid #ccc; border-radius: 3px; flex: 1; min-width: 150px; font-size: 12px;">
                                     <button class="btn btn-success btn-sm" onclick="_excludeAddStock()" style="padding: 6px 12px; font-size: 11px;">+ Add</button>
                                     <button class="btn btn-info btn-sm" onclick="_excludeExportCSV()" style="padding: 6px 12px; font-size: 11px;">📥 Export CSV</button>
                                     <button class="btn btn-warning btn-sm" onclick="_excludeOpenImport()" style="padding: 6px 12px; font-size: 11px;">📤 Import CSV</button>
                                     <button class="btn btn-danger btn-sm" onclick="_excludeClearAll()" style="padding: 6px 12px; font-size: 11px;">Clear All</button>
                                 </div>
+                                <div style="font-size: 11px; color: #666; margin-bottom: 10px;">Type one or more symbols. Separate multiple symbols with commas or spaces.</div>
                                 
                                 <!-- Hidden file input for CSV import -->
                                 <input type="file" id="excludeCSVInput" accept=".csv" style="display: none;" onchange="_excludeImportCSV()">
@@ -1848,6 +1919,72 @@
       }
     } catch(e){ console.warn("news keyword beep failed", e); }
   }
+
+  // ===== TTS ALERT FUNCTIONS (Text-to-Speech Announcements) =====
+  
+  /**
+   * Announce a stock indicator alert via text-to-speech
+   * @param {string} symbol - Stock symbol (e.g., "AAPL")
+   * @param {string} indicatorName - Indicator that was triggered (e.g., "200 SMA Bullish Crossover")
+   */
+  function announceStockAlert(symbol, indicatorName) {
+    if (!symbol || !indicatorName) return;
+    
+    try {
+      // Build announcement text
+      const announcement = `${symbol} ${indicatorName}`;
+      
+      // Use existing TTS function
+      speakText(announcement);
+    } catch(e) {
+      console.warn("Stock alert announcement failed:", e);
+    }
+  }
+
+  /**
+   * Announce 200 SMA Bullish Crossover via TTS
+   * @param {string} symbol - Stock symbol
+   */
+  function announceSMA200Bullish(symbol) {
+    announceStockAlert(symbol || "Unknown", "200 SMA Bullish Crossover");
+  }
+
+  /**
+   * Announce OBV Strong Bullish via TTS
+   * @param {string} symbol - Stock symbol
+   */
+  function announceOBVBullish(symbol) {
+    announceStockAlert(symbol || "Unknown", "OBV Strong Bullish");
+  }
+
+  /**
+   * Announce OBV Strong Bearish via TTS
+   * @param {string} symbol - Stock symbol
+   */
+  function announceOBVBearish(symbol) {
+    announceStockAlert(symbol || "Unknown", "OBV Strong Bearish");
+  }
+
+  /**
+   * Announce Price Change Alert via TTS
+   * @param {string} symbol - Stock symbol
+   * @param {number} percentChange - Percentage change value
+   */
+  function announcePriceChange(symbol, percentChange) {
+    const pctStr = percentChange ? percentChange.toFixed(2) : "unknown";
+    announceStockAlert(symbol || "Unknown", `Price change ${pctStr} percent`);
+  }
+
+  /**
+   * Announce Volume Spike Alert via TTS
+   * @param {string} symbol - Stock symbol
+   * @param {number} volume - Volume value
+   */
+  function announceVolumeSpike(symbol, volume) {
+    const volStr = volume ? Math.round(volume).toLocaleString() : "high";
+    announceStockAlert(symbol || "Unknown", `Volume spike ${volStr} shares`);
+  }
+
 
   // Car horn beep for Fibonacci Pullback — loud, attention-grabbing pattern
   function playBeepCarHorn(){
@@ -2580,18 +2717,18 @@ function renderResultsFromBackend(response) {
                 let sma200CrossoverStyle = "";
                 if (dta.variableResults && dta.variableResults["sma200Crossover"]) {
                     sma200CrossoverStyle = " style='background:#ffe5cc;color:#000;font-weight:700'";
-                    // Play sound if enabled
+                    // Read alert if enabled
                     try {
-                        const playSound = document.querySelector('input[name="PlaySound200SMA"]');
-                        if (playSound && playSound.checked) {
-                            playBeep200SMABullishCrossover();
+                        const enableTTS = document.querySelector('input[name="EnableSMA200TTS"]');
+                        if (enableTTS && enableTTS.checked) {
+                            announceSMA200Bullish(dta.symbol);
                         }
                     } catch(e) {
-                        console.warn("200 SMA crossover sound playback error:", e);
+                        console.warn("200 SMA crossover TTS alert error:", e);
                     }
                 }
 
-                // Check OBV analysis and apply highlighting + sounds
+                // Check OBV analysis and apply highlighting + TTS alerts
                 let obvStyle = "";
                 if (dta.obvAnalysis && dta.obvAnalysis.signal) {
                     const signal = dta.obvAnalysis.signal;
@@ -2600,12 +2737,12 @@ function renderResultsFromBackend(response) {
                         // Purple for strong bullish OBV
                         obvStyle = " style='background:#e6d5f0;color:#000;font-weight:700'";
                         try {
-                            const enableAudio = document.querySelector('input[name="EnableOBVAudio"]');
-                            if (enableAudio && enableAudio.checked) {
-                                playBeepOBVBullish();
+                            const enableTTS = document.querySelector('input[name="EnableOBVTTS"]');
+                            if (enableTTS && enableTTS.checked) {
+                                announceOBVBullish(dta.symbol);
                             }
                         } catch(e) {
-                            console.warn("OBV bullish sound error:", e);
+                            console.warn("OBV bullish TTS alert error:", e);
                         }
                     } else if (signal === "bullish") {
                         // Light purple for bullish OBV
@@ -2614,16 +2751,40 @@ function renderResultsFromBackend(response) {
                         // Light red for strong bearish OBV
                         obvStyle = " style='background:#ffe6e6;color:#000;font-weight:700'";
                         try {
-                            const enableAudio = document.querySelector('input[name="EnableOBVAudio"]');
-                            if (enableAudio && enableAudio.checked) {
-                                playBeepOBVBearish();
+                            const enableTTS = document.querySelector('input[name="EnableOBVTTS"]');
+                            if (enableTTS && enableTTS.checked) {
+                                announceOBVBearish(dta.symbol);
                             }
                         } catch(e) {
-                            console.warn("OBV bearish sound error:", e);
+                            console.warn("OBV bearish TTS alert error:", e);
                         }
                     } else if (signal === "bearish") {
                         // Very light red for bearish OBV
                         obvStyle = " style='background:#fff0f0;color:#000;font-weight:600'";
+                    }
+                }
+                
+                // Check Price Change monitoring and announce TTS alert
+                if (dta.variableResults && dta.variableResults["pctChange"]) {
+                    try {
+                        const enableTTS = document.querySelector('input[name="EnablePctChangeTTS"]');
+                        if (enableTTS && enableTTS.checked) {
+                            announcePriceChange(dta.symbol, dta.pctChange);
+                        }
+                    } catch(e) {
+                        console.warn("Price change TTS alert error:", e);
+                    }
+                }
+                
+                // Check Volume monitoring and announce TTS alert
+                if (dta.variableResults && dta.variableResults["volumeSum"]) {
+                    try {
+                        const enableTTS = document.querySelector('input[name="EnableVolumeTTS"]');
+                        if (enableTTS && enableTTS.checked) {
+                            announceVolumeSpike(dta.symbol, dta.volumeSum);
+                        }
+                    } catch(e) {
+                        console.warn("Volume spike TTS alert error:", e);
                     }
                 }
 
@@ -3167,7 +3328,11 @@ function populateNewsFeedPanel(response) {
             const escHl = esc(ni.headline);
             const escProv = esc(ni.provider);
             const escT = esc(t);
-            const link = `<a href="javascript:void(0)" onclick="focusIBKR()" style="color:#0969da;text-decoration:underline;cursor:pointer">${escHl || 'link'}</a>`;
+            const providerArg = (ni.provider || "").replace(/'/g, "\\'");
+            const articleArg = (ni.articleId || "").replace(/'/g, "\\'");
+            const link = (ni.provider && ni.articleId)
+                ? `<a href="javascript:void(0)" onclick="openNewsArticleModal('${providerArg}', '${articleArg}')" style="color:#0969da;text-decoration:underline;cursor:pointer">${escHl || 'link'}</a>`
+                : `<span style="color:#888;">${escHl || 'link'}</span>`;
             html += `<tr style="border-bottom:1px solid #d0d7de;">`;
             html += `<td style="padding:4px 6px;white-space:nowrap;color:#57606a;width:150px;">${escT}</td>`;
             html += `<td style="padding:4px 6px;color:#1f2328;width:45px;">${escProv}</td>`;
@@ -4877,7 +5042,9 @@ function _aoOpenSettings() {
 
 function _aoTogglePricePct() {
     var m = document.getElementById("ao_price_mode").value;
-    document.getElementById("ao_price_pct_field").style.display = (m === "last") ? "none" : "";
+    document.getElementById("ao_price_pct_field").style.display = (m === "custom") ? "none" : "";
+    var customField = document.getElementById("ao_custom_price_field");
+    if (customField) customField.style.display = (m === "custom") ? "" : "none";
 }
 
 function _aoToggleBracket() {
@@ -4930,12 +5097,14 @@ function _aoGetSettings() {
         quantity: document.getElementById("ao_quantity").value || "1",
         dollarAmt: document.getElementById("ao_dollar_amt") ? document.getElementById("ao_dollar_amt").value : "100",
         entryType: document.getElementById("ao_entry_type").value || "limit",
-        priceMode: document.getElementById("ao_price_mode").value || "last",
+        priceMode: document.getElementById("ao_price_mode").value || "current",
         pricePct: document.getElementById("ao_price_pct").value || "0.5",
+        customPrice: document.getElementById("ao_custom_price") ? document.getElementById("ao_custom_price").value : "",
         orderType: document.getElementById("ao_order_type").value || "bracket",
         targetPct: document.getElementById("ao_target_pct").value || "2",
         stopPct: document.getElementById("ao_stop_pct").value || "1",
         useTrailingStop: document.getElementById("ao_trailing_stop") ? document.getElementById("ao_trailing_stop").checked : false,
+        holdOffMarket: document.getElementById("ao_hold_off_market") ? document.getElementById("ao_hold_off_market").checked : false,
         trailMode: document.getElementById("ao_trail_mode").value || "amount",
         trailValue: document.getElementById("ao_trail_value").value || "1",
         tif: document.getElementById("ao_tif").value || "DAY",
@@ -4967,12 +5136,14 @@ function _aoApplySettings(s) {
     _set("ao_quantity", s.quantity || "1");
     _set("ao_dollar_amt", s.dollarAmt || "100");
     _set("ao_entry_type", s.entryType || "limit");
-    _set("ao_price_mode", s.priceMode || "last");
+    _set("ao_price_mode", s.priceMode || "current");
     _set("ao_price_pct", s.pricePct || "0.5");
+    _set("ao_custom_price", s.customPrice || "");
     _set("ao_order_type", s.orderType || "bracket");
     _set("ao_target_pct", s.targetPct || "2");
     _set("ao_stop_pct", s.stopPct || "1");
     _chk("ao_trailing_stop", s.useTrailingStop);
+    _chk("ao_hold_off_market", s.holdOffMarket);
     _set("ao_trail_mode", s.trailMode || "amount");
     _set("ao_trail_value", s.trailValue || "1");
     _set("ao_tif", s.tif || "DAY");
@@ -5138,18 +5309,65 @@ function _aoLoadDefaultPreset() {
 
 // Compute entry price for auto-order based on settings & stock data
 function _aoCalcEntryPrice(ao, stockData) {
-    var lastPrice = parseFloat(stockData.close) || 0;
     if (ao.entryType === "market") return 0;  // market order, no price needed
-    var mode = ao.priceMode;
+    var ref = ao.priceMode || "current";
     var pct = parseFloat(ao.pricePct) || 0;
-    if (mode === "last") return lastPrice;
-    // For bid/ask modes, use last price as approximation (real bid/ask would need streaming data)
-    // The backend will handle dynamic pricing via the priceMode field
-    if (mode === "bid_minus_pct") return +(lastPrice * (1 - pct / 100)).toFixed(2);
-    if (mode === "bid_plus_pct") return +(lastPrice * (1 + pct / 100)).toFixed(2);
-    if (mode === "ask_minus_pct") return +(lastPrice * (1 - pct / 100)).toFixed(2);
-    if (mode === "ask_plus_pct") return +(lastPrice * (1 + pct / 100)).toFixed(2);
-    return lastPrice;
+    var lastPrice = parseFloat(stockData.close) || 0;
+    var basePrice = 0;
+
+    // Preserve compatibility with legacy AO presets
+    if (ref === "last") {
+        basePrice = lastPrice;
+    } else if (ref === "bid_minus_pct") {
+        return +(lastPrice * (1 - pct / 100)).toFixed(2);
+    } else if (ref === "bid_plus_pct") {
+        return +(lastPrice * (1 + pct / 100)).toFixed(2);
+    } else if (ref === "ask_minus_pct") {
+        return +(lastPrice * (1 - pct / 100)).toFixed(2);
+    } else if (ref === "ask_plus_pct") {
+        return +(lastPrice * (1 + pct / 100)).toFixed(2);
+    } else if (ref === "custom") {
+        var customBase = parseFloat(ao.customPrice) || 0;
+        return customBase > 0 ? +customBase.toFixed(2) : 0;
+    } else if (ref === "current") {
+        basePrice = lastPrice;
+    } else if (ref === "vwap") {
+        basePrice = parseFloat(stockData.vwap) || 0;
+    } else if (ref.indexOf("pivot_") === 0) {
+        var pivotKey = ref.replace("pivot_", "");
+        if (stockData.Pivot && typeof stockData.Pivot === "object" && stockData.Pivot[pivotKey] != null) {
+            basePrice = parseFloat(stockData.Pivot[pivotKey]) || 0;
+        } else if (stockData.Pivot1 && typeof stockData.Pivot1 === "object" && stockData.Pivot1[pivotKey] != null) {
+            basePrice = parseFloat(stockData.Pivot1[pivotKey]) || 0;
+        }
+    } else if (ref === "prevClose") {
+        basePrice = parseFloat(stockData.prevClose || stockData.PrevClose) || 0;
+    } else if (ref === "smaFast") {
+        basePrice = parseFloat(stockData.smaFast) || 0;
+    } else if (ref === "smaMedium") {
+        basePrice = parseFloat(stockData.smaMedium) || 0;
+    } else if (ref === "smaSlow") {
+        basePrice = parseFloat(stockData.smaSlow) || 0;
+    } else if (ref === "sma50") {
+        basePrice = parseFloat(stockData.cross50SMA_value) || 0;
+    } else if (ref === "sma200") {
+        basePrice = parseFloat(stockData.cross200SMA_value) || 0;
+    } else if (ref === "emaFast") {
+        basePrice = parseFloat(stockData.emaFast) || 0;
+    } else if (ref === "emaSlow") {
+        basePrice = parseFloat(stockData.emaSlow) || 0;
+    } else if (ref === "lowOfDay") {
+        basePrice = parseFloat(stockData.lowOfDay) || 0;
+    } else if (ref === "lowOfDay1") {
+        basePrice = parseFloat(stockData.lowOfDay1 || stockData.LowOfDay1) || 0;
+    } else if (ref === "highOfDay") {
+        basePrice = parseFloat(stockData.highOfDay) || 0;
+    } else {
+        basePrice = lastPrice;
+    }
+
+    if (basePrice <= 0) return 0;
+    return +(basePrice * (1 + pct / 100)).toFixed(2);
 }
 
 // Core: attempt auto-order for a matching stock
@@ -5162,6 +5380,17 @@ function _aoSendOrder(ao, sym, stockData) {
     }
 
     var entryPrice = _aoCalcEntryPrice(ao, stockData);
+    if (ao.holdOffMarket && ao.entryType === 'market') {
+        ao.entryType = 'limit';
+        if (entryPrice <= 0) {
+            entryPrice = parseFloat(stockData.close) || parseFloat(stockData.last) || 0;
+        }
+    }
+
+    if (ao.entryType === 'limit' && entryPrice <= 0) {
+        _aoLog(sym + ": skipped (invalid entry price for ref '" + ao.priceMode + "')");
+        return;
+    }
     var side = ao.side || "long";
     var qty;
     if (ao.qtyMode === 'dollars') {
@@ -5196,10 +5425,21 @@ function _aoSendOrder(ao, sym, stockData) {
     var trailingType = "amount";
     if (ao.useTrailingStop) {
         if (ao.trailMode === "candle_low") {
-            // Set trailing based on distance from entry to low of day
             var lowOfDay = parseFloat(stockData.lowOfDay) || 0;
+            var offset = parseFloat(ao.trailValue) || 0;
             if (lowOfDay > 0 && entryPrice > 0) {
-                trailingAmount = Math.abs(entryPrice - lowOfDay).toFixed(2);
+                trailingAmount = Math.abs(entryPrice - lowOfDay) + offset;
+                trailingAmount = trailingAmount.toFixed(2);
+            } else {
+                trailingAmount = parseFloat(ao.trailValue).toFixed(2);
+            }
+            trailingType = "amount";
+        } else if (ao.trailMode === "prev_low") {
+            var prevLow = parseFloat(stockData.lowOfDay1 || stockData.LowOfDay1) || 0;
+            var offset = parseFloat(ao.trailValue) || 0;
+            if (prevLow > 0 && entryPrice > 0) {
+                trailingAmount = Math.abs(entryPrice - prevLow) + offset;
+                trailingAmount = trailingAmount.toFixed(2);
             } else {
                 trailingAmount = parseFloat(ao.trailValue).toFixed(2);
             }
@@ -5222,6 +5462,7 @@ function _aoSendOrder(ao, sym, stockData) {
         useTrailingStop: useTrailingStop,
         trailingAmount: trailingAmount,
         trailingType: trailingType,
+        holdOffMarket: ao.holdOffMarket ? "on" : "off",
         tif: ao.tif || "DAY",
         outsideRth: ao.session || "regular",
         entryType: ao.entryType || "limit",
@@ -7217,24 +7458,25 @@ async function _excludeRefreshList() {
 async function _excludeAddStock() {
     try {
         const input = document.getElementById('excludeSymbolInput');
-        const symbol = input.value.trim().toUpperCase();
+        const value = input.value.trim();
+        const symbols = value.split(/[\s,]+/).filter(s => s);
         
-        if (!symbol) {
-            alert('Please enter a stock symbol');
+        if (symbols.length === 0) {
+            alert('Please enter one or more stock symbols');
             return;
         }
         
         const response = await fetch('/exclude/add', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ symbol: symbol })
+            body: JSON.stringify({ symbols: symbols.map(s => s.toUpperCase()) })
         });
         
         const data = await response.json();
         if (data.ok) {
             input.value = '';
             _excludeRefreshList();
-            console.log(`Added ${symbol} to exclusion list`);
+            console.log(`Added ${symbols.join(', ')} to exclusion list`);
         } else {
             alert('Error: ' + (data.error || 'Unknown error'));
         }

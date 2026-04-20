@@ -904,6 +904,12 @@ class Parameters(FlaskForm):
         render_kw={"title": "Check % change over last X minutes", "min": 1, "max": 1440}
     )
     
+    EnablePctChangeTTS = BooleanField(
+        "Read Alert on % Change",
+        default=True,
+        render_kw={"title": "Read stock name when price change exceeds threshold"}
+    )
+    
     EnableVolumeMonitor = BooleanField(
         "Enable Volume Monitoring",
         default=False,
@@ -920,6 +926,12 @@ class Parameters(FlaskForm):
         "Volume Threshold (min)",
         default=50000,
         render_kw={"title": "Alert when volume in period exceeds this amount", "min": 1000}
+    )
+    
+    EnableVolumeTTS = BooleanField(
+        "Read Alert on Volume Spike",
+        default=True,
+        render_kw={"title": "Read stock name when volume exceeds threshold"}
     )
     
     EnableKeyLevelDetection = BooleanField(
@@ -950,10 +962,10 @@ class Parameters(FlaskForm):
         render_kw={"title": "Detect when stock crosses above 200 SMA from below"}
     )
     
-    PlaySound200SMA = BooleanField(
-        "Play Sound on 200 SMA Bullish Crossover",
+    EnableSMA200TTS = BooleanField(
+        "Read Alert on 200 SMA Bullish Crossover",
         default=True,
-        render_kw={"title": "Play custom sound when bullish 200 SMA crossover detected"}
+        render_kw={"title": "Read stock name and indicator name when bullish 200 SMA crossover detected"}
     )
 
     # ------------------------------------------------------------------
@@ -984,10 +996,10 @@ class Parameters(FlaskForm):
         render_kw={"title": "Minimum % change in OBV to consider 'strong'", "min": 1.0, "max": 100.0, "step": 1.0}
     )
     
-    EnableOBVAudio = BooleanField(
-        "Play Sound on Strong OBV Changes",
+    EnableOBVTTS = BooleanField(
+        "Read Alert on Strong OBV Changes",
         default=True,
-        render_kw={"title": "Alert when OBV shows strong rising/declining momentum"}
+        render_kw={"title": "Read stock name when OBV shows strong rising/declining momentum"}
     )
 
     # ------------------------------------------------------------------

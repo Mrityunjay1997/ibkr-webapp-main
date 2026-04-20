@@ -530,6 +530,10 @@ def sendorders():
         tif = asset.get("tif", "DAY")  # DAY, GTC
         outside_rth = asset.get("outsideRth", "regular")  # regular, extended, overnight
         entry_type = asset.get("entryType", "limit")  # "limit" or "market"
+        hold_off_market = asset.get("holdOffMarket", "off") == "on"
+
+        if hold_off_market and entry_type == "market":
+            entry_type = "limit"
 
         # ------------------------------------------------------------
         # Resolve contract via symbol lookup
@@ -953,27 +957,50 @@ def exclude_list():
 
 @app.route("/exclude/add", methods=["POST"])
 def exclude_add():
-    """Add a stock symbol to the exclusion list."""
+    """Add one or more stock symbols to the exclusion list."""
     try:
         payload = request.get_json(silent=True)
         if not payload:
             return jsonify({"error": "JSON payload required"}), 400
-        
-        symbol = payload.get("symbol", "").strip().upper()
-        if not symbol:
+
+        symbols = []
+        if "symbols" in payload:
+            raw = payload.get("symbols")
+            if isinstance(raw, str):
+                symbols = [s.strip().upper() for s in re.split(r"[\s,]+", raw) if s.strip()]
+            elif isinstance(raw, (list, tuple, set)):
+                symbols = [str(s).strip().upper() for s in raw if str(s).strip()]
+            else:
+                return jsonify({"error": "invalid symbols format"}), 400
+        elif "symbol" in payload:
+            raw = payload.get("symbol", "")
+            symbols = [s.strip().upper() for s in re.split(r"[\s,]+", str(raw)) if s.strip()]
+        else:
             return jsonify({"error": "symbol required"}), 400
-        
-        success = IBAPI.add_excluded_stock(symbol)
-        if success:
-            excluded = IBAPI.get_excluded_stocks()
+
+        if not symbols:
+            return jsonify({"error": "symbol required"}), 400
+
+        failed = []
+        for symbol in symbols:
+            if not IBAPI.add_excluded_stock(symbol):
+                failed.append(symbol)
+
+        excluded = IBAPI.get_excluded_stocks()
+        if failed:
             return jsonify({
-                "ok": True,
-                "message": f"Added {symbol} to exclusion list",
+                "ok": False,
+                "error": f"failed to save: {', '.join(failed)}",
                 "excluded": sorted(list(excluded)),
                 "count": len(excluded)
-            }), 200
-        else:
-            return jsonify({"error": "failed to save"}), 500
+            }), 500
+
+        return jsonify({
+            "ok": True,
+            "message": f"Added {len(symbols)} symbol(s) to exclusion list",
+            "excluded": sorted(list(excluded)),
+            "count": len(excluded)
+        }), 200
     except Exception as e:
         logger.exception("Failed to add excluded stock: %s", e)
         return jsonify({"error": "failed to add stock"}), 500
@@ -1821,21 +1848,21 @@ class BackgroundScanner:
 
         _ = idle_timeout
         while not self._stop_event.is_set():
-            # # ---- client lease / heartbeat check (new) ----
-            # # If the frontend hasn't polled /background/results recently, assume the client has died and stop scanner.
-            # try:
-            #     if self.last_client_seen is not None:
-            #         idle = time.time() - self.last_client_seen
-            #         if idle > idle_timeout:
-            #             logger.info("Background scanner stopping due to client inactivity (idle %.1fs > timeout %.1fs)",
-            #                         idle, idle_timeout)
-            #             # avoid clearing latest_results so frontend can still show last known table
-            #             # perform graceful stop and exit loop
-            #             self._stop_event.set()
-            #             # ensure IB cleaned up below after loop exit
-            #             break
-            # except Exception:
-            #     logger.exception("Error during client lease check")
+            # ---- client lease / heartbeat check ----
+            try:
+                heartbeat_time = self.last_client_seen or self._start_request_time
+                if heartbeat_time is not None:
+                    idle = time.time() - heartbeat_time
+                    if idle > idle_timeout:
+                        logger.info(
+                            "Background scanner stopping due to client inactivity (idle %.1fs > timeout %.1fs)",
+                            idle,
+                            idle_timeout,
+                        )
+                        self._stop_event.set()
+                        break
+            except Exception:
+                logger.exception("Error during client lease check")
 
             # do not start a new run if one is already in progress
             if self.is_running:
@@ -1900,6 +1927,8 @@ class BackgroundScanner:
             except Exception:
                 logger.exception("Error cleaning IB resources during loop exit")
 
+        with self.lock:
+            self.enabled = False
         logger.info("Background scanner loop exiting")
         run_gc()
 
@@ -2274,7 +2303,33 @@ class BackgroundTop50Scanner:
     def _loop(self, form, scanner_params):
         logger.info("Top 50 scanner loop started (interval=%.1fs)", self.interval_seconds)
 
+        global cfg
+        try:
+            if hasattr(cfg, "bg_client_idle_timeout") and cfg.bg_client_idle_timeout:
+                idle_timeout = float(cfg.bg_client_idle_timeout)
+            else:
+                idle_timeout = float(getattr(cfg, "scanner_poll_interval", 15000)) / 1000.0 * 4.0
+                if idle_timeout < 30.0:
+                    idle_timeout = 30.0
+        except Exception:
+            idle_timeout = 60.0
+
         while not self._stop_event.is_set():
+            try:
+                heartbeat_time = self.last_client_seen or self._start_request_time
+                if heartbeat_time is not None:
+                    idle = time.time() - heartbeat_time
+                    if idle > idle_timeout:
+                        logger.info(
+                            "Top 50 scanner stopping due to client inactivity (idle %.1fs > timeout %.1fs)",
+                            idle,
+                            idle_timeout,
+                        )
+                        self._stop_event.set()
+                        break
+            except Exception:
+                logger.exception("Error during top50 client lease check")
+
             if self.is_running:
                 if self._stop_event.wait(0.25):
                     break
@@ -2430,6 +2485,8 @@ class BackgroundTop50Scanner:
 
         # Cleanup on exit
         self._disconnect_ib()
+        with self.lock:
+            self.enabled = False
         logger.info("Top 50 scanner loop exiting")
         run_gc()
 

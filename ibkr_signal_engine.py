@@ -99,6 +99,7 @@ def _normalize_market_cap(value):
     - Direct numeric values (assumed to be in millions from IBKR)
     - Values with suffixes like '1.15m' (millions), '1.92b' (billions)
     - Semicolon-delimited format from IBKR fundamental data
+    - Very large numbers (> 1B) assumed to be in dollars
     
     Returns the value in millions as a float, or None if parsing fails.
     
@@ -109,6 +110,7 @@ def _normalize_market_cap(value):
       - "2.5b" or "2.5B" -> 2500.0 (convert billions to millions)
       - "1.15m" -> 1.15 (already in millions)
       - 50000000 -> 50.0 (in dollars, convert to millions)
+      - 2500000000 -> 2500.0 (in dollars, convert to millions)
     """
     if value is None:
         return None
@@ -137,7 +139,10 @@ def _normalize_market_cap(value):
             # Extract the numeric part before 'm'
             numeric_str = val_str.split('m')[0].strip()
             try:
-                return float(numeric_str)
+                numeric = float(numeric_str)
+                # Check if it looks like millions (reasonable range for market cap values in millions)
+                if numeric >= 0 and numeric < 1000000000:
+                    return numeric
             except ValueError:
                 pass
         
@@ -151,11 +156,51 @@ def _normalize_market_cap(value):
         if numeric > 1000000000:
             return numeric / 1000000.0  # Convert from dollars to millions
         
-        # Otherwise assume it's already in millions
-        return numeric
+        # For values between 0 and 1,000,000,000, assume they're already in millions
+        # This handles IBKR's native million format
+        if numeric >= 0:
+            return numeric
+        
+        # Negative values are invalid
+        return None
     
     except (ValueError, TypeError, AttributeError):
         logger.debug("Failed to normalize market cap value: %s", value)
+        return None
+
+
+def _calculate_market_cap_from_price_and_shares(current_price, shares_outstanding):
+    """
+    Calculate market cap from current price and shares outstanding.
+    
+    Both parameters should be numeric values.
+    Returns market cap in millions, or None if calculation fails.
+    
+    Formula: Market Cap (in millions) = (Current Price × Shares Outstanding) / 1,000,000
+    
+    Examples:
+      - price=100, shares=50000000 -> 5000 million ($5B market cap)
+      - price=25.50, shares=100000000 -> 2550 million
+    """
+    if current_price is None or shares_outstanding is None:
+        return None
+    
+    try:
+        price = float(current_price)
+        shares = float(shares_outstanding)
+        
+        # Validate inputs
+        if price <= 0 or shares <= 0:
+            return None
+        
+        # Calculate market cap in dollars, then convert to millions
+        market_cap_dollars = price * shares
+        market_cap_millions = market_cap_dollars / 1_000_000.0
+        
+        return market_cap_millions
+    
+    except (ValueError, TypeError, AttributeError):
+        logger.debug("Failed to calculate market cap from price=%s, shares=%s", current_price, shares_outstanding)
         return None
 
 
@@ -464,13 +509,14 @@ def detect_nearby_key_levels(data: dict, proximity_pct: float = 1.0) -> bool:
         key_levels = []
         
         # Pivot point levels
-        if "Pivot" in data and isinstance(data["Pivot"], dict):
-            for level_name in ["PP", "S1", "S2", "S3", "R1", "R2", "R3"]:
-                if level_name in data["Pivot"]:
+        pivot_sources = ["PivotLevels", "Pivot", "Pivot1", "Pivot2", "Pivot3"]
+        for source in pivot_sources:
+            if source in data and isinstance(data[source], dict):
+                for val in data[source].values():
                     try:
-                        val = float(data["Pivot"][level_name])
-                        if val > 0:
-                            key_levels.append(val)
+                        level_val = float(val)
+                        if level_val > 0:
+                            key_levels.append(level_val)
                     except (ValueError, TypeError):
                         pass
         
@@ -2637,6 +2683,9 @@ class IBapi(EWrapper, EClient):
                 # try to return requested pivot value, otherwise return the main pivot
                 val = pivots.get(pp_name, P)
                 indicators["Pivot"] = {pp_name: val}
+
+                # Store full pivot dictionary so other features can inspect all levels
+                indicators["PivotLevels"] = pivots.copy()
 
                 if form.get("ComparisonPivotPoint") == "between":
                     pp_name1 = form.get("PivotPoint1", pp_name)
@@ -4958,11 +5007,20 @@ class IBapi(EWrapper, EClient):
         
         # -------- Gap Detection --------
         try:
-            if form.GapDetectionEnabled:
+            if form.get("GapDetectionEnabled", False):
                 current_price = data.get("close")
-                lookback_days = form.GapLookbackDays
-                min_gap_percent = form.GapMinimumPercent
-                proximity_percent = form.GapProximityPercent
+                try:
+                    lookback_days = int(form.get("GapLookbackDays", 60))
+                except Exception:
+                    lookback_days = 60
+                try:
+                    min_gap_percent = float(form.get("GapMinimumPercent", 2.0))
+                except Exception:
+                    min_gap_percent = 2.0
+                try:
+                    proximity_percent = float(form.get("GapProximityPercent", 50.0))
+                except Exception:
+                    proximity_percent = 50.0
                 
                 # Get historical data for gap analysis
                 symbol = data.get("symbol")
@@ -5708,10 +5766,12 @@ class IBapi(EWrapper, EClient):
         # Request market cap if:
         # 1. ComparisonMarketCap is configured, OR
         # 2. filterMarketCap checkbox is enabled
-        # The normalization function _normalize_market_cap() handles various formats:
-        # - "1500m" or "1500M" -> 1500 (millions)
-        # - "2.5b" or "2.5B" -> 2500 (billions converted to millions)
-        # - "100" -> 100 (already in millions)
+        # 
+        # Approach (in priority order):
+        # 1. Try to calculate from current_price × shares_outstanding (most real-time)
+        # 2. Fall back to IBKR MKTCAP fundamental data (may be delayed 1+ day)
+        # 
+        # The normalization function _normalize_market_cap() handles various formats
         _mktcap_value = None
         should_fetch_mktcap = (
             form.get("ComparisonMarketCap", "Not used") != "Not used" or 
@@ -5728,7 +5788,7 @@ class IBapi(EWrapper, EClient):
                 self._fundamental_done[mktcap_req_id] = False
 
             try:
-                # Request generic tick 258 (FUNDAMENTAL_RATIOS) which includes MKTCAP
+                # Request generic tick 258 (FUNDAMENTAL_RATIOS) which includes MKTCAP and SHARES
                 self.reqMktData(mktcap_req_id, contract, "258", False, False, [])
                 logger.debug("Requested market cap data (tick 258) for %s (reqId=%s)", m, mktcap_req_id)
             except Exception as e:
@@ -5752,18 +5812,53 @@ class IBapi(EWrapper, EClient):
                 ratios = self._fundamental_data.pop(mktcap_req_id, {})
                 self._fundamental_done.pop(mktcap_req_id, None)
 
-            if "MKTCAP" in ratios and ratios["MKTCAP"]:
+            # First, try to calculate market cap from price × shares_outstanding (most real-time)
+            shares_outstanding = None
+            current_price = None
+            
+            # Try to get shares outstanding from fundamental data
+            if "SHARES" in ratios and ratios["SHARES"]:
+                try:
+                    shares_outstanding = float(ratios["SHARES"])
+                    logger.debug("Got shares outstanding for %s: %s", m, shares_outstanding)
+                except (ValueError, TypeError):
+                    logger.debug("Failed to parse SHARES for %s: %s", m, ratios.get("SHARES"))
+            
+            # Try to get current price from latest market data or use the last available close
+            # We'll get it from the history data after it's loaded
+            # For now, we'll try LASTPRICE from fundamental data or use the close from history
+            if "LASTPRICE" in ratios and ratios["LASTPRICE"]:
+                try:
+                    current_price = float(ratios["LASTPRICE"])
+                    logger.debug("Got last price for %s: %s", m, current_price)
+                except (ValueError, TypeError):
+                    logger.debug("Failed to parse LASTPRICE for %s: %s", m, ratios.get("LASTPRICE"))
+            
+            # If we have both price and shares, calculate market cap
+            if shares_outstanding and current_price and shares_outstanding > 0 and current_price > 0:
+                _mktcap_value = _calculate_market_cap_from_price_and_shares(current_price, shares_outstanding)
+                if _mktcap_value is not None and _mktcap_value > 0:
+                    logger.info("Market cap for %s calculated from price(%.2f) × shares(%.0f) = %.2f million", 
+                               m, current_price, shares_outstanding, _mktcap_value)
+            
+            # Fall back to IBKR's MKTCAP fundamental data if calculation wasn't possible
+            if _mktcap_value is None and "MKTCAP" in ratios and ratios["MKTCAP"]:
                 try:
                     # Normalize market cap to millions (handles m/M and b/B suffixes)
                     _mktcap_value = _normalize_market_cap(ratios["MKTCAP"])
                     if _mktcap_value is not None and _mktcap_value > 0:
-                        logger.info("Market cap for %s: %s -> %.2f million", m, ratios["MKTCAP"], _mktcap_value)
+                        logger.info("Market cap for %s from IBKR fundamental data: %s -> %.2f million", 
+                                   m, ratios["MKTCAP"], _mktcap_value)
                     else:
                         logger.debug("Market cap normalization failed for %s: %s", m, ratios["MKTCAP"])
                 except (ValueError, TypeError) as e:
                     logger.debug("Market cap parsing error for %s: %s", m, e)
-            else:
-                logger.debug("No MKTCAP in fundamental data for %s. Available keys: %s", m, list(ratios.keys()))
+            
+            # Log available ratios if we couldn't find MKTCAP
+            if _mktcap_value is None:
+                logger.debug("No valid market cap for %s. Shares: %s, Price: %s, Ratios keys: %s", 
+                           m, shares_outstanding, current_price, list(ratios.keys()))
+
 
         # -------------------------
         # Determine the per-indicator timeframe plan

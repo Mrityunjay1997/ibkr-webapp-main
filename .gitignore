@@ -1,14 +1,14 @@
 .env
-.venv
+.venv/
 .idea
 *.log*
 log.txt*
 .ignore
 todo.txt
 logs
-VENV
-venv
-__pycache__
+VENV/
+venv/
+__pycache__/
 *.pyc
 *.pyo
 *.pyd
@@ -29,4 +29,4 @@ build
 *.rej
 *.sublime-project
 *.sublime-workspace
-.VENV
+.VENV/
