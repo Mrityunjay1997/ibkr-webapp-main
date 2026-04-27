@@ -4,17 +4,20 @@ import math
 import random
 import logging
 import threading
+import traceback
 import numpy as np
 import pandas as pd
 from config import Config
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+from datetime import time as datetime_time
 
-from ibapi.order import *
-from ibapi.common import *
-from ibapi.common import OrderId
+import pytz
+
+from ibapi.order import Order
+from ibapi.common import OrderId, ListOfPriceIncrements
 from ibapi.client import EClient
 from ibapi.wrapper import EWrapper
-from ibapi.contract import Contract
+from ibapi.contract import Contract, ComboLeg
 from ibapi.order_state import OrderState
 from ibapi.scanner import ScannerSubscription
 
@@ -37,6 +40,9 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
 )
+logging.getLogger("waitress").setLevel(logging.WARNING)
+logging.getLogger("ibapi").setLevel(logging.WARNING)
+logging.getLogger("ibapi.client").setLevel(logging.WARNING)
 logger = logging.getLogger("ibkr_app")
 
 
@@ -253,6 +259,36 @@ def calculate_volume_sum(data: pd.DataFrame, lookback_bars: int = 5) -> float:
         return 0.0
 
 
+def _safe_to_float(value) -> Optional[float]:
+    """
+    Safely convert any value to float, handling numpy types and None.
+    
+    Args:
+        value: Value to convert (can be float, int, numpy type, string, None, etc.)
+    
+    Returns:
+        float or None if conversion fails
+    """
+    if value is None:
+        return None
+    
+    try:
+        # Handle numpy types
+        if hasattr(value, 'item'):
+            # numpy scalar
+            val = float(value.item())
+        else:
+            val = float(value)
+        
+        # Check for NaN
+        if pd.isna(val):
+            return None
+        
+        return val
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
 def apply_result_filters(stock_data: dict, form: dict) -> bool:
     """
     Check if a stock result meets all enabled filter criteria.
@@ -272,13 +308,9 @@ def apply_result_filters(stock_data: dict, form: dict) -> bool:
     # Helper to evaluate if an indicator meets its configured condition
     def check_indicator_condition(indicator_value, indicator_key, comparison_key, value_key, value_key1=None):
         """Check if indicator meets the configured comparison condition."""
+        # Safely convert indicator value to float
+        indicator_value = _safe_to_float(indicator_value)
         if indicator_value is None:
-            return False
-        
-        # Ensure indicator_value is numeric
-        try:
-            indicator_value = float(indicator_value)
-        except (ValueError, TypeError):
             return False
         
         comparison = form.get(comparison_key, "Not used")
@@ -292,11 +324,16 @@ def apply_result_filters(stock_data: dict, form: dict) -> bool:
         if threshold in (None, ""):
             return True
         
-        try:
-            threshold = float(threshold) if threshold else 0
-            threshold1 = float(threshold1) if threshold1 else threshold
-        except (ValueError, TypeError):
+        # Safely convert thresholds to float
+        threshold = _safe_to_float(threshold)
+        threshold1 = _safe_to_float(threshold1) if threshold1 else None
+        
+        if threshold is None:
             return True
+        
+        # If threshold1 was provided but conversion failed, use threshold as fallback
+        if threshold1 is None and value_key1:
+            threshold1 = threshold
         
         # Evaluate based on comparison operator
         try:
@@ -309,173 +346,99 @@ def apply_result_filters(stock_data: dict, form: dict) -> bool:
             elif comparison == "lowerEqual":
                 return indicator_value <= threshold
             elif comparison == "between":
-                return threshold <= indicator_value <= threshold1
+                # Both thresholds required for 'between'
+                if threshold1 is None:
+                    return True
+                # Ensure threshold <= threshold1
+                min_val, max_val = min(threshold, threshold1), max(threshold, threshold1)
+                return min_val <= indicator_value <= max_val
             elif comparison == "withinPercentAbove":
-                return _within_percent_check(threshold, indicator_value, "withinPercentAbove", abs(threshold1 - threshold) if threshold1 else 0)
+                # Note: indicator_value is the current close, threshold is the reference level
+                pct_diff = abs(threshold1 - threshold) if threshold1 else 0
+                return _within_percent_check(threshold, indicator_value, "withinPercentAbove", pct_diff)
             elif comparison == "withinPercentBelow":
-                return _within_percent_check(threshold, indicator_value, "withinPercentBelow", abs(threshold1 - threshold) if threshold1 else 0)
+                pct_diff = abs(threshold1 - threshold) if threshold1 else 0
+                return _within_percent_check(threshold, indicator_value, "withinPercentBelow", pct_diff)
             elif comparison == "withinPercentEither":
-                return _within_percent_check(threshold, indicator_value, "withinPercentEither", abs(threshold1 - threshold) if threshold1 else 0)
+                pct_diff = abs(threshold1 - threshold) if threshold1 else 0
+                return _within_percent_check(threshold, indicator_value, "withinPercentEither", pct_diff)
             else:
                 return True
         except Exception as e:
             logger.debug("Error evaluating condition %s: %s", comparison_key, e)
             return False
     
-    # Check each filter
-    if form.get("filterVWAP", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("vwap"), "vwap", "ComparisonVWAP", "VWAP", "PercentageVWAP"):
-            return False
+    # Define all numeric filters as a list of tuples:
+    # (filter_key, stock_data_key, comparison_key, value_key, value_key1)
+    numeric_filters = [
+        # Top group indicators (VWAP & SMAs)
+        ("filterVWAP", "vwap", "ComparisonVWAP", "VWAP", "PercentageVWAP"),
+        ("filterFastSMA", "smaFast", "ComparisonFastSMA", "FastSMA", "PercentageFastSMA"),
+        ("filterMediumSMA", "smaMedium", "ComparisonMediumSMA", "MediumSMA", "PercentageMediumSMA"),
+        ("filterSlowSMA", "smaSlow", "ComparisonSlowSMA", "SlowSMA", "PercentageSlowSMA"),
+        
+        # Momentum indicators
+        ("filterRSI", "rsi", "ComparisonRSI", "RSI", "PercentageRSI"),
+        ("filterFastEMA", "emaFast", "ComparisonFastEMA", "FastEMA", "PercentageFastEMA"),
+        ("filterSlowEMA", "emaSlow", "ComparisonSlowEMA", "SlowEMA", "PercentageSlowEMA"),
+        ("filterOBV", "obv", "ComparisonOBV", "OBV", "PercentageOBV"),
+        ("filterATR", "atr", "ComparisonATR", "ATR", "PercentageATR"),
+        
+        # Volume indicators
+        ("filterAverageVolume", "averageVolume", "ComparisonAverageVolume", "AverageVolume", None),
+        ("filterRelativeVolume", "relativeVolume", "ComparisonRelativeVolume", "RelativeVolume", None),
+        ("filterVolume", "volumeIndicator", "ComparisonVolume", "Volume", None),
+        
+        # Price-based indicators
+        ("filterPrevClose", "prevClose", "ComparisonPrevClose", "PrevClose", "PercentagePrevClose"),
+        ("filterLowOfDay", "lowOfDay", "ComparisonLowOfDay", "LowOfDay", "PercentageLowOfDay"),
+        ("filterHighOfDay", "highOfDay", "ComparisonHighOfDay", "HighOfDay", "PercentageHighOfDay"),
+        ("filterBreakHigh", "breakHigh", "ComparisonBreakHigh", "BreakHigh", "PercentageBreakHigh"),
+        
+        # Pullback and Gap indicators
+        ("filterPullbackPct", "pullbackPct", "ComparisonPullbackPct", "PullbackPct", "PercentagePullbackPct"),
+        ("filterPullbackPct2", "pullbackPct2", "ComparisonPullbackPct2", "PullbackPct2", "PercentagePullbackPct2"),
+        ("filterFibPullback", "fibPullback", "ComparisonFibPullback", "FibPullback", "PercentageFibPullback"),
+        ("filterGapPullback", "gapPullback", "ComparisonGapPullback", "GapPullback", "PercentageGapPullback"),
+        ("filterUpGap", "upGap", "ComparisonUpGap", "UpGap", "PercentageUpGap"),
+        ("filterDownGap", "downGap", "ComparisonDownGap", "DownGap", "PercentageDownGap"),
+        
+        # Market indicators
+        ("filterMarketCap", "marketCap", "ComparisonMarketCap", "MarketCap", "PercentageMarketCap"),
+    ]
     
-    if form.get("filterFastSMA", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("smaFast"), "smaFast", "ComparisonFastSMA", "FastSMA", "PercentageFastSMA"):
-            return False
+    # Check all numeric filters
+    for filter_key, stock_key, comp_key, val_key, val_key1 in numeric_filters:
+        if form.get(filter_key, False):
+            any_filter_enabled = True
+            if not check_indicator_condition(stock_data.get(stock_key), stock_key, comp_key, val_key, val_key1):
+                return False
     
-    if form.get("filterMediumSMA", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("smaMedium"), "smaMedium", "ComparisonMediumSMA", "MediumSMA", "PercentageMediumSMA"):
-            return False
-    
-    if form.get("filterSlowSMA", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("smaSlow"), "smaSlow", "ComparisonSlowSMA", "SlowSMA", "PercentageSlowSMA"):
-            return False
-    
-    if form.get("filterRSI", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("rsi"), "rsi", "ComparisonRSI", "RSI", "PercentageRSI"):
-            return False
-    
-    if form.get("filterFastEMA", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("emaFast"), "emaFast", "ComparisonFastEMA", "FastEMA", "PercentageFastEMA"):
-            return False
-    
-    if form.get("filterSlowEMA", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("emaSlow"), "emaSlow", "ComparisonSlowEMA", "SlowEMA", "PercentageSlowEMA"):
-            return False
-    
-    if form.get("filterOBV", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("obv"), "obv", "ComparisonOBV", "OBV", "PercentageOBV"):
-            return False
-    
-    if form.get("filterATR", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("atr"), "atr", "ComparisonATR", "ATR", "PercentageATR"):
-            return False
-    
-    if form.get("filterAverageVolume", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("averageVolume"), "averageVolume", "ComparisonAverageVolume", "AverageVolume"):
-            return False
-    
-    if form.get("filterRelativeVolume", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("relativeVolume"), "relativeVolume", "ComparisonRelativeVolume", "RelativeVolume"):
-            return False
-    
-    if form.get("filterPrevClose", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("prevClose"), "prevClose", "ComparisonPrevClose", "PrevClose", "PercentagePrevClose"):
-            return False
-    
-    if form.get("filterLowOfDay", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("lowOfDay"), "lowOfDay", "ComparisonLowOfDay", "LowOfDay", "PercentageLowOfDay"):
-            return False
-    
-    if form.get("filterHighOfDay", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("highOfDay"), "highOfDay", "ComparisonHighOfDay", "HighOfDay", "PercentageHighOfDay"):
-            return False
-    
-    # Cross SMA filters - check variableResults
+    # Cross SMA filters - check variableResults (boolean checks, not numeric comparisons)
     if form.get("filterCross50SMA", False):
         any_filter_enabled = True
         variable_results = stock_data.get("variableResults", {})
-        # Check for "cross 50 SMA" in variable results or check the cross50SMA_either field
         if not (variable_results.get("cross50SMA_either") or stock_data.get("cross50SMA_either")):
             return False
     
     if form.get("filterCross200SMA", False):
         any_filter_enabled = True
         variable_results = stock_data.get("variableResults", {})
-        # Check for "cross 200 SMA" in variable results or check the cross200SMA_either field
         if not (variable_results.get("cross200SMA_either") or stock_data.get("cross200SMA_either")):
             return False
     
-    if form.get("filterBreakHigh", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("breakHigh"), "breakHigh", "ComparisonBreakHigh", "BreakHigh", "PercentageBreakHigh"):
-            return False
-    
-    if form.get("filterPullbackPct", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("pullbackPct"), "pullbackPct", "ComparisonPullbackPct", "PullbackPct", "PercentagePullbackPct"):
-            return False
-    
-    if form.get("filterPullbackPct2", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("pullbackPct2"), "pullbackPct2", "ComparisonPullbackPct2", "PullbackPct2", "PercentagePullbackPct2"):
-            return False
-    
-    if form.get("filterFibPullback", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("fibPullback"), "fibPullback", "ComparisonFibPullback", "FibPullback", "PercentageFibPullback"):
-            return False
-    
-    if form.get("filterGapPullback", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("gapPullback"), "gapPullback", "ComparisonGapPullback", "GapPullback", "PercentageGapPullback"):
-            return False
-    
-    # Pivot Point filter
+    # Pivot Point filter (boolean check)
     if form.get("filterPivotPoint", False):
         any_filter_enabled = True
         variable_results = stock_data.get("variableResults", {})
         if not variable_results.get("Pivot", False):
             return False
     
-    # Up/Down Gap filters
-    if form.get("filterUpGap", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("upGap"), "upGap", "ComparisonUpGap", "UpGap", "PercentageUpGap"):
-            return False
-    
-    if form.get("filterDownGap", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("downGap"), "downGap", "ComparisonDownGap", "DownGap", "PercentageDownGap"):
-            return False
-    
-    # News Keywords filter
+    # News Keywords filter (boolean check)
     if form.get("filterNewsKeyword", False):
         any_filter_enabled = True
         variable_results = stock_data.get("variableResults", {})
         if not variable_results.get("newsKeyword", False):
-            return False
-    
-    # Market Cap filter
-    if form.get("filterMarketCap", False):
-        any_filter_enabled = True
-        market_cap = stock_data.get("marketCap")
-        
-        # If market cap is missing, try to get it from comparison conditions
-        if market_cap is None:
-            # Market cap might not have been fetched; stock fails this filter
-            logger.debug("Stock %s missing market cap data for filter", stock_data.get("symbol", "unknown"))
-            return False
-        
-        if not check_indicator_condition(market_cap, "marketCap", "ComparisonMarketCap", "MarketCap", "PercentageMarketCap"):
-            return False
-    
-    # Volume filter
-    if form.get("filterVolume", False):
-        any_filter_enabled = True
-        if not check_indicator_condition(stock_data.get("volumeIndicator"), "volumeIndicator", "ComparisonVolume", "Volume"):
             return False
     
     # If no filters were enabled, return True (include all results)
@@ -560,14 +523,19 @@ def detect_nearby_key_levels(data: dict, proximity_pct: float = 1.0) -> bool:
         return False
 
 
-def detect_200sma_bullish_crossover(data: dict, hist_data=None) -> bool:
+def detect_200sma_bullish_crossover(data: dict, form: dict = None, hist_data=None) -> bool:
     """
     Detect if stock crossed above 200 SMA from below (bullish crossover).
-    Requires: yesterday's close < 200 SMA AND today's close > 200 SMA
+    Works with both regular hours and extended hours:
+    - Regular hours: Compares yesterday's close to today's close
+    - Extended hours: Compares previous bar's close to current bar's close
+    
+    This allows detection of crossovers in premarket and after-hours sessions.
     
     Args:
-        data: Dictionary with current stock data (close, smaSlow, prevClose, etc.)
-        hist_data: Optional historical DataFrame with OHLC and SMA data
+        data: Dictionary with current stock data (close, smaSlow, prevClose, prevBarClose, etc.)
+        form: Optional form dict with EnableExtendedHours flag
+        hist_data: Optional historical DataFrame with OHLC and SMA data (unused, kept for compatibility)
     
     Returns:
         True if bullish 200 SMA crossover detected, False otherwise
@@ -578,10 +546,26 @@ def detect_200sma_bullish_crossover(data: dict, hist_data=None) -> bool:
     try:
         current_close = float(data.get("close", 0))
         sma_200 = float(data.get("smaSlow", 0))
-        prev_close = float(data.get("prevClose", 0))
         
         # Basic validation
-        if current_close <= 0 or sma_200 <= 0 or prev_close <= 0:
+        if current_close <= 0 or sma_200 <= 0:
+            return False
+        
+        # Determine which "previous close" to use:
+        # - If extended hours enabled: use prevBarClose (previous bar from extended hours data)
+        # - Otherwise: use prevClose (previous trading day's close from regular hours)
+        enable_extended = form.get("EnableExtendedHours", False) if form else False
+        
+        if enable_extended and "prevBarClose" in data:
+            # Extended hours mode: use previous bar's close from the continuous extended hours data
+            # This allows detection in premarket/after-hours
+            prev_close = float(data.get("prevBarClose", 0))
+            logger.debug("200 SMA crossover using extended hours mode (prevBarClose=%.2f)", prev_close)
+        else:
+            # Regular hours mode: use previous trading day's close
+            prev_close = float(data.get("prevClose", 0))
+        
+        if prev_close <= 0:
             return False
         
         # Condition 1: Current close ABOVE 200 SMA
@@ -592,6 +576,10 @@ def detect_200sma_bullish_crossover(data: dict, hist_data=None) -> bool:
         
         # Both conditions must be true for a bullish crossover
         crossover_detected = is_above_today and is_below_yesterday
+        
+        if crossover_detected:
+            logger.info("200 SMA bullish crossover detected: prevClose=%.2f < sma200=%.2f, current=%.2f > sma200",
+                       prev_close, sma_200, current_close)
         
         return crossover_detected
     except Exception as e:
@@ -1317,8 +1305,11 @@ class IBapi(EWrapper, EClient):
         """
         logger.debug("historicalNews reqId=%s provider=%s headline=%.80s", request_id, provider_code, headline)
         with self._news_lock:
+            # Ensure the request ID has been initialized by fetchNews
+            # If not, this might be a stale callback, so silently ignore it
             if request_id not in self._news_data:
-                self._news_data[request_id] = []
+                logger.debug("historicalNews for unknown reqId=%s (may be stale callback), ignoring", request_id)
+                return
             self._news_data[request_id].append({
                 "time": time_str,
                 "provider": provider_code,
@@ -1330,9 +1321,13 @@ class IBapi(EWrapper, EClient):
         """
         Callback fired when all historical news for request_id were sent.
         """
-        count = len(self._news_data.get(request_id, []))
-        logger.info("historicalNewsEnd reqId=%s headlines=%d hasMore=%s", request_id, count, has_more)
-        self._news_done[request_id] = True
+        with self._news_lock:
+            count = len(self._news_data.get(request_id, []))
+            logger.info("historicalNewsEnd reqId=%s headlines=%d hasMore=%s", request_id, count, has_more)
+            if request_id in self._news_done:
+                self._news_done[request_id] = True
+            else:
+                logger.debug("historicalNewsEnd for unknown reqId=%s (may be stale callback), ignoring", request_id)
 
     def newsProviders(self, news_providers):
         """
@@ -1350,9 +1345,10 @@ class IBapi(EWrapper, EClient):
                 "No news providers subscribed.  "
                 "Enable at least 'Benzinga General News (BZ:BZ_FREE)' in "
                 "IBKR Account Management → Settings → Market Data Subscriptions "
-                "to see news headlines."
+                "to see news headlines. Will use fallback provider list."
             )
-            self._subscribed_news_providers = ""
+            # Don't set to empty string - use fallback in fetchNews
+            self._subscribed_news_providers = None
 
     def newsArticle(self, request_id, article_type, article_text):
         """
@@ -1465,14 +1461,18 @@ class IBapi(EWrapper, EClient):
                 self._fundamental_done[req_id] = True
             return
 
-        # Silently handle news-request errors (e.g. "Rejected - Invalid
-        # value in field # 48" when a provider code isn't subscribed).
-        # Do NOT set _news_done = True here — valid headlines from other
-        # providers may still arrive via historicalNews / historicalNewsEnd.
-        # The 5-second timeout in fetchNews() handles the case where
-        # historicalNewsEnd never fires.
-        if req_id in self._news_done and not self._news_done[req_id]:
-            logger.info("News request %s got error %s: %s — suppressed (still waiting for headlines)", req_id, error_code, error_string)
+        # Handle news-request errors (e.g. "Rejected - Invalid value in field # 48" when provider not subscribed).
+        # Valid headlines from other providers may still arrive via historicalNews / historicalNewsEnd.
+        with self._news_lock:
+            is_news_request = req_id in self._news_done
+        
+        if is_news_request:
+            logger.warning("News request %s got error %s: %s — suppressed, will continue waiting for headlines", 
+                          req_id, error_code, error_string)
+            # Mark as done to unblock wait loop - timeout will handle cases where no data arrives
+            with self._news_lock:
+                if req_id in self._news_done and not self._news_done[req_id]:
+                    self._news_done[req_id] = True
             return
 
         # store but don't print
@@ -1840,7 +1840,10 @@ class IBapi(EWrapper, EClient):
             days_needed = int(math.ceil(float(lookback_window) / bars_per_day))
             if days_needed < 1:
                 days_needed = 1
-            timeperiod = f"{days_needed} D"
+            # Account for weekends/holidays: request ~1.4x more calendar days to ensure we get enough trading days
+            # For RVOL calculations on intraday bars, we need complete days of history
+            calendar_days_needed = int(math.ceil(days_needed * 1.4))
+            timeperiod = f"{calendar_days_needed} D"
         elif ib_bar_size == "1 hour":
             # estimate ~6.5 trading hours/day for regular hours
             bars_per_day = 6.5
@@ -2150,7 +2153,7 @@ class IBapi(EWrapper, EClient):
         # If still NaT, keep original 'date' as string index to preserve previous logic
         if result_full["ts"].isna().any():
             # best-effort: fill NaT with forward fill of last valid
-            result_full["ts"] = result_full["ts"].fillna(method="ffill").fillna(method="bfill")
+            result_full["ts"] = result_full["ts"].ffill().bfill()
 
         # set a proper datetime index
         result_full = result_full.set_index("ts", drop=False).sort_index()
@@ -2194,6 +2197,68 @@ class IBapi(EWrapper, EClient):
             if days_to_use.empty:
                 return float(np.nan)
             return float(days_to_use.mean())
+        
+        def _avg_volume_by_time_of_day(_lookback_days):
+            """
+            Calculate average volume for each time-of-day slot across historical days.
+            
+            Returns dict: {time_str: avg_volume}
+            This is used for proper RVOL calculation on intraday bars.
+            
+            Formula from IBKR documentation:
+            RVOL_intraday = (Current Bar Volume) / (Average Volume for this time slot across past N complete days)
+            
+            Example: {'09:30': 50000, '09:35': 45000, ...}
+            """
+            try:
+                if result_full.empty or len(result_full) < 2:
+                    return {}
+                
+                # Create a copy to add temporary columns
+                temp_df = result_full.copy()
+                
+                # Extract time component (HH:MM) from index
+                temp_df["time_slot"] = temp_df.index.strftime("%H:%M")
+                
+                # Track which day each bar belongs to
+                temp_df["trading_day"] = temp_df.index.normalize()
+                
+                # Get all unique trading days
+                unique_trading_days = sorted(temp_df["trading_day"].unique())
+                
+                # CRITICAL: Only use PREVIOUS COMPLETE days (exclude today's incomplete data)
+                # If we only have today's data, we can't calculate proper TOD averages
+                if len(unique_trading_days) <= 1:
+                    logger.debug("Not enough complete days for TOD averages (only %d day(s))", len(unique_trading_days))
+                    return {}  # Not enough previous days
+                
+                # Exclude the last (current/incomplete) day
+                previous_days = unique_trading_days[:-1]
+                
+                # Limit to _lookback_days of previous data
+                previous_days = previous_days[-_lookback_days:]
+                
+                if len(previous_days) == 0:
+                    logger.debug("No previous complete days available after filtering")
+                    return {}
+                
+                # Filter to only previous complete days
+                hist_data = temp_df[temp_df["trading_day"].isin(previous_days)].copy()
+                
+                if hist_data.empty:
+                    logger.debug("No historical data found for previous days")
+                    return {}
+                
+                # Group by time slot and calculate mean volume
+                time_of_day_avg = hist_data.groupby("time_slot")["volume"].mean().to_dict()
+                
+                logger.debug("Computed TOD averages for %d time slots from %d complete days: %s", 
+                           len(time_of_day_avg), len(previous_days), list(sorted(time_of_day_avg.keys()))[:5])
+                return time_of_day_avg
+            except Exception as e:
+                logger.debug("Error computing time-of-day averages: %s", e)
+                logger.debug(traceback.format_exc())
+                return {}
 
         # cumulative today volume up to the last available bar in session
         today_cum_volume = float(result_session["volume"].sum()) if not result_session.empty else float(np.nan)
@@ -2258,33 +2323,51 @@ class IBapi(EWrapper, EClient):
                 rv_lookback = 5
 
             # Detect if we're using intraday bars (multiple bars per day) or daily bars
-            # For intraday: compare volume at current time to average volume at that same time on previous days
-            # For daily: use today's cumulative volume / avg daily volume
             is_intraday_data = result_full.shape[0] > 1 and len(unique_dates) > 1 and result_full.shape[0] / max(1,
                                                                                                  len(unique_dates)) > 1.5
 
             if is_intraday_data:
-                # Time-of-day adjusted RVOL for intraday bars
-                # Extract time from the last bar (current bar)
-                current_bar_time = result_full.index[-1].time()
+                # Time-of-day adjusted RVOL for intraday bars (e.g., 5-min, 15-min)
+                # This matches the IBKR formula for proper RVOL calculation
+                # 1. Get current bar's time and volume
+                current_bar_time_str = result_full.index[-1].strftime("%H:%M")
+                current_bar_volume = float(result_full["volume"].iloc[-1])
                 
-                # Find all bars at this same time (across all days in history)
-                same_time_mask = result_full.index.time == current_bar_time
-                same_time_volumes = result_full.loc[same_time_mask, "volume"]
+                # 2. Calculate average volume at this time of day across past N days
+                tod_averages = _avg_volume_by_time_of_day(rv_lookback)
                 
-                # If we have multiple bars at this time, use them; otherwise fall back to recent bars
-                if len(same_time_volumes) > 1:
-                    # Average the previous occurrences at this time (exclude the current/last bar)
-                    avg_bar = float(same_time_volumes.iloc[:-1].mean()) if len(same_time_volumes) > 1 else float(np.nan)
+                # 3. Get the average volume for this specific time slot
+                if current_bar_time_str in tod_averages and tod_averages[current_bar_time_str] > 0:
+                    avg_volume_at_time = float(tod_averages[current_bar_time_str])
+                    rel_vol = current_bar_volume / avg_volume_at_time
+                    logger.debug("RVOL for %s: %.2f (current=%d, avg_at_time=%.0f) [TOD method]", 
+                               current_bar_time_str, rel_vol, current_bar_volume, avg_volume_at_time)
                 else:
-                    # Not enough historical samples at this time slot
-                    # Fall back to: last bar volume / average of recent previous bars
-                    if result_full.shape[0] > rv_lookback:
-                        avg_bar = float(result_full["volume"].iloc[-(rv_lookback+1):-1].mean()) if result_full.shape[0] > rv_lookback else float(np.nan)
+                    # Fallback: TOD data not available, calculate average from recent complete days
+                    logger.debug("TOD data not available for %s, using fallback method", current_bar_time_str)
+                    
+                    # Method 1: Use average daily volume across previous complete days
+                    avg_daily = _avg_daily_volume(rv_lookback)
+                    if avg_daily and not np.isnan(avg_daily) and avg_daily > 0:
+                        # Estimate bars per day and get the expected bar average
+                        bars_per_day = result_full.shape[0] / max(1, len(unique_dates) - 1)
+                        if bars_per_day > 1:
+                            # If intraday bars, divide daily average by approximate bars per day
+                            avg_bar_volume = avg_daily / bars_per_day
+                        else:
+                            avg_bar_volume = avg_daily
+                        rel_vol = current_bar_volume / avg_bar_volume if avg_bar_volume > 0 else float(np.nan)
+                        logger.debug("RVOL fallback (daily avg): %.2f (current=%d, daily_avg=%.0f, bars_per_day=%.1f)", 
+                                   rel_vol if not np.isnan(rel_vol) else 0, current_bar_volume, avg_daily, bars_per_day)
                     else:
-                        avg_bar = float(result_full["volume"].iloc[:-1].mean()) if result_full.shape[0] > 1 else float(np.nan)
-                
-                rel_vol = last_bar_volume / avg_bar if avg_bar and avg_bar > 0 else float(np.nan)
+                        # Method 2: Use recent bar average (excluding current bar)
+                        if result_full.shape[0] > rv_lookback:
+                            avg_bar = float(result_full["volume"].iloc[-(rv_lookback+1):-1].mean())
+                        else:
+                            avg_bar = float(result_full["volume"].iloc[:-1].mean()) if result_full.shape[0] > 1 else float(np.nan)
+                        rel_vol = current_bar_volume / avg_bar if avg_bar and avg_bar > 0 else float(np.nan)
+                        logger.debug("RVOL fallback (recent bars): %.2f (current=%d, recent_avg=%.0f)", 
+                                   rel_vol if not np.isnan(rel_vol) else 0, current_bar_volume, avg_bar if avg_bar else 0)
             else:
                 # Daily or longer timeframe: use today's cumulative volume / avg daily volume
                 avg_daily = _avg_daily_volume(rv_lookback)
@@ -2297,7 +2380,7 @@ class IBapi(EWrapper, EClient):
                     else:
                         avg_bar = float(result_full["volume"].iloc[:-1].mean()) if result_full.shape[0] > 1 else float(np.nan)
                     rel_vol = last_bar_volume / avg_bar if avg_bar and avg_bar > 0 else float(np.nan)
-
+                    
             indicators["relativeVolume"] = rel_vol
 
             if form.get("ComparisonRelativeVolume") == "between":
@@ -2308,19 +2391,21 @@ class IBapi(EWrapper, EClient):
                 
                 if is_intraday_data:
                     # Time-of-day adjusted RVOL for "between" comparison
-                    current_bar_time = result_full.index[-1].time()
-                    same_time_mask = result_full.index.time == current_bar_time
-                    same_time_volumes = result_full.loc[same_time_mask, "volume"]
+                    current_bar_time_str = result_full.index[-1].strftime("%H:%M")
+                    current_bar_volume = float(result_full["volume"].iloc[-1])
                     
-                    if len(same_time_volumes) > 1:
-                        avg_bar1 = float(same_time_volumes.iloc[:-1].mean()) if len(same_time_volumes) > 1 else float(np.nan)
+                    tod_averages1 = _avg_volume_by_time_of_day(rv_lookback1)
+                    
+                    if current_bar_time_str in tod_averages1 and tod_averages1[current_bar_time_str] > 0:
+                        avg_volume_at_time1 = float(tod_averages1[current_bar_time_str])
+                        rel_vol1 = current_bar_volume / avg_volume_at_time1
                     else:
+                        # Fallback
                         if result_full.shape[0] > rv_lookback1:
                             avg_bar1 = float(result_full["volume"].iloc[-(rv_lookback1+1):-1].mean()) if result_full.shape[0] > rv_lookback1 else float(np.nan)
                         else:
                             avg_bar1 = float(result_full["volume"].iloc[:-1].mean()) if result_full.shape[0] > 1 else float(np.nan)
-                    
-                    rel_vol1 = last_bar_volume / avg_bar1 if avg_bar1 and avg_bar1 > 0 else float(np.nan)
+                        rel_vol1 = current_bar_volume / avg_bar1 if avg_bar1 and avg_bar1 > 0 else float(np.nan)
                 else:
                     # Daily or longer timeframe: use today's cumulative volume / avg daily volume
                     avg_daily1 = _avg_daily_volume(rv_lookback1)
@@ -3005,14 +3090,29 @@ class IBapi(EWrapper, EClient):
             indicators["fib618"] = None
 
         # --- Up Gap & Down Gap (daily gap from 9:30 AM - 4 PM EST) ---
-        # Calculates gaps using only regular trading hours (9:30 AM - 4 PM EST)
-        # Excludes pre/post market trading
+        # 
+        # WHAT IS A GAP?
+        # A gap occurs when a stock opens significantly away from where it closed.
+        # This is calculated as: (Today's RTH Open - Yesterday's Close) / Yesterday's Close * 100%
+        #
+        # GAP UP (Positive gap):
+        #   - Today's opening price > Yesterday's closing price
+        #   - Indicates overnight bullish sentiment/news
+        #   - Gap is "filled/closed" when price returns to yesterday's close level
+        #   - Common setup: Gap up then pullback intraday (buyers vs sellers)
+        #
+        # GAP DOWN (Negative gap):
+        #   - Today's opening price < Yesterday's closing price
+        #   - Indicates overnight bearish sentiment/news
+        #   - Gap is "filled/closed" when price returns to yesterday's close level
+        #   - Common setup: Gap down then bounce intraday (oversold bounce)
+        #
+        # Calculations use only Regular Trading Hours (9:30 AM - 4 PM EST)
+        # to exclude pre/post-market gaps
+        
         if form.get("ComparisonUpGap", "Not used") != "Not used" or form.get("ComparisonDownGap", "Not used") != "Not used":
             try:
-                import pytz
-                from datetime import time as datetime_time
-                
-                # Filter to 9:30 AM - 4 PM EST only
+                # Filter to 9:30 AM - 4 PM EST only (Regular Trading Hours)
                 eastern = pytz.timezone('US/Eastern')
                 result_rth = result_full.copy()
                 
@@ -3033,7 +3133,7 @@ class IBapi(EWrapper, EClient):
                 else:
                     open_rth = float(result_full["open"].iloc[-1])
                 
-                # Get previous close
+                # Get previous day's closing price
                 if len(unique_dates) >= 2:
                     prev_date = unique_dates[-2]
                     prev_mask = result_full.index.normalize() == prev_date
@@ -3041,12 +3141,13 @@ class IBapi(EWrapper, EClient):
                 else:
                     prev_close = float(result_full["close"].iloc[-2]) if len(result_full) >= 2 else float(result_full["close"].iloc[-1])
                 
-                # Calculate gap
+                # Calculate the gap: (Today's Open - Yesterday's Close)
                 gap = open_rth - prev_close
                 
-                # UP GAP: positive gap
+                # UP GAP: positive gap (today opened higher than yesterday's close)
                 if gap > 0 and prev_close > 0:
                     up_gap_pct = (gap / prev_close) * 100.0
+                    # Example: Open $103, Previous Close $100, Gap = $3, Gap% = 3%
                     indicators["upGap"] = up_gap_pct
                     if form.get("ComparisonUpGap") == "between":
                         indicators["upGap1"] = up_gap_pct
@@ -3055,9 +3156,10 @@ class IBapi(EWrapper, EClient):
                     if form.get("ComparisonUpGap") == "between":
                         indicators["upGap1"] = 0
                 
-                # DOWN GAP: negative gap
+                # DOWN GAP: negative gap (today opened lower than yesterday's close)
                 if gap < 0 and prev_close > 0:
                     down_gap_pct = (abs(gap) / prev_close) * 100.0
+                    # Example: Open $97, Previous Close $100, Gap = -$3, Gap% = 3%
                     indicators["downGap"] = down_gap_pct
                     if form.get("ComparisonDownGap") == "between":
                         indicators["downGap1"] = down_gap_pct
@@ -3091,7 +3193,6 @@ class IBapi(EWrapper, EClient):
                     prev_low_fg = float(result_full["low"].iloc[-2]) if len(result_full) >= 2 else float(result_full["low"].iloc[-1])
 
                 gap = open_price_fg - prev_close_fg
-                gap_range = prev_high_fg - prev_low_fg if prev_high_fg != prev_low_fg else 1.0
 
                 # Fib retracement levels of the gap
                 fib_levels = {
@@ -3100,7 +3201,7 @@ class IBapi(EWrapper, EClient):
                     "61.8": prev_close_fg + gap * 0.618,
                 }
 
-                # Find nearest fib level and compute distance as % of gap range
+                # Find nearest fib level and compute distance as % of gap size
                 best_dist = None
                 best_level = None
                 for lbl, lvl in fib_levels.items():
@@ -3109,8 +3210,10 @@ class IBapi(EWrapper, EClient):
                         best_dist = dist
                         best_level = lbl
 
-                # fibGap = distance from nearest fib level as % of gap range
-                fib_gap_pct = (best_dist / abs(gap_range)) * 100.0 if gap_range != 0 else None
+                # fibGap = distance from nearest fib level as % of the gap size
+                # If gap is $10 and current price is $0.50 away from the 50% level, 
+                # then fibGap = 5% (0.50 / 10.0 * 100)
+                fib_gap_pct = (best_dist / abs(gap)) * 100.0 if gap != 0 else None
                 indicators["fibGap"] = fib_gap_pct
                 indicators["fibGapLevel"] = best_level
                 indicators["fibGapDir"] = "up" if gap > 0 else ("down" if gap < 0 else "flat")
@@ -3163,6 +3266,23 @@ class IBapi(EWrapper, EClient):
             indicators["marketCap"] = market_cap
             if form.get("ComparisonMarketCap") == "between":
                 indicators["marketCap1"] = market_cap
+
+        # --- Previous Bar Close (for extended hours crossover detection) ---
+        # When extended hours are enabled, we need the previous bar's close (not previous day's close)
+        # to detect crossovers in premarket and after-hours sessions
+        if form.get("Enable200SMABullishCrossover") or form.get("EnableExtendedHours"):
+            try:
+                if len(result_full) >= 2:
+                    # Use the second-to-last close for continuous extended hours data
+                    indicators["prevBarClose"] = float(result_full["close"].iloc[-2])
+                    logger.debug("Computed prevBarClose=%.2f for extended hours crossover detection", 
+                                indicators["prevBarClose"])
+                else:
+                    # Not enough bars
+                    indicators["prevBarClose"] = None
+            except Exception as e:
+                logger.debug("Failed to compute prevBarClose: %s", e)
+                indicators["prevBarClose"] = None
 
         return indicators
 
@@ -5193,11 +5313,26 @@ class IBapi(EWrapper, EClient):
         sma_200_crossover_condition = None
         if form.get("Enable200SMABullishCrossover"):
             try:
-                sma_200_crossover_condition = detect_200sma_bullish_crossover(data)
+                # Pass form dict so the function can check EnableExtendedHours flag
+                sma_200_crossover_condition = detect_200sma_bullish_crossover(data, form=form)
                 data["sma200BullishCrossover"] = sma_200_crossover_condition
+                
+                # Add description for the crossover
+                if sma_200_crossover_condition:
+                    current_price = data.get("close")
+                    sma_200_value = data.get("smaSlow")  # Use smaSlow (the actual 200 SMA)
+                    if sma_200_value:
+                        description = f"200 SMA Bullish Crossover: Price ${current_price:.2f} crossed above 200 SMA ${sma_200_value:.2f}"
+                    else:
+                        description = "200 SMA Bullish Crossover Detected"
+                    data["sma200BullishCrossoverDescription"] = description
+                else:
+                    data["sma200BullishCrossoverDescription"] = None
+                    
             except Exception as e:
                 logger.warning(f"200 SMA bullish crossover detection failed: {e}")
                 sma_200_crossover_condition = False
+                data["sma200BullishCrossoverDescription"] = None
         
         if sma_200_crossover_condition is not None:
             variable_results["sma200Crossover"] = bool(sma_200_crossover_condition)
@@ -5304,9 +5439,10 @@ class IBapi(EWrapper, EClient):
                 p.strip().lower() for p in str(exclude_raw).split(",") if p.strip()
             }
 
-        # Prepare the news request
-        self._news_data[news_req_id] = []
-        self._news_done[news_req_id] = False
+        # Prepare the news request with thread-safe initialization
+        with self._news_lock:
+            self._news_data[news_req_id] = []
+            self._news_done[news_req_id] = False
 
         # IBKR reqHistoricalNews:
         #   reqId, conId, providerCodes, startDateTime, endDateTime, totalResults, historicalNewsOptions
@@ -5314,11 +5450,15 @@ class IBapi(EWrapper, EClient):
         # Date format: "YYYYMMDD-HH:MM:SS" or "" for open-ended
         #
         # Wait briefly for the newsProviders callback if it hasn't fired yet
+        # But don't wait too long to avoid blocking the entire screening
         if self._subscribed_news_providers is None:
+            logger.debug("Waiting for news provider discovery...")
             _pw = 0.0
-            while self._subscribed_news_providers is None and _pw < 3.0:
-                time.sleep(0.1)
-                _pw += 0.1
+            while self._subscribed_news_providers is None and _pw < 2.0:
+                time.sleep(0.05)
+                _pw += 0.05
+            if self._subscribed_news_providers is None:
+                logger.warning("News provider discovery did not complete, will use fallback providers")
 
         # -------------------------
         # Determine which news providers to request
@@ -5360,7 +5500,7 @@ class IBapi(EWrapper, EClient):
         )
 
         try:
-            logger.debug("Requesting historical news for conId %s", con_id)
+            logger.debug("Requesting historical news for conId %s with providers: %s", con_id, provider_codes)
             self.reqHistoricalNews(
                 news_req_id,
                 con_id,
@@ -5370,27 +5510,42 @@ class IBapi(EWrapper, EClient):
                 total_to_request,
                 [],
             )
+            logger.debug("reqHistoricalNews submitted successfully for reqId=%s", news_req_id)
         except Exception as e:
-            logger.warning("reqHistoricalNews failed for conId %s: %s", con_id, e)
+            logger.error("reqHistoricalNews failed for conId %s: %s", con_id, e)
+            with self._news_lock:
+                self._news_data.pop(news_req_id, None)
+                self._news_done.pop(news_req_id, None)
             return []
 
-        # Wait for news (bounded) - increased timeout to 10 seconds
+        # Wait for news (bounded) - increased timeout to 15 seconds for slower connections
         waited = 0.0
-        timeout = 10.0  # seconds (increased from 5.0 to allow more time for news to arrive)
-        poll_interval = 0.1
-        while not self._news_done.get(news_req_id, False):
+        timeout = 15.0  # seconds (increased to handle slower IBKR API responses)
+        poll_interval = 0.2  # increased poll interval to reduce contention
+        while True:
+            with self._news_lock:
+                if self._news_done.get(news_req_id, False):
+                    logger.debug("fetchNews reqId=%s: historicalNewsEnd received", news_req_id)
+                    break
+            
             time.sleep(poll_interval)
             waited += poll_interval
             if waited >= timeout:
-                logger.warning("fetchNews timeout for conId %s after %.1fs, received %d headlines so far", 
-                              con_id, waited, len(self._news_data.get(news_req_id, [])))
+                with self._news_lock:
+                    headline_count = len(self._news_data.get(news_req_id, []))
+                logger.warning("fetchNews timeout for conId %s after %.1fs, received %d headlines so far. "
+                              "This may indicate slow API response or no news available.",
+                              con_id, waited, headline_count)
                 break
 
-        raw_headlines = self._news_data.get(news_req_id, [])
-        is_done = self._news_done.get(news_req_id, False)
+        # Retrieve headlines with lock protection
+        with self._news_lock:
+            raw_headlines = self._news_data.get(news_req_id, [])[:]  # make a copy
+            is_done = self._news_done.get(news_req_id, False)
+        
         logger.info(
-            "fetchNews reqId=%s returned %d raw headlines (done=%s, waited=%.1fs)",
-            news_req_id, len(raw_headlines), is_done, waited,
+            "fetchNews reqId=%s conId=%s returned %d raw headlines (done=%s, waited=%.1fs)",
+            news_req_id, con_id, len(raw_headlines), is_done, waited,
         )
 
         # Filter excluded publishers
@@ -5532,10 +5687,15 @@ class IBapi(EWrapper, EClient):
                 "url": url,
             })
 
-        # Cleanup
-        self._news_data.pop(news_req_id, None)
-        self._news_done.pop(news_req_id, None)
-
+        # Cleanup with thread-safe removal
+        # Note: we keep these in the dict for a short time to allow any stray callbacks
+        # to detect the request is no longer active and log appropriately
+        with self._news_lock:
+            self._news_data.pop(news_req_id, None)
+            self._news_done.pop(news_req_id, None)
+        
+        logger.debug("fetchNews reqId=%s cleanup complete, returning %d final headlines", 
+                    news_req_id, len(result))
         return result
 
     def fetchNewsArticle(self, provider_code, article_id):
@@ -5765,7 +5925,8 @@ class IBapi(EWrapper, EClient):
         # This provides near-real-time market cap data (not historical/lag).
         # Request market cap if:
         # 1. ComparisonMarketCap is configured, OR
-        # 2. filterMarketCap checkbox is enabled
+        # 2. filterMarketCap checkbox is enabled, OR
+        # 3. Always fetch for display in results (now default behavior)
         # 
         # Approach (in priority order):
         # 1. Try to calculate from current_price × shares_outstanding (most real-time)
@@ -5773,10 +5934,7 @@ class IBapi(EWrapper, EClient):
         # 
         # The normalization function _normalize_market_cap() handles various formats
         _mktcap_value = None
-        should_fetch_mktcap = (
-            form.get("ComparisonMarketCap", "Not used") != "Not used" or 
-            form.get("filterMarketCap", False)
-        )
+        should_fetch_mktcap = True  # Always fetch market cap for results display
         
         if should_fetch_mktcap:
             with self.Locking:
@@ -6235,6 +6393,122 @@ class IBapi(EWrapper, EClient):
         bracketOrder[-1].transmit = True
 
         return bracketOrder
+
+    def multiLevelOrder(self, multi_level_order_dict: dict) -> list:
+        """
+        Create multiple independent bracket orders for a multi-level trading strategy.
+        
+        Args:
+            multi_level_order_dict: Dictionary containing levels configuration
+                {
+                    'action': 'BUY' | 'SELL',
+                    'tif': 'DAY' | 'GTC',
+                    'outside_rth': bool,
+                    'start_order_id': int,
+                    'levels': [
+                        {
+                            'quantity': int,
+                            'entry_price': float,
+                            'entry_type': 'LMT' | 'MKT',
+                            'exit_price': float | None,
+                            'stop_price': float | None,
+                            'use_trailing_stop': bool,
+                            'trailing_amount': float | None,
+                            'trailing_type': 'amount' | 'percent',
+                        },
+                        ...
+                    ]
+                }
+        
+        Returns:
+            List of all Order objects for all levels (entry + exit + stop for each)
+        """
+        all_orders = []
+        action = multi_level_order_dict.get('action', 'BUY')
+        tif = multi_level_order_dict.get('tif', 'DAY')
+        outside_rth = multi_level_order_dict.get('outside_rth', False)
+        start_order_id = multi_level_order_dict.get('start_order_id', int(time.time()))
+        levels = multi_level_order_dict.get('levels', [])
+        
+        current_order_id = start_order_id
+        
+        for level in levels:
+            quantity = level.get('quantity')
+            entry_price = level.get('entry_price')
+            entry_type = level.get('entry_type', 'LMT')
+            exit_price = level.get('exit_price')
+            stop_price = level.get('stop_price')
+            use_trailing_stop = level.get('use_trailing_stop', False)
+            trailing_amount = level.get('trailing_amount')
+            trailing_type = level.get('trailing_type', 'amount')
+            
+            # Create parent entry order
+            parent = Order()
+            parent.eTradeOnly = False
+            parent.firmQuoteOnly = False
+            parent.orderId = current_order_id
+            parent.action = action
+            parent.orderType = entry_type
+            parent.totalQuantity = quantity
+            parent.tif = tif
+            parent.outsideRth = outside_rth
+            parent.transmit = False
+            
+            if entry_type == "LMT" and entry_price:
+                parent.lmtPrice = round(entry_price, 2)
+            
+            all_orders.append(parent)
+            current_order_id += 1
+            
+            # Create exit order if exit price is specified
+            if exit_price is not None:
+                exit_order = Order()
+                exit_order.eTradeOnly = False
+                exit_order.firmQuoteOnly = False
+                exit_order.orderId = current_order_id
+                exit_order.action = "SELL" if action == "BUY" else "BUY"
+                exit_order.orderType = "LMT"
+                exit_order.totalQuantity = quantity
+                exit_order.lmtPrice = round(exit_price, 2)
+                exit_order.parentId = parent.orderId
+                exit_order.tif = tif
+                exit_order.outsideRth = outside_rth
+                exit_order.transmit = False
+                
+                all_orders.append(exit_order)
+                current_order_id += 1
+            
+            # Create stop-loss order if stop price is specified or trailing stop
+            if stop_price is not None or (use_trailing_stop and trailing_amount is not None):
+                stop_order = Order()
+                stop_order.eTradeOnly = False
+                stop_order.firmQuoteOnly = False
+                stop_order.orderId = current_order_id
+                stop_order.action = "SELL" if action == "BUY" else "BUY"
+                stop_order.totalQuantity = quantity
+                stop_order.parentId = parent.orderId
+                stop_order.tif = tif
+                stop_order.outsideRth = outside_rth
+                stop_order.transmit = False
+                
+                if use_trailing_stop and trailing_amount is not None:
+                    stop_order.orderType = "TRAIL"
+                    if trailing_type == "percent":
+                        stop_order.trailingPercent = trailing_amount
+                    else:
+                        stop_order.auxPrice = round(trailing_amount, 2)
+                else:
+                    stop_order.orderType = "STP"
+                    stop_order.auxPrice = round(stop_price, 2)
+                
+                all_orders.append(stop_order)
+                current_order_id += 1
+        
+        # Set the last order to transmit=True to trigger batch submission
+        if all_orders:
+            all_orders[-1].transmit = True
+        
+        return all_orders
 
     def marketRule(self, market_rule_id: int, price_increments: ListOfPriceIncrements):
         """

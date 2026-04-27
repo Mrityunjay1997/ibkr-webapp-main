@@ -25,10 +25,23 @@ def last_value(series: pd.Series, default: Optional[float] = None) -> Optional[f
     """Return the last non-NaN value of a series or `default` if none."""
     if not isinstance(series, pd.Series) or series.empty:
         return default
+    
     val = series.values[-1]
+    
+    # Check for NaN first
     try:
-        return float(val) if not pd.isna(val) else default
-    except Exception:
+        if pd.isna(val):
+            return default
+    except (ValueError, TypeError):
+        pass
+    
+    try:
+        # Handle numpy scalar types with .item() method
+        if hasattr(val, 'item'):
+            return float(val.item())
+        else:
+            return float(val)
+    except (ValueError, TypeError, AttributeError):
         return default
 
 

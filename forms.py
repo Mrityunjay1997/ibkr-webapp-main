@@ -392,19 +392,34 @@ class Parameters(FlaskForm):
     # of the overnight gap (open - previous close)
     # Can select specific Fib level (38.2%, 50%, 61.8%, 78.6%)
     # and tolerance percentage
+    #
+    # Example: If a stock gaps up 10%, the 50% Fibonacci level would be at 5%
+    # A "50% pullback" means price has pulled back 50% of the gap size
+    # 
+    # Use this to find stocks that gapped and are now at key pullback levels:
+    # - 38.2%: Shallow pullback, strong momentum continuation likely
+    # - 50%: Mid-level pullback, balanced risk/reward
+    # - 61.8%: Deep pullback, potential reversal area or strong support
+    # - 78.6%: Near-complete pullback, major support/resistance
 
     GapPullbackLevel = SelectField(
         "Gap Level",
         choices=[
-            ("38.2", "38.2%"),
-            ("50.0", "50.0%"),
-            ("61.8", "61.8%"),
-            ("78.6", "78.6%"),
+            ("38.2", "38.2% (Shallow)"),
+            ("50.0", "50.0% (Mid)"),
+            ("61.8", "61.8% (Deep)"),
+            ("78.6", "78.6% (Full)"),
         ],
         default="61.8",
     )
 
-    GapPullback = DecimalField("Gap Pullback Tolerance %")
+    GapPullback = DecimalField(
+        "Gap Pullback Tolerance %",
+        render_kw={
+            "title": "Tolerance percentage above/below the target Fib level",
+            "placeholder": "e.g., 0.5 for ±0.5% tolerance"
+        }
+    )
     PercentageGapPullback = DecimalField("Gap Pullback Within %")
     PercentageGapPullback1 = DecimalField("Gap Pullback Within %1")
 
@@ -423,11 +438,33 @@ class Parameters(FlaskForm):
     # ------------------------------------------------------------------
     # Up Gap (daily gap up from previous close 9:30 AM - 4 PM EST)
     # ------------------------------------------------------------------
-    # Measures how much a stock gaps UP from previous close as %
-    # Perfect for finding gap-up plays that may pullback
-    # Uses only regular trading hours (9:30 AM - 4 PM EST)
+    # WHAT IS A GAP UP?
+    # A gap up occurs when today's opening price is HIGHER than yesterday's
+    # closing price. This happens when significant news/events occur after 
+    # hours, causing the stock to open at a higher price.
+    #
+    # WHAT THE "GAP %" SHOWS:
+    # The percentage increase from yesterday's close to today's open.
+    # Example: If yesterday closed at $100 and today opened at $103, 
+    #          that's a 3% gap up.
+    #
+    # IS THE GAP CLOSED?
+    # A gap is considered CLOSED when price returns to yesterday's close level.
+    # If stock gapped up to $103 but then drops back below $100 (yesterday's close),
+    # the gap has been filled/closed.
+    #
+    # USE THIS TO FIND:
+    # - Bullish stocks with strong overnight demand (gap-up plays)
+    # - Stocks showing strength that may continue upward
+    # - Potential pullback entry points (when gap closes)
 
-    UpGap = IntegerField("Up Gap")
+    UpGap = IntegerField(
+        "Up Gap %",
+        render_kw={
+            "title": "Minimum gap up percentage to find (e.g., 3 for 3% gap up)",
+            "placeholder": "Enter minimum % gap"
+        }
+    )
     PercentageUpGap = DecimalField("Up Gap %")
     PercentageUpGap1 = DecimalField("Up Gap %1")
 
@@ -439,11 +476,33 @@ class Parameters(FlaskForm):
     # ------------------------------------------------------------------
     # Down Gap (daily gap down from previous close 9:30 AM - 4 PM EST)
     # ------------------------------------------------------------------
-    # Measures how much a stock gaps DOWN from previous close as %
-    # Perfect for finding gap-down stocks for reversal plays
-    # Uses only regular trading hours (9:30 AM - 4 PM EST)
+    # WHAT IS A GAP DOWN?
+    # A gap down occurs when today's opening price is LOWER than yesterday's
+    # closing price. This happens when negative news/events occur after hours,
+    # causing the stock to open at a lower price.
+    #
+    # WHAT THE "GAP %" SHOWS:
+    # The percentage decrease from yesterday's close to today's open.
+    # Example: If yesterday closed at $100 and today opened at $97,
+    #          that's a 3% gap down.
+    #
+    # IS THE GAP CLOSED?
+    # A gap is considered CLOSED when price returns to yesterday's close level.
+    # If stock gapped down to $97 but then rises back above $100 (yesterday's close),
+    # the gap has been filled/closed.
+    #
+    # USE THIS TO FIND:
+    # - Bearish stocks with weakness from overnight news (gap-down plays)
+    # - Short opportunities or potential reversal trades
+    # - Support levels at yesterday's close (where gap would fill)
 
-    DownGap = IntegerField("Down Gap")
+    DownGap = IntegerField(
+        "Down Gap %",
+        render_kw={
+            "title": "Minimum gap down percentage to find (e.g., 3 for 3% gap down)",
+            "placeholder": "Enter minimum % gap"
+        }
+    )
     PercentageDownGap = DecimalField("Down Gap %")
     PercentageDownGap1 = DecimalField("Down Gap %1")
 

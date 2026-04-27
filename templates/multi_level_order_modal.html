@@ -1,0 +1,670 @@
+<!-- 
+  Multi-Level Order Builder Modal
+  Provides advanced order entry with multiple levels, flexible price references,
+  and preset management for trading strategies.
+-->
+
+<!-- Multi-Level Order Builder Modal -->
+<div class="modal fade" id="multiLevelOrderModal" tabindex="-1" role="dialog" aria-labelledby="multiLevelOrderTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg" role="document" style="max-width:1000px;">
+    <div class="modal-content" style="background:#fff;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
+      
+      <!-- Header -->
+      <div class="modal-header" style="background:#f8f9fa;border-bottom:2px solid #e0e0e0;border-radius:10px 10px 0 0;padding:16px 20px;">
+        <h5 class="modal-title" style="font-size:18px;font-weight:700;color:#1f2328;">
+          <i class="icon-layers"></i> Multi-Level Order Builder
+        </h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="modal-body" style="background:#fff;padding:20px;max-height:700px;overflow-y:auto;">
+
+        <!-- Top Control Bar -->
+        <div style="display:flex;gap:10px;margin-bottom:20px;align-items:center;">
+          <div style="flex:1;">
+            <label style="font-weight:600;margin-right:8px;">Symbol:</label>
+            <input type="text" id="mlo_symbol" class="form-control" placeholder="e.g., AAPL" style="display:inline-block;width:120px;">
+          </div>
+          <div>
+            <label style="font-weight:600;margin-right:8px;">Action:</label>
+            <select id="mlo_action" class="form-control" style="display:inline-block;width:100px;">
+              <option value="BUY">BUY</option>
+              <option value="SELL">SELL</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-weight:600;margin-right:8px;">TIF:</label>
+            <select id="mlo_tif" class="form-control" style="display:inline-block;width:80px;">
+              <option value="DAY">DAY</option>
+              <option value="GTC">GTC</option>
+            </select>
+          </div>
+          <div style="margin-left:auto;">
+            <label style="white-space:nowrap;">
+              <input type="checkbox" id="mlo_outside_rth"> Extended Hours
+            </label>
+          </div>
+        </div>
+
+        <!-- Preset Management Bar -->
+        <div style="display:flex;gap:8px;margin-bottom:20px;padding:12px;background:#f0f0f0;border-radius:6px;">
+          <select id="mlo_preset_list" class="form-control" style="flex:1;">
+            <option value="">-- Load Preset --</option>
+          </select>
+          <input type="text" id="mlo_preset_name" class="form-control" placeholder="Preset name..." style="flex:1;">
+          <button type="button" class="btn btn-sm btn-outline-primary" onclick="mloLoadPreset()">Load</button>
+          <button type="button" class="btn btn-sm btn-outline-success" onclick="mloSavePreset()">Save</button>
+          <button type="button" class="btn btn-sm btn-outline-danger" onclick="mloDeletePreset()">Delete</button>
+        </div>
+
+        <!-- Levels Container -->
+        <div id="mlo_levels_container" style="border:1px solid #ddd;border-radius:8px;padding:15px;margin-bottom:20px;background:#fafafa;">
+          <!-- Levels will be inserted here by JavaScript -->
+        </div>
+
+        <!-- Add Level Button -->
+        <div style="margin-bottom:20px;">
+          <button type="button" class="btn btn-sm btn-primary" onclick="mloAddLevel()">
+            <i class="icon-plus"></i> Add Level
+          </button>
+        </div>
+
+        <!-- Strategy Notes -->
+        <div style="margin-bottom:20px;">
+          <label style="font-weight:600;">Strategy Notes (optional):</label>
+          <textarea id="mlo_strategy_notes" class="form-control" placeholder="Document your strategy here..." style="height:80px;"></textarea>
+        </div>
+
+        <!-- Price Reference Reference Chart -->
+        <div style="padding:12px;background:#e8f4f8;border-radius:6px;border-left:4px solid #0099cc;font-size:12px;margin-bottom:15px;">
+          <strong>Available Price References:</strong>
+          <div style="margin-top:8px;column-count:2;gap:15px;">
+            <div><strong>Indicators:</strong> VWAP, SMA Fast/Med/Slow, EMA Fast/Slow, Previous Close</div>
+            <div><strong>Fibonacci:</strong> 23.6%, 38.2%, 50%, 61.8%, 78.6%</div>
+            <div><strong>Levels:</strong> Support 1, Resistance 1, Day High, Day Low</div>
+            <div><strong>Special:</strong> Trailing Stop ($ or %), Trailing Candle</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Footer -->
+      <div class="modal-footer" style="background:#f8f9fa;border-top:2px solid #e0e0e0;border-radius:0 0 10px 10px;padding:12px 20px;">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="mlo_submit_btn" onclick="mloSubmitOrders()">Place Multi-Level Orders</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Multi-Level Order Styles */
+  .mlo-level {
+    border:1px solid #ddd;
+    border-radius:8px;
+    padding:15px;
+    margin-bottom:12px;
+    background:white;
+  }
+
+  .mlo-level-header {
+    display:flex;
+    align-items:center;
+    margin-bottom:15px;
+    padding-bottom:10px;
+    border-bottom:1px solid #eee;
+  }
+
+  .mlo-level-title {
+    font-weight:700;
+    color:#333;
+    flex:1;
+  }
+
+  .mlo-level-delete {
+    background:#ff6b6b;
+    color:white;
+    border:none;
+    padding:6px 12px;
+    border-radius:4px;
+    cursor:pointer;
+    font-size:12px;
+  }
+
+  .mlo-section {
+    margin-bottom:12px;
+  }
+
+  .mlo-section-title {
+    font-weight:600;
+    color:#555;
+    margin-bottom:8px;
+    font-size:13px;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+  }
+
+  .mlo-row {
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr 1fr;
+    gap:10px;
+  }
+
+  .mlo-row.full {
+    grid-template-columns:1fr;
+  }
+
+  .mlo-field {
+    display:flex;
+    flex-direction:column;
+  }
+
+  .mlo-label {
+    font-size:12px;
+    font-weight:600;
+    color:#666;
+    margin-bottom:4px;
+  }
+
+  .mlo-input, .mlo-select {
+    padding:8px 10px;
+    border:1px solid #ccc;
+    border-radius:4px;
+    font-size:13px;
+    font-family:inherit;
+  }
+
+  .mlo-input:focus, .mlo-select:focus {
+    outline:none;
+    border-color:#0099cc;
+    box-shadow:0 0 0 2px rgba(0,153,204,0.1);
+  }
+
+  .mlo-input-small {
+    padding:6px 8px;
+    font-size:12px;
+  }
+
+  .mlo-price-ref-item {
+    display:grid;
+    grid-template-columns:2fr 1fr 1fr;
+    gap:10px;
+    align-items:end;
+  }
+
+  .mlo-price-ref-item.trailing {
+    grid-template-columns:2fr 1fr 1fr;
+  }
+
+  .mlo-checkbox-group {
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:8px;
+    background:#f5f5f5;
+    border-radius:4px;
+  }
+
+  .mlo-checkbox-group input[type="checkbox"] {
+    margin:0;
+  }
+
+  .mlo-summary {
+    padding:12px;
+    background:#e8f5e9;
+    border-radius:6px;
+    border-left:4px solid #4caf50;
+    margin-top:12px;
+    font-size:12px;
+  }
+
+  .mlo-summary strong {
+    color:#333;
+  }
+
+  .mlo-alert {
+    padding:12px;
+    background:#fff3cd;
+    border-radius:6px;
+    border-left:4px solid #ffc107;
+    margin:12px 0;
+    font-size:12px;
+    color:#856404;
+  }
+
+</style>
+
+<script>
+// ===================================================================
+// Multi-Level Order Builder - JavaScript Functions
+// ===================================================================
+
+// Global state
+let mloLevels = [];
+let mloLevelCounter = 0;
+
+// Available price references
+const MlopriceReferences = {
+  'vwap': 'VWAP',
+  'sma_fast': 'SMA Fast',
+  'sma_medium': 'SMA Medium',
+  'sma_slow': 'SMA Slow',
+  'ema_fast': 'EMA Fast',
+  'ema_slow': 'EMA Slow',
+  'prev_close': 'Previous Close',
+  'fibonacci_23.6': 'Fibonacci 23.6%',
+  'fibonacci_38.2': 'Fibonacci 38.2%',
+  'fibonacci_50.0': 'Fibonacci 50%',
+  'fibonacci_61.8': 'Fibonacci 61.8%',
+  'fibonacci_78.6': 'Fibonacci 78.6%',
+  'support_1': 'Support Level 1',
+  'resistance_1': 'Resistance Level 1',
+  'day_high': 'Day High',
+  'day_low': 'Day Low',
+  'custom': 'Custom Price',
+  'trailing_stop': 'Trailing Stop',
+};
+
+/**
+ * Initialize the multi-level order builder
+ */
+function mloInit() {
+  const levelContainer = document.getElementById('mlo_levels_container');
+  if (levelContainer) {
+    levelContainer.innerHTML = '';
+    mloLevels = [];
+    mloLevelCounter = 0;
+    mloAddLevel(); // Start with one level
+  }
+  mloRefreshPresetList();
+}
+
+/**
+ * Add a new order level
+ */
+function mloAddLevel() {
+  const levelNum = ++mloLevelCounter;
+  const level = {
+    id: `level_${levelNum}`,
+    num: levelNum,
+    quantity: 100,
+    entry: {
+      ref: 'vwap',
+      offset: -2,
+      type: 'limit',
+    },
+    exit: {
+      ref: 'fibonacci_61.8',
+      offset: 1,
+      type: 'limit',
+    },
+    stop: {
+      ref: 'support_1',
+      offset: -0.5,
+      type: 'stop',
+    },
+  };
+
+  mloLevels.push(level);
+  mloRenderLevelUI(level);
+}
+
+/**
+ * Render a single level's UI
+ */
+function mloRenderLevelUI(level) {
+  const container = document.getElementById('mlo_levels_container');
+  
+  const levelHtml = `
+    <div class="mlo-level" id="${level.id}">
+      <div class="mlo-level-header">
+        <div class="mlo-level-title">Level ${level.num}</div>
+        <button type="button" class="mlo-level-delete" onclick="mloDeleteLevel('${level.id}')">Delete</button>
+      </div>
+
+      <div class="mlo-section">
+        <div class="mlo-section-title">Position Size</div>
+        <div class="mlo-row full">
+          <div class="mlo-field">
+            <label class="mlo-label">Quantity (shares):</label>
+            <input type="number" class="mlo-input" value="${level.quantity}" 
+                   onchange="mloUpdateLevel('${level.id}', 'quantity', this.value)" min="1">
+          </div>
+        </div>
+      </div>
+
+      <div class="mlo-section">
+        <div class="mlo-section-title">Entry Configuration</div>
+        ${mloRenderPriceRefUI(level.id, 'entry', level.entry)}
+      </div>
+
+      <div class="mlo-section">
+        <div class="mlo-section-title">Exit / Take Profit Configuration</div>
+        ${mloRenderPriceRefUI(level.id, 'exit', level.exit)}
+      </div>
+
+      <div class="mlo-section">
+        <div class="mlo-section-title">Stop Loss Configuration</div>
+        ${mloRenderPriceRefUI(level.id, 'stop', level.stop)}
+      </div>
+
+      <div class="mlo-summary">
+        <strong>Level Summary:</strong> Buy ${level.quantity} shares
+      </div>
+    </div>
+  `;
+
+  container.insertAdjacentHTML('beforeend', levelHtml);
+}
+
+/**
+ * Render price reference configuration UI
+ */
+function mloRenderPriceRefUI(levelId, refType, refConfig) {
+  const refTypeCapitalized = refType.charAt(0).toUpperCase() + refType.slice(1);
+  
+  return `
+    <div class="mlo-price-ref-item">
+      <div class="mlo-field">
+        <label class="mlo-label">Price Reference:</label>
+        <select class="mlo-select" onchange="mloUpdateLevel('${levelId}', '${refType}_ref', this.value)">
+          ${Object.entries(MlopriceReferences).map(([key, label]) => 
+            `<option value="${key}" ${refConfig.ref === key ? 'selected' : ''}>${label}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div class="mlo-field">
+        <label class="mlo-label">Offset (%):</label>
+        <input type="number" class="mlo-input mlo-input-small" value="${refConfig.offset}" step="0.1"
+               onchange="mloUpdateLevel('${levelId}', '${refType}_offset', this.value)">
+      </div>
+      <div class="mlo-field">
+        <label class="mlo-label">Order Type:</label>
+        <select class="mlo-select mlo-input-small" onchange="mloUpdateLevel('${levelId}', '${refType}_type', this.value)">
+          <option value="limit" ${refConfig.type === 'limit' ? 'selected' : ''}>Limit</option>
+          <option value="market" ${refConfig.type === 'market' ? 'selected' : ''}>Market</option>
+          <option value="stop" ${refConfig.type === 'stop' ? 'selected' : ''}>Stop</option>
+          <option value="trail" ${refConfig.type === 'trail' ? 'selected' : ''}>Trailing</option>
+        </select>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Update a level's configuration
+ */
+function mloUpdateLevel(levelId, field, value) {
+  const level = mloLevels.find(l => l.id === levelId);
+  if (!level) return;
+
+  if (field === 'quantity') {
+    level.quantity = parseInt(value) || 100;
+  } else if (field.includes('_ref')) {
+    const refType = field.split('_')[0]; // 'entry', 'exit', 'stop'
+    level[refType].ref = value;
+  } else if (field.includes('_offset')) {
+    const refType = field.split('_')[0];
+    level[refType].offset = parseFloat(value) || 0;
+  } else if (field.includes('_type')) {
+    const refType = field.split('_')[0];
+    level[refType].type = value;
+  }
+}
+
+/**
+ * Delete a level
+ */
+function mloDeleteLevel(levelId) {
+  const idx = mloLevels.findIndex(l => l.id === levelId);
+  if (idx >= 0) {
+    mloLevels.splice(idx, 1);
+    const elem = document.getElementById(levelId);
+    if (elem) elem.remove();
+  }
+}
+
+/**
+ * Save current order configuration as a preset
+ */
+function mloSavePreset() {
+  const name = document.getElementById('mlo_preset_name').value;
+  const symbol = document.getElementById('mlo_symbol').value;
+  
+  if (!name || name.trim() === '') {
+    alert('Please enter a preset name');
+    return;
+  }
+
+  if (!symbol || symbol.trim() === '') {
+    alert('Please enter a symbol');
+    return;
+  }
+
+  // Convert levels to JSON format for saving
+  const presetData = {
+    name: name,
+    symbol: symbol,
+    strategy_notes: document.getElementById('mlo_strategy_notes').value,
+    levels: mloLevels.map(level => ({
+      level_num: level.num,
+      quantity: level.quantity,
+      entry: {
+        type: level.entry.ref,
+        offset_pct: parseFloat(level.entry.offset),
+        order_type: level.entry.type,
+      },
+      exit: {
+        type: level.exit.ref,
+        offset_pct: parseFloat(level.exit.offset),
+        order_type: level.exit.type,
+      },
+      stop_loss: level.stop ? {
+        type: level.stop.ref,
+        offset_pct: parseFloat(level.stop.offset),
+        order_type: level.stop.type,
+      } : null,
+    }))
+  };
+
+  // Save to backend
+  fetch('/order-presets/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(presetData)
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.status === 'ok') {
+      alert(`Preset saved: ${data.filename}`);
+      document.getElementById('mlo_preset_name').value = '';
+      mloRefreshPresetList();
+    } else {
+      alert(`Error: ${data.message}`);
+    }
+  })
+  .catch(e => alert(`Error saving preset: ${e}`));
+}
+
+/**
+ * Load a preset
+ */
+function mloLoadPreset() {
+  const filename = document.getElementById('mlo_preset_list').value;
+  
+  if (!filename) {
+    alert('Please select a preset');
+    return;
+  }
+
+  fetch(`/order-presets/load/${filename}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'ok') {
+        mloLoadPresetData(data.preset);
+      } else {
+        alert(`Error: ${data.message}`);
+      }
+    })
+    .catch(e => alert(`Error loading preset: ${e}`));
+}
+
+/**
+ * Load preset data into the UI
+ */
+function mloLoadPresetData(preset) {
+  // Clear current levels
+  document.getElementById('mlo_levels_container').innerHTML = '';
+  mloLevels = [];
+  mloLevelCounter = 0;
+
+  // Load basic info
+  document.getElementById('mlo_symbol').value = preset.symbol;
+  document.getElementById('mlo_strategy_notes').value = preset.strategy_notes || '';
+  document.getElementById('mlo_preset_name').value = preset.name;
+
+  // Load levels
+  preset.levels.forEach(levelData => {
+    const level = {
+      id: `level_${++mloLevelCounter}`,
+      num: mloLevelCounter,
+      quantity: levelData.quantity,
+      entry: {
+        ref: levelData.entry.type,
+        offset: levelData.entry.offset_pct,
+        type: levelData.entry.order_type,
+      },
+      exit: {
+        ref: levelData.exit.type,
+        offset: levelData.exit.offset_pct,
+        type: levelData.exit.order_type,
+      },
+      stop: levelData.stop_loss ? {
+        ref: levelData.stop_loss.type,
+        offset: levelData.stop_loss.offset_pct,
+        type: levelData.stop_loss.order_type,
+      } : null,
+    };
+    mloLevels.push(level);
+    mloRenderLevelUI(level);
+  });
+
+  alert(`Loaded preset: ${preset.name}`);
+}
+
+/**
+ * Delete a preset
+ */
+function mloDeletePreset() {
+  const filename = document.getElementById('mlo_preset_list').value;
+  
+  if (!filename) {
+    alert('Please select a preset');
+    return;
+  }
+
+  if (!confirm('Delete this preset?')) return;
+
+  fetch(`/order-presets/delete/${filename}`, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'ok') {
+        alert(data.message);
+        mloRefreshPresetList();
+      } else {
+        alert(`Error: ${data.message}`);
+      }
+    })
+    .catch(e => alert(`Error: ${e}`));
+}
+
+/**
+ * Refresh the preset list dropdown
+ */
+function mloRefreshPresetList() {
+  const symbol = document.getElementById('mlo_symbol').value;
+  const select = document.getElementById('mlo_preset_list');
+
+  const url = symbol ? `/order-presets/list?symbol=${symbol}` : '/order-presets/list';
+
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'ok') {
+        select.innerHTML = '<option value="">-- Load Preset --</option>';
+        data.presets.forEach(preset => {
+          const opt = document.createElement('option');
+          opt.value = preset.filename;
+          opt.textContent = `${preset.name} (${preset.symbol}) - ${preset.num_levels} levels`;
+          select.appendChild(opt);
+        });
+      }
+    })
+    .catch(e => console.error('Error loading presets:', e));
+}
+
+/**
+ * Submit multi-level orders
+ */
+function mloSubmitOrders() {
+  if (mloLevels.length === 0) {
+    alert('Please add at least one level');
+    return;
+  }
+
+  const symbol = document.getElementById('mlo_symbol').value;
+  if (!symbol) {
+    alert('Please enter a symbol');
+    return;
+  }
+
+  // Build multi-level order configuration
+  const levelConfigs = mloLevels.map(level => ({
+    quantity: level.quantity,
+    entry_price: null, // Will be calculated from price reference
+    entry_type: level.entry.type === 'market' ? 'MKT' : 'LMT',
+    exit_price: null,   // Will be calculated
+    stop_price: null,   // Will be calculated
+    use_trailing_stop: level.stop.type === 'trail',
+    trailing_amount: level.stop.offset,
+    trailing_type: 'amount', // For now, using absolute amount
+  }));
+
+  const formData = new FormData();
+  formData.append('tickerOrder', symbol);
+  formData.append('longshort', document.getElementById('mlo_action').value === 'BUY' ? 'long' : 'short');
+  formData.append('tif', document.getElementById('mlo_tif').value);
+  formData.append('outsideRth', document.getElementById('mlo_outside_rth').checked ? 'extended' : 'regular');
+  formData.append('isMultiLevel', 'true');
+  formData.append('multiLevelConfig', JSON.stringify({ levels: levelConfigs }));
+  formData.append('quantity', mloLevels.reduce((sum, l) => sum + l.quantity, 0));
+
+  fetch('/sendorders', {
+    method: 'POST',
+    body: formData
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.status === 'ok') {
+      alert(`Orders submitted successfully!\nOrders ID: ${data.ordersId}\n\nDetails:\n${data.sentOrders.map(o => 
+        `Order ${o.orderId}: ${o.action} ${o.quantity} @ ${o.orderType}`
+      ).join('\n')}`);
+      $('#multiLevelOrderModal').modal('hide');
+      mloInit(); // Reset the form
+    } else {
+      alert(`Error: ${data.message}`);
+    }
+  })
+  .catch(e => alert(`Error submitting orders: ${e}`));
+}
+
+// Initialize when modal is shown
+$(document).on('show.bs.modal', '#multiLevelOrderModal', function() {
+  mloInit();
+});
+
+</script>

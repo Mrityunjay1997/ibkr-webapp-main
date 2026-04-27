@@ -888,6 +888,20 @@
 											<th style="padding:10px">Auto-Read All News</th>
 											<td style="padding:10px" colspan="4">{{ Param.NewsAutoReadAll(class_="NewsAutoReadAll") }}</td>
 										</tr>
+										<tr>
+											<th style="padding:10px">TTS Volume Control</th>
+											<td style="padding:10px" colspan="4">
+												<div style="display: flex; gap: 15px; align-items: center;">
+													<div style="display: flex; align-items: center; gap: 10px;">
+														<span style="font-size:11px">Volume:</span>
+														<input type="range" id="ttsVolumeSlider" min="0" max="1" step="0.05" value="0.7" style="width:150px; cursor:pointer;" onchange="setTTSVolume(this.value)">
+														<span id="ttsVolumeLabel" style="font-size:11px; min-width:35px;">70%</span>
+													</div>
+													<button id="ttsMuteBtn" style="padding:6px 12px; background:#0073aa; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:bold;" onclick="toggleTTSMute()">🔊 Mute</button>
+													<button id="ttsStopBtn" style="padding:6px 12px; background:#c74a4a; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:bold;" onclick="stopTTSPlayback()">⏹️ Stop</button>
+												</div>
+											</td>
+										</tr>
 									</tbody>
 								</table>
 
@@ -959,7 +973,7 @@
 								<!-- 200 SMA Bullish Crossover Detection Configuration -->
 								<table class="table table-bordered" style="margin-top:0;">
 									<thead>
-										<tr style="background:#27ae60; color:#fff;">
+										<tr style="background:#ffa500; color:#fff;">
 											<th style="padding:10px" colspan="5">200 SMA Bullish Crossover Detection</th>
 										</tr>
 										<tr>
@@ -1025,164 +1039,7 @@
                                      Current time: <span id="bg_now">--:--:--</span>
                                 </div>
 
-								<!-- ============ FILTER RESULTS SECTION ============ -->
-								<div style="margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 5px; border-left: 4px solid #007bff;">
-									<h4 style="margin: 0 0 15px 0; color: #333; font-weight: bold;">
-										✓ Filter Results by Indicators
-									</h4>
-									<p style="margin: 0 0 10px 0; font-size: 12px; color: #666;">
-										Check the boxes below to return ONLY stocks that meet ALL selected criteria. Leave unchecked to show all results.
-									</p>
-									<table style="width: 100%; font-size: 13px;">
-										<tbody>
-											<tr>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterVWAP(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">VWAP</span>
-													</label>
-												</td>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterFastSMA(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">Fast SMA</span>
-													</label>
-												</td>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterMediumSMA(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">Medium SMA</span>
-													</label>
-												</td>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterSlowSMA(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">Slow SMA</span>
-													</label>
-												</td>
-											</tr>
-											<tr>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterRSI(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">RSI</span>
-													</label>
-												</td>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterFastEMA(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">Fast EMA</span>
-													</label>
-												</td>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterSlowEMA(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">Slow EMA</span>
-													</label>
-												</td>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterOBV(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">OBV</span>
-													</label>
-												</td>
-											</tr>
-											<tr>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterATR(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">ATR</span>
-													</label>
-												</td>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterAverageVolume(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">Avg Volume</span>
-													</label>
-												</td>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterRelativeVolume(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">Rel Volume</span>
-													</label>
-												</td>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterCross200SMA(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">Cross 200 SMA</span>
-													</label>
-												</td>
-											</tr>
-											<tr>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterCross50SMA(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">Cross 50 SMA</span>
-													</label>
-												</td>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterBreakHigh(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">Break High</span>
-													</label>
-												</td>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterPullbackPct(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">Pullback %</span>
-													</label>
-												</td>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterFibPullback(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">Fib Pullback</span>
-													</label>
-												</td>
-											</tr>
-											<tr>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterGapPullback(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">Gap Pullback</span>
-													</label>
-												</td>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterUpGap(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">Up Gap</span>
-													</label>
-												</td>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterDownGap(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">Down Gap</span>
-													</label>
-												</td>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterNewsKeyword(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">News Keywords</span>
-													</label>
-												</td>
-											</tr>
-											<tr>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterMarketCap(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">Market Cap</span>
-													</label>
-												</td>
-												<td style="padding: 5px 10px;">
-													<label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 5px;">
-														{{ Param.filterVolume(class_="filter-checkbox") }}
-														<span style="margin-left: 8px;">Volume</span>
-													</label>
-												</td>
-												<td colspan="2">&nbsp;</td>
-											</tr>
-										</tbody>
-									</table>
-								</div>
+
 
 <div style="margin-top:12px; display:flex; justify-content:flex-end;">
                                     <div style="display:flex; align-items:center; gap:10px;">
@@ -1289,6 +1146,9 @@
 							  </div>
 							</div>
 
+							<!-- Multi-Level Order Builder Modal -->
+							{% include 'multi_level_order_modal.html' %}
+
 							<!-- ===== Auto-Order Panel ===== -->
 							<div class="ao-panel" id="ao_panel">
 								<div class="ao-panel-header">
@@ -1387,109 +1247,135 @@
 												<option value="market">Market</option>
 											</select>
 										</div>
+										<div class="ao-field">
+											<label class="ao-label">Entry Price Mode</label>
+											<select id="ao_price_mode" class="ao-select" onchange="_aoTogglePriceMode()">
+												<option value="current" selected>Current Price</option>
+												<option value="bid_plus">Current Bid +</option>
+												<option value="bid_minus">Current Bid -</option>
+												<option value="last">Last Price</option>
+												<option value="vwap">VWAP</option>
+												<option value="pivot_pp">Pivot PP</option>
+												<option value="pivot_s1">Pivot S1</option>
+												<option value="pivot_s2">Pivot S2</option>
+												<option value="pivot_s3">Pivot S3</option>
+												<option value="pivot_r1">Pivot R1</option>
+												<option value="pivot_r2">Pivot R2</option>
+												<option value="pivot_r3">Pivot R3</option>
+												<option value="prevClose">Prev Close (Gap)</option>
+												<option value="smaFast">Fast SMA</option>
+												<option value="smaMedium">Medium SMA</option>
+												<option value="smaSlow">Slow SMA</option>
+												<option value="sma50">50 SMA</option>
+												<option value="sma200">200 SMA</option>
+												<option value="emaFast">Fast EMA</option>
+												<option value="emaSlow">Slow EMA</option>
+												<option value="lowOfDay">Low of Day</option>
+												<option value="highOfDay">High of Day</option>
+												<option value="fib">Fibonacci Level</option>
+												<option value="custom">Custom Price</option>
+											</select>
+										</div>
+										<div class="ao-field ao-price-mode-field" id="ao_price_pct_field">
+											<label class="ao-label">Price Offset %</label>
+											<input type="number" id="ao_price_pct" class="ao-input" value="0.5" min="0" step="0.1">
+										</div>
+										<div class="ao-field ao-price-mode-field" id="ao_fib_level_field" style="display:none;">
+											<label class="ao-label">Fib Level</label>
+											<select id="ao_fib_level" class="ao-select">
+												<option value="0.236">23.6%</option>
+												<option value="0.382" selected>38.2%</option>
+												<option value="0.50">50.0%</option>
+												<option value="0.618">61.8%</option>
+												<option value="0.786">78.6%</option>
+											</select>
+										</div>
+										<div class="ao-field ao-price-mode-field" id="ao_custom_price_field" style="display:none;">
+											<label class="ao-label">Custom Price</label>
+											<input type="number" id="ao_custom_price" class="ao-input" value="" min="0" step="0.01">
+										</div>
                                         <div class="ao-field">
                                             <label class="ao-chk-label"><input type="checkbox" id="ao_hold_off_market"> Hold off market</label>
                                         </div>
-										<option value="current" selected>Current Price</option>
-                                        <option value="last">Last Price</option>
-										<option value="vwap">VWAP</option>
-										<option value="pivot_pp">Pivot PP</option>
-										<option value="pivot_s1">Pivot S1</option>
-										<option value="pivot_s2">Pivot S2</option>
-										<option value="pivot_s3">Pivot S3</option>
-										<option value="pivot_r1">Pivot R1</option>
-										<option value="pivot_r2">Pivot R2</option>
-										<option value="pivot_r3">Pivot R3</option>
-										<option value="prevClose">Prev Close (Gap)</option>
-										<option value="smaFast">Fast SMA</option>
-										<option value="smaMedium">Medium SMA</option>
-										<option value="smaSlow">Slow SMA</option>
-										<option value="sma50">50 SMA</option>
-										<option value="sma200">200 SMA</option>
-										<option value="emaFast">Fast EMA</option>
-										<option value="emaSlow">Slow EMA</option>
-										<option value="lowOfDay">Low of Day</option>
-										<option value="highOfDay">High of Day</option>
-										<option value="custom">Custom Price</option>
-									</select>
-								</div>
-								<div class="ao-field" id="ao_price_pct_field">
-									<label class="ao-label">Price Offset %</label>
-									<input type="number" id="ao_price_pct" class="ao-input" value="0.5" min="0" step="0.1">
-								</div>
-								<div class="ao-field" id="ao_custom_price_field" style="display:none;">
-									<label class="ao-label">Custom Price</label>
-									<input type="number" id="ao_custom_price" class="ao-input" value="" min="0" step="0.01">
-															</div>
-				</div>
+									</div>
 <!-- Bracket / Stop -->
-									<div class="ao-section-title">Bracket / Stop</div>
-									<div class="ao-row">
-										<div class="ao-field">
-											<label class="ao-label">Order Type</label>
-											<select id="ao_order_type" class="ao-select" onchange="_aoToggleBracket()">
-												<option value="bracket" selected>Bracket</option>
-												<option value="limit">Limit Only</option>
-											</select>
-										</div>
-										<div class="ao-field ao-bracket-field">
-											<label class="ao-label">Target %</label>
-											<input type="number" id="ao_target_pct" class="ao-input" value="2" min="0" step="0.1">
-										</div>
-										<div class="ao-field ao-bracket-field">
-											<label class="ao-label">Stop %</label>
-											<input type="number" id="ao_stop_pct" class="ao-input" value="1" min="0" step="0.1">
-										</div>
-									</div>
+									<details class="ao-collapsible">
+										<summary class="ao-section-title" style="cursor:pointer;user-select:none;padding:8px;">▶ Bracket / Stop</summary>
+										<div style="padding:10px;">
+											<div class="ao-row">
+												<div class="ao-field">
+													<label class="ao-label">Order Type</label>
+													<select id="ao_order_type" class="ao-select" onchange="_aoToggleBracket()">
+														<option value="bracket" selected>Bracket</option>
+														<option value="limit">Limit Only</option>
+													</select>
+												</div>
+												<div class="ao-field ao-bracket-field">
+													<label class="ao-label">Target %</label>
+													<input type="number" id="ao_target_pct" class="ao-input" value="2" min="0" step="0.1">
+												</div>
+												<div class="ao-field ao-bracket-field">
+													<label class="ao-label">Stop %</label>
+													<input type="number" id="ao_stop_pct" class="ao-input" value="1" min="0" step="0.1">
+												</div>
+											</div>
 
-									<!-- Trailing stop options -->
-									<div class="ao-row ao-bracket-field">
-										<div class="ao-field">
-											<label class="ao-chk-label"><input type="checkbox" id="ao_trailing_stop" onchange="_aoToggleTrailing()"> Trailing Stop</label>
+											<!-- Trailing stop options -->
+											<div class="ao-row ao-bracket-field">
+												<div class="ao-field">
+													<label class="ao-chk-label"><input type="checkbox" id="ao_trailing_stop" onchange="_aoToggleTrailing()"> Trailing Stop</label>
+												</div>
+												<div class="ao-field ao-trailing-fields" style="display:none;">
+													<label class="ao-label">Trail Mode</label>
+													<select id="ao_trail_mode" class="ao-select">
+														<option value="amount" selected>$ Amount</option>
+														<option value="percent">% Percent</option>
+														<option value="candle_low">Low of Candle</option>
+													</select>
+												</div>
+												<div class="ao-field ao-trailing-fields" style="display:none;">
+													<label class="ao-label">Trail Value</label>
+													<input type="number" id="ao_trail_value" class="ao-input" value="1.00" min="0" step="0.01">
+												</div>
+											</div>
 										</div>
-										<div class="ao-field ao-trailing-fields" style="display:none;">
-											<label class="ao-label">Trail Mode</label>
-											<select id="ao_trail_mode" class="ao-select">
-												<option value="amount" selected>$ Amount</option>
-												<option value="percent">% Percent</option>
-												<option value="candle_low">Low of Candle</option>
-											</select>
-										</div>
-										<div class="ao-field ao-trailing-fields" style="display:none;">
-											<label class="ao-label">Trail Value</label>
-											<input type="number" id="ao_trail_value" class="ao-input" value="1.00" min="0" step="0.01">
-										</div>
-									</div>
-
+									</details>
 									<!-- TIF / Session -->
-									<div class="ao-row">
-										<div class="ao-field">
-											<label class="ao-label">Time in Force</label>
-											<select id="ao_tif" class="ao-select">
-												<option value="DAY" selected>Day</option>
-												<option value="GTC">Good Till Cancel</option>
-											</select>
-										</div>
-										<div class="ao-field">
-											<label class="ao-label">Session</label>
-											<select id="ao_session" class="ao-select">
-												<option value="regular" selected>Regular Hours</option>
-												<option value="extended">Regular + Extended</option>
-												<option value="overnight">Regular + Ext + Overnight</option>
-											</select>
-										</div>
-									</div>
+									<details class="ao-collapsible">
+										<summary class="ao-section-title" style="cursor:pointer;user-select:none;padding:8px;">▶ Time & Session</summary>
+										<div style="padding:10px;">
+											<div class="ao-row">
+												<div class="ao-field">
+													<label class="ao-label">Time in Force</label>
+													<select id="ao_tif" class="ao-select">
+														<option value="DAY" selected>Day</option>
+														<option value="GTC">Good Till Cancel</option>
+													</select>
+												</div>
+												<div class="ao-field">
+													<label class="ao-label">Session</label>
+													<select id="ao_session" class="ao-select">
+														<option value="regular" selected>Regular Hours</option>
+														<option value="extended">Regular + Extended</option>
+														<option value="overnight">Regular + Ext + Overnight</option>
+													</select>
+												</div>
+											</div>
 
-									<!-- Max orders per symbol -->
-									<div class="ao-row">
-										<div class="ao-field" style="max-width:180px;">
-											<label class="ao-label">Max Orders per Symbol</label>
-											<input type="number" id="ao_max_per_sym" class="ao-input" value="1" min="1" step="1">
+											<!-- Max orders per symbol -->
+											<div class="ao-row">
+												<div class="ao-field" style="max-width:180px;">
+													<label class="ao-label">Max Orders per Symbol</label>
+													<input type="number" id="ao_max_per_sym" class="ao-input" value="1" min="1" step="1">
+												</div>
+											</div>
 										</div>
-									</div>
+									</details>
 
 									<!-- Fibonacci Settings -->
-									<div class="ao-section-title">Fibonacci Pullback Settings</div>
+									<details class="ao-collapsible">
+										<summary class="ao-section-title" style="cursor:pointer;user-select:none;padding:8px;">▶ Fibonacci Pullback Settings</summary>
+										<div style="padding:10px;">
 									<div class="ao-row">
 										<div class="ao-field" style="flex:1 1 100%;">
 											<label class="ao-label" style="display:flex;align-items:center;gap:8px;">
@@ -1543,7 +1429,43 @@
 												<span style="font-size:11px;color:#666;margin-left:6px;">Profit target</span>
 											</div>
 										</div>
-									</div>
+										</div>
+									</details>
+
+									<!-- Multi-Level Targets -->
+									<details class="ao-collapsible">
+										<summary class="ao-section-title" style="cursor:pointer;user-select:none;padding:8px;">▶ Multi-Level Targets</summary>
+										<div style="padding:10px;">
+											<div class="ao-row">
+												<div class="ao-field">
+													<label class="ao-chk-label"><input type="checkbox" id="ao_ml_enabled" onchange="_aoToggleMultiLevel()"> Enable Multi-Level Orders</label>
+												</div>
+											</div>
+											<div id="ao_ml_settings" style="display:none;">
+												<div class="ao-row">
+													<div class="ao-field">
+														<label class="ao-label">Number of Levels</label>
+														<input type="number" id="ao_ml_levels" class="ao-input" value="3" min="1" max="5" step="1">
+													</div>
+													<div class="ao-field">
+														<label class="ao-label">Total Capital ($)</label>
+														<input type="number" id="ao_ml_total_cap" class="ao-input" value="3000" min="100" step="100">
+													</div>
+													<div class="ao-field">
+														<label class="ao-label">Allocation Mode</label>
+														<select id="ao_ml_alloc_mode" class="ao-select">
+															<option value="equal" selected>Equal Split</option>
+															<option value="front_weighted">Front-Weighted</option>
+															<option value="back_weighted">Back-Weighted</option>
+														</select>
+													</div>
+												</div>
+												<div style="font-size:11px;color:#666;margin:8px 0;">Each level entry offset + target offset (%):</div>
+												<div class="ao-row" id="ao_ml_levels_container">
+												</div>
+											</div>
+										</div>
+									</details>
 
 									<!-- Log -->
 									<div class="ao-section-title">Auto-Order Log</div>
@@ -2092,6 +2014,13 @@ function cleanNewsArticleText(rawText) {
   let _queuedHeadlines = new Set();
   // Voice preference - default to 'female' for pleasant voice
   let _preferredVoiceGender = localStorage.getItem('ttsVoiceGender') || 'female';
+  // Volume control - default to 0.7 (70%), stored in localStorage
+  let _ttsVolume = parseFloat(localStorage.getItem('ttsVolume')) || 0.7;
+  // Mute state tracking
+  let _ttsMuted = localStorage.getItem('ttsMuted') === 'true' ? true : false;
+  // Track loop cycle to prevent reading headlines multiple times per loop
+  let _lastLoopReadTime = 0;
+  let _loopReadInterval = 2000; // Minimum 2 seconds between headline reads per loop
   
   // Get available voices and select based on preference
   function _getPreferredVoice() {
@@ -2147,7 +2076,8 @@ function cleanNewsArticleText(rawText) {
       const utter = new SpeechSynthesisUtterance(text);
       utter.rate = 1.0;
       utter.pitch = 1.0;
-      utter.volume = 0.9;
+      // Use current volume setting, or 0 if muted
+      utter.volume = _ttsMuted ? 0 : _ttsVolume;
       
       // Apply voice preference
       const preferredVoice = _getPreferredVoice();
@@ -2201,6 +2131,44 @@ function cleanNewsArticleText(rawText) {
   function _clearHeadlineCache() {
     _readHeadlinesCache.clear();
     _queuedHeadlines.clear();
+  }
+
+  // Set TTS volume (0.0 to 1.0)
+  function setTTSVolume(volume) {
+    const vol = Math.max(0, Math.min(1, parseFloat(volume)));
+    _ttsVolume = vol;
+    localStorage.setItem('ttsVolume', vol);
+    // Update UI if volume slider exists
+    const volumeSlider = document.getElementById('ttsVolumeSlider');
+    const volumeLabel = document.getElementById('ttsVolumeLabel');
+    if (volumeSlider) volumeSlider.value = vol;
+    if (volumeLabel) volumeLabel.textContent = Math.round(vol * 100) + '%';
+    console.log('TTS volume set to:', Math.round(vol * 100) + '%');
+  }
+
+  // Toggle mute state
+  function toggleTTSMute() {
+    _ttsMuted = !_ttsMuted;
+    localStorage.setItem('ttsMuted', _ttsMuted);
+    // Update mute button UI
+    const muteBtn = document.getElementById('ttsMuteBtn');
+    if (muteBtn) {
+      muteBtn.innerHTML = _ttsMuted ? '🔇 Unmute' : '🔊 Mute';
+      muteBtn.style.color = _ttsMuted ? '#999' : '#fff';
+      muteBtn.style.backgroundColor = _ttsMuted ? '#555' : '#0073aa';
+    }
+    console.log('TTS mute:', _ttsMuted ? 'ON' : 'OFF');
+    return _ttsMuted;
+  }
+
+  // Stop current headline playback
+  function stopTTSPlayback() {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    _headlineQueue = [];
+    _isPlayingHeadline = false;
+    console.log('TTS playback stopped');
   }
   
   // Utility function to set voice preference ('male', 'female', or 'system')
@@ -2352,6 +2320,25 @@ function cleanNewsArticleText(rawText) {
 
   // Try to initialize voices when page loads
   _initializeTTSVoice();
+
+  // Initialize TTS UI controls (volume slider and mute button) when page loads
+  window.addEventListener('DOMContentLoaded', function() {
+    // Set initial volume slider value
+    const volumeSlider = document.getElementById('ttsVolumeSlider');
+    if (volumeSlider) {
+      volumeSlider.value = _ttsVolume;
+      const volumeLabel = document.getElementById('ttsVolumeLabel');
+      if (volumeLabel) volumeLabel.textContent = Math.round(_ttsVolume * 100) + '%';
+    }
+    
+    // Initialize mute button state
+    const muteBtn = document.getElementById('ttsMuteBtn');
+    if (muteBtn) {
+      muteBtn.innerHTML = _ttsMuted ? '🔇 Unmute' : '🔊 Mute';
+      muteBtn.style.color = _ttsMuted ? '#999' : '#fff';
+      muteBtn.style.backgroundColor = _ttsMuted ? '#555' : '#0073aa';
+    }
+  });
 </script>
 
 
@@ -2608,6 +2595,7 @@ function renderResultsFromBackend(response) {
                     
                     // SMA Crossover columns
                     if ("sma200BullishCrossover" in dta) headerCols.push({ key: "sma200BullishCrossover", label: "200 SMA Cross", vrKey: "sma200Crossover" });
+                    if ("sma200BullishCrossoverDescription" in dta && dta.sma200BullishCrossoverDescription) headerCols.push({ key: "sma200BullishCrossoverDescription", label: "Crossover Details" });
                     
                     // OBV Analysis columns
                     if ("obvTrend" in dta) headerCols.push({ key: "obvTrend", label: "OBV Trend" });
@@ -2716,7 +2704,7 @@ function renderResultsFromBackend(response) {
                 // Check if 200 SMA bullish crossover and apply orange highlighting
                 let sma200CrossoverStyle = "";
                 if (dta.variableResults && dta.variableResults["sma200Crossover"]) {
-                    sma200CrossoverStyle = " style='background:#ffe5cc;color:#000;font-weight:700'";
+                    sma200CrossoverStyle = " style='background:#ffa500;color:#fff;font-weight:700'";
                     // Read alert if enabled
                     try {
                         const enableTTS = document.querySelector('input[name="EnableSMA200TTS"]');
@@ -3055,7 +3043,9 @@ function renderResultsFromBackend(response) {
         // TTS: read matched keyword headlines aloud if enabled AND within time window
         {
             const readAloud = document.querySelector('.NewsReadAloud');
-            if (readAloud && readAloud.value === 'on') {
+            const autoReadAllNews = document.querySelector('.NewsAutoReadAll');
+            const autoReadAllEnabled = autoReadAllNews && (autoReadAllNews.value === 'on' || autoReadAllNews.value === 'True');
+            if (readAloud && readAloud.value === 'on' && !autoReadAllEnabled) {
                 // Get time window settings
                 const withinValueInput = document.querySelector('.NewsReadAloudWithinValue');
                 const timeUnitSelect = document.querySelector('.NewsReadAloudTimeUnit');
@@ -3150,6 +3140,16 @@ function renderResultsFromBackend(response) {
                 const now = Date.now();
                 const cutoffTime = withinMinutes > 0 ? now - (withinMinutes * 60 * 1000) : 0;
                 
+                // Check if enough time has passed since last loop read (apply ONCE for entire batch of stocks)
+                const shouldReadNews = (now - _lastLoopReadTime >= _loopReadInterval);
+                if (!shouldReadNews) {
+                    console.log("Skipping all headline reads - too soon since last loop read (" + (now - _lastLoopReadTime) + "ms ago)");
+                }
+                
+                if (shouldReadNews) {
+                    _lastLoopReadTime = now;
+                }
+                
                 for (const groupKey in msg) {
                     const rows = Array.isArray(msg[groupKey])
                         ? msg[groupKey]
@@ -3176,8 +3176,8 @@ function renderResultsFromBackend(response) {
                                 }
                             }
                             
-                            // Only read symbol and headlines if we have any to read
-                            if (headlinesToRead.length > 0) {
+                            // Only read symbol and headlines if we have any to read AND time check passed
+                            if (headlinesToRead.length > 0 && shouldReadNews) {
                                 console.log("Reading headlines for symbol:", sym, "Count:", headlinesToRead.length);
                                 readHeadlineAloud("News for " + sym);
                                 for (const headline of headlinesToRead) {
@@ -5026,6 +5026,23 @@ function _aoCalcSharesFromDollars() {
     sharesEl.title = "Will be calculated during auto-trade execution based on actual entry price";
 }
 
+function _aoTogglePriceMode() {
+    var mode = document.getElementById("ao_price_mode") ? document.getElementById("ao_price_mode").value : "current";
+    var offsetField = document.getElementById("ao_price_pct_field");
+    var fibField = document.getElementById("ao_fib_level_field");
+    var customField = document.getElementById("ao_custom_price_field");
+    
+    if (offsetField) offsetField.style.display = (mode !== "custom" && mode !== "fib") ? "" : "none";
+    if (fibField) fibField.style.display = (mode === "fib") ? "" : "none";
+    if (customField) customField.style.display = (mode === "custom") ? "" : "none";
+}
+
+function _aoToggleMultiLevel() {
+    var enabled = document.getElementById("ao_ml_enabled") ? document.getElementById("ao_ml_enabled").checked : false;
+    var settings = document.getElementById("ao_ml_settings");
+    if (settings) settings.style.display = enabled ? "" : "none";
+}
+
 function _aoOpenSettings() {
     // Open/toggle settings panel without requiring Enable checkbox
     var body = document.getElementById("ao_body");
@@ -5100,6 +5117,7 @@ function _aoGetSettings() {
         priceMode: document.getElementById("ao_price_mode").value || "current",
         pricePct: document.getElementById("ao_price_pct").value || "0.5",
         customPrice: document.getElementById("ao_custom_price") ? document.getElementById("ao_custom_price").value : "",
+        fibLevel: document.getElementById("ao_fib_level") ? document.getElementById("ao_fib_level").value : "0.382",
         orderType: document.getElementById("ao_order_type").value || "bracket",
         targetPct: document.getElementById("ao_target_pct").value || "2",
         stopPct: document.getElementById("ao_stop_pct").value || "1",
@@ -5116,6 +5134,11 @@ function _aoGetSettings() {
         fibEntryOffset: parseFloat(document.getElementById("fib_entry_offset").value) || 0,
         fibStopLossPct: parseFloat(document.getElementById("fib_stop_loss_pct").value) || 2,
         fibTargetPct: parseFloat(document.getElementById("fib_target_pct").value) || 2,
+        // Multi-level settings
+        mlEnabled: document.getElementById("ao_ml_enabled") ? document.getElementById("ao_ml_enabled").checked : false,
+        mlLevels: parseInt(document.getElementById("ao_ml_levels").value) || 3,
+        mlTotalCap: parseFloat(document.getElementById("ao_ml_total_cap").value) || 3000,
+        mlAllocMode: document.getElementById("ao_ml_alloc_mode") ? document.getElementById("ao_ml_alloc_mode").value : "equal",
     };
 }
 
@@ -5139,6 +5162,7 @@ function _aoApplySettings(s) {
     _set("ao_price_mode", s.priceMode || "current");
     _set("ao_price_pct", s.pricePct || "0.5");
     _set("ao_custom_price", s.customPrice || "");
+    _set("ao_fib_level", s.fibLevel || "0.382");
     _set("ao_order_type", s.orderType || "bracket");
     _set("ao_target_pct", s.targetPct || "2");
     _set("ao_stop_pct", s.stopPct || "1");
@@ -5171,14 +5195,24 @@ function _aoApplySettings(s) {
         document.querySelector('.fib_level_check[value="0.618"]').checked = true;
     }
     
+    // Apply multi-level settings
+    _chk("ao_ml_enabled", s.mlEnabled);
+    _set("ao_ml_levels", s.mlLevels || "3");
+    _set("ao_ml_total_cap", s.mlTotalCap || "3000");
+    _set("ao_ml_alloc_mode", s.mlAllocMode || "equal");
+    
     _aoTogglePanel();
     _aoToggleStockList();
     _aoTogglePricing();
     _aoTogglePricePct();
+    _aoTogglePriceMode();
     _aoToggleBracket();
     _aoToggleTrailing();
     _aoToggleQtyMode();
+    _aoToggleMultiLevel();
 }
+
+// Auto-order preset CRUD
 
 // Auto-order preset CRUD
 function _aoRefreshPresetDropdown() {

@@ -1109,6 +1109,16 @@ input[type="text"] {
   color: #fff;
 }
 
+/* Place Order Button - Blue */
+#sendOrderToFlask {
+  background-color: #337ab7 !important;
+  border-color: #2e6da4 !important;
+}
+#sendOrderToFlask:hover, #sendOrderToFlask:focus, #sendOrderToFlask:active {
+  background-color: #286090 !important;
+  border-color: #204d74 !important;
+}
+
 .btn-outline {
   background: none;
   border: 2px solid gray;

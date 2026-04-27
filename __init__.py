@@ -26,6 +26,9 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
 )
+logging.getLogger("waitress").setLevel(logging.WARNING)
+logging.getLogger("ibapi").setLevel(logging.WARNING)
+logging.getLogger("ibapi.client").setLevel(logging.WARNING)
 logger = logging.getLogger("ibkr_app")
 
 cfg = Config()
@@ -474,6 +477,7 @@ def something():
 @app.route("/sendorders", methods=["POST", "GET"])
 def sendorders():
     from ibkr_signal_engine import IBapi
+    import json
 
     IBAPI = None
 
@@ -497,6 +501,9 @@ def sendorders():
         orders_id = int(time.time())
         response["ordersId"] = orders_id
 
+        # Check if this is a multi-level order request
+        is_multi_level = asset.get("isMultiLevel", "false") == "true"
+        
         # ===== STEP 1: Connect to IBKR =====
         client_id = random.randint(300, 399)
         IBAPI = IBapi()
@@ -514,26 +521,13 @@ def sendorders():
             response["message"] = response["Connection"]
             return response
 
-        # ------------------------------------------------------------
-        # Read input
-        # ------------------------------------------------------------
+        # Get ticker and common parameters
         ticker_order = asset["tickerOrder"]
-        limit_price = asset["limitPrice"]
-        bracket_limit = asset["bracketlimit"]
         longshort = asset["longshort"]
-        high_bracket = asset["highBraket"]
-        low_bracket = asset["lowBraket"]
-        quantity = int(asset["quantity"])
-        use_trailing_stop = asset.get("useTrailingStop", "off") == "on"
-        trailing_amount = asset.get("trailingAmount", "")
-        trailing_type = asset.get("trailingType", "amount")  # "amount" or "percent"
-        tif = asset.get("tif", "DAY")  # DAY, GTC
-        outside_rth = asset.get("outsideRth", "regular")  # regular, extended, overnight
-        entry_type = asset.get("entryType", "limit")  # "limit" or "market"
-        hold_off_market = asset.get("holdOffMarket", "off") == "on"
-
-        if hold_off_market and entry_type == "market":
-            entry_type = "limit"
+        action = "BUY" if longshort == "long" else "SELL"
+        tif = asset.get("tif", "DAY")
+        outside_rth = asset.get("outsideRth", "regular")
+        allow_outside_rth = outside_rth in ("extended", "overnight")
 
         # ------------------------------------------------------------
         # Resolve contract via symbol lookup
@@ -580,67 +574,99 @@ def sendorders():
 
         IBAPI.reqMarketDataType(4)
 
-        action = "BUY" if longshort == "long" else "SELL"
-
-        # ------------------------------------------------------------
-        # Build orders
-        # ------------------------------------------------------------
-        trailing_amt = None
-        if use_trailing_stop and trailing_amount:
-            trailing_amt = round(float(trailing_amount), 2)
-
-        # outsideRth mapping
-        allow_outside_rth = outside_rth in ("extended", "overnight")
-
-        if entry_type == "market":
-            # Market order — no limit price, optional bracket legs
-            from ibapi.order import Order as IBOrder
-            orders = []
-            parent = IBOrder()
-            parent.eTradeOnly = False
-            parent.firmQuoteOnly = False
-            parent.orderId = orders_id
-            parent.action = action
-            parent.orderType = "MKT"
-            parent.totalQuantity = quantity
-            parent.tif = tif
-            parent.outsideRth = allow_outside_rth
-            parent.transmit = True
-            orders.append(parent)
-
-        elif bracket_limit == "bracket":
-
-            price_to_use = round(float(limit_price), 2) if limit_price != "" else None
-            bracket_high = round(float(high_bracket), 2) if high_bracket != "" else None
-            bracket_low = round(float(low_bracket), 2) if low_bracket != "" else None
-
-            orders = IBAPI.bracketOrder(
-                orders_id,
-                action,
-                quantity,
-                price_to_use,
-                bracket_high,
-                bracket_low,
-                tif=tif,
-                outside_rth=allow_outside_rth,
-                use_trailing_stop=use_trailing_stop,
-                trailing_amount=trailing_amt,
-                trailing_percent=(trailing_type == "percent"),
-            )
-
+        # ===== MULTI-LEVEL ORDER HANDLING =====
+        if is_multi_level:
+            try:
+                # Parse multi-level order configuration
+                multi_level_json = asset.get("multiLevelConfig", "{}")
+                multi_level_config = json.loads(multi_level_json)
+                
+                # Build order specification
+                order_spec = {
+                    'action': action,
+                    'tif': tif,
+                    'outside_rth': allow_outside_rth,
+                    'start_order_id': orders_id,
+                    'levels': multi_level_config.get('levels', [])
+                }
+                
+                # Create multi-level orders
+                orders = IBAPI.multiLevelOrder(order_spec)
+                
+            except Exception as e:
+                logger.exception("Error processing multi-level orders")
+                raise RuntimeError(f"Invalid multi-level order configuration: {str(e)}")
+        
+        # ===== STANDARD SINGLE-LEVEL ORDER HANDLING =====
         else:
-            price_to_use = round(float(limit_price), 2)
+            limit_price = asset["limitPrice"]
+            bracket_limit = asset["bracketlimit"]
+            high_bracket = asset["highBraket"]
+            low_bracket = asset["lowBraket"]
+            quantity = int(asset["quantity"])
+            use_trailing_stop = asset.get("useTrailingStop", "off") == "on"
+            trailing_amount = asset.get("trailingAmount", "")
+            trailing_type = asset.get("trailingType", "amount")  # "amount" or "percent"
+            entry_type = asset.get("entryType", "limit")  # "limit" or "market"
+            hold_off_market = asset.get("holdOffMarket", "off") == "on"
 
-            orders = IBAPI.bracketOrder(
-                orders_id,
-                action,
-                quantity,
-                price_to_use,
-                None,
-                None,
-                tif=tif,
-                outside_rth=allow_outside_rth,
-            )
+            if hold_off_market and entry_type == "market":
+                entry_type = "limit"
+
+            # Build orders
+            trailing_amt = None
+            if use_trailing_stop and trailing_amount:
+                trailing_amt = round(float(trailing_amount), 2)
+
+            if entry_type == "market":
+                # Market order — no limit price, optional bracket legs
+                from ibapi.order import Order as IBOrder
+                orders = []
+                parent = IBOrder()
+                parent.eTradeOnly = False
+                parent.firmQuoteOnly = False
+                parent.orderId = orders_id
+                parent.action = action
+                parent.orderType = "MKT"
+                parent.totalQuantity = quantity
+                parent.tif = tif
+                parent.outsideRth = allow_outside_rth
+                parent.transmit = True
+                orders.append(parent)
+
+            elif bracket_limit == "bracket":
+
+                price_to_use = round(float(limit_price), 2) if limit_price != "" else None
+                bracket_high = round(float(high_bracket), 2) if high_bracket != "" else None
+                bracket_low = round(float(low_bracket), 2) if low_bracket != "" else None
+
+                orders = IBAPI.bracketOrder(
+                    orders_id,
+                    action,
+                    quantity,
+                    price_to_use,
+                    bracket_high,
+                    bracket_low,
+                    tif=tif,
+                    outside_rth=allow_outside_rth,
+                    use_trailing_stop=use_trailing_stop,
+                    trailing_amount=trailing_amt,
+                    trailing_percent=(trailing_type == "percent"),
+                )
+
+            else:
+                price_to_use = round(float(limit_price), 2)
+
+                orders = IBAPI.bracketOrder(
+                    orders_id,
+                    action,
+                    quantity,
+                    price_to_use,
+                    None,
+                    None,
+                    tif=tif,
+                    outside_rth=allow_outside_rth,
+                )
 
         # ------------------------------------------------------------
         # Send orders
@@ -682,6 +708,107 @@ def sendorders():
 
     run_gc()
     return response
+
+
+# =============================================================================
+# Order Preset Management Routes
+# =============================================================================
+
+@app.route("/order-presets/save", methods=["POST"])
+def save_order_preset():
+    """Save a multi-level order preset."""
+    from order_manager import MultiLevelOrder, OrderPresetManager
+    
+    try:
+        data = request.get_json()
+        
+        if not data or 'name' not in data or 'symbol' not in data or 'levels' not in data:
+            return {"status": "error", "message": "Missing required fields"}, 400
+        
+        # Create MultiLevelOrder from request data
+        order = MultiLevelOrder(
+            name=data['name'],
+            symbol=data['symbol'],
+            levels=data['levels'],  # This should be pre-serialized as dicts
+            strategy_notes=data.get('strategy_notes', '')
+        )
+        
+        # Save the preset
+        manager = OrderPresetManager(cfg.order_presets_dir)
+        filepath = manager.save_preset(order)
+        
+        return {
+            "status": "ok",
+            "message": f"Preset saved: {filepath.name}",
+            "filename": filepath.name
+        }
+    
+    except Exception as e:
+        logger.exception("Error saving order preset")
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.route("/order-presets/list", methods=["GET"])
+def list_order_presets():
+    """List all available order presets, optionally filtered by symbol."""
+    from order_manager import OrderPresetManager
+    
+    try:
+        symbol = request.args.get('symbol', None)
+        manager = OrderPresetManager(cfg.order_presets_dir)
+        presets = manager.list_presets(symbol=symbol)
+        
+        return {
+            "status": "ok",
+            "presets": presets,
+            "count": len(presets)
+        }
+    
+    except Exception as e:
+        logger.exception("Error listing order presets")
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.route("/order-presets/load/<filename>", methods=["GET"])
+def load_order_preset(filename):
+    """Load a specific order preset."""
+    from order_manager import OrderPresetManager
+    
+    try:
+        filepath = cfg.order_presets_dir / filename
+        
+        if not filepath.exists():
+            return {"status": "error", "message": "Preset not found"}, 404
+        
+        manager = OrderPresetManager(cfg.order_presets_dir)
+        order = manager.load_preset(filepath)
+        
+        return {
+            "status": "ok",
+            "preset": order.to_dict()
+        }
+    
+    except Exception as e:
+        logger.exception("Error loading order preset")
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.route("/order-presets/delete/<filename>", methods=["DELETE"])
+def delete_order_preset(filename):
+    """Delete an order preset."""
+    from order_manager import OrderPresetManager
+    
+    try:
+        manager = OrderPresetManager(cfg.order_presets_dir)
+        
+        if manager.delete_preset(filename):
+            return {"status": "ok", "message": f"Preset deleted: {filename}"}
+        else:
+            return {"status": "error", "message": "Preset not found"}, 404
+    
+    except Exception as e:
+        logger.exception("Error deleting order preset")
+        return {"status": "error", "message": str(e)}, 500
 
 
 @app.route("/upload-csv", methods=["POST"])
@@ -940,10 +1067,20 @@ def watchlists_delete():
 # Stock Exclusion List Management
 # -------------------------------------------------------------------------
 
+def _get_excluded_api():
+    try:
+        from ibkr_signal_engine import IBapi
+        return IBapi()
+    except Exception:
+        logger.exception("Failed to import IBapi for exclusion list")
+        raise
+
+
 @app.route("/exclude/list", methods=["GET"])
 def exclude_list():
     """Get the list of excluded stocks."""
     try:
+        IBAPI = _get_excluded_api()
         excluded = IBAPI.get_excluded_stocks()
         return jsonify({
             "ok": True,
@@ -959,6 +1096,7 @@ def exclude_list():
 def exclude_add():
     """Add one or more stock symbols to the exclusion list."""
     try:
+        IBAPI = _get_excluded_api()
         payload = request.get_json(silent=True)
         if not payload:
             return jsonify({"error": "JSON payload required"}), 400
@@ -1010,6 +1148,7 @@ def exclude_add():
 def exclude_remove():
     """Remove a stock symbol from the exclusion list."""
     try:
+        IBAPI = _get_excluded_api()
         payload = request.get_json(silent=True)
         if not payload:
             return jsonify({"error": "JSON payload required"}), 400
@@ -1038,6 +1177,7 @@ def exclude_remove():
 def exclude_import_csv():
     """Import excluded stocks from a CSV file."""
     try:
+        IBAPI = _get_excluded_api()
         if "csvfile" not in request.files:
             return jsonify({"error": "csvfile required"}), 400
         
@@ -1082,6 +1222,7 @@ def exclude_import_csv():
 def exclude_export_csv():
     """Export excluded stocks as a CSV file."""
     try:
+        IBAPI = _get_excluded_api()
         from io import StringIO
         from flask import send_file
         
@@ -1111,6 +1252,7 @@ def exclude_export_csv():
 def exclude_clear():
     """Clear the entire exclusion list."""
     try:
+        IBAPI = _get_excluded_api()
         success = IBAPI.save_excluded_stocks([])
         if success:
             return jsonify({
