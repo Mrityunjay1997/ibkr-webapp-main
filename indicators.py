@@ -139,6 +139,87 @@ class OBVIndicator:
         return self.on_balance_volume()
 
 
+class FastOBVIndicator:
+    """Fast OBV - OBV with 5-bar moving average smoothing."""
+
+    def __init__(self, close: pd.Series, volume: pd.Series, window: int = 5):
+        self.close = close
+        self.volume = volume
+        self.window = int(window)
+
+    def fast_obv(self) -> pd.Series:
+        """Calculate OBV and apply fast MA smoothing."""
+        direction = self.close.diff()
+        
+        signed_volume = self.volume.copy()
+        signed_volume[direction > 0] = self.volume[direction > 0]
+        signed_volume[direction < 0] = -self.volume[direction < 0]
+        signed_volume[direction == 0] = 0.0
+        
+        obv = signed_volume.cumsum()
+        # Apply fast moving average
+        fast_obv = obv.rolling(self.window, min_periods=1).mean()
+        return fast_obv
+
+    # aliases for compatibility
+    def obv(self) -> pd.Series:
+        return self.fast_obv()
+
+
+class MediumOBVIndicator:
+    """Medium OBV - OBV with 10-bar moving average smoothing."""
+
+    def __init__(self, close: pd.Series, volume: pd.Series, window: int = 10):
+        self.close = close
+        self.volume = volume
+        self.window = int(window)
+
+    def medium_obv(self) -> pd.Series:
+        """Calculate OBV and apply medium MA smoothing."""
+        direction = self.close.diff()
+        
+        signed_volume = self.volume.copy()
+        signed_volume[direction > 0] = self.volume[direction > 0]
+        signed_volume[direction < 0] = -self.volume[direction < 0]
+        signed_volume[direction == 0] = 0.0
+        
+        obv = signed_volume.cumsum()
+        # Apply medium moving average
+        medium_obv = obv.rolling(self.window, min_periods=1).mean()
+        return medium_obv
+
+    # aliases for compatibility
+    def obv(self) -> pd.Series:
+        return self.medium_obv()
+
+
+class SlowOBVIndicator:
+    """Slow OBV - OBV with 20-bar moving average smoothing."""
+
+    def __init__(self, close: pd.Series, volume: pd.Series, window: int = 20):
+        self.close = close
+        self.volume = volume
+        self.window = int(window)
+
+    def slow_obv(self) -> pd.Series:
+        """Calculate OBV and apply slow MA smoothing."""
+        direction = self.close.diff()
+        
+        signed_volume = self.volume.copy()
+        signed_volume[direction > 0] = self.volume[direction > 0]
+        signed_volume[direction < 0] = -self.volume[direction < 0]
+        signed_volume[direction == 0] = 0.0
+        
+        obv = signed_volume.cumsum()
+        # Apply slow moving average
+        slow_obv = obv.rolling(self.window, min_periods=1).mean()
+        return slow_obv
+
+    # aliases for compatibility
+    def obv(self) -> pd.Series:
+        return self.slow_obv()
+
+
 class ATRIndicator:
     """Average True Range."""
 

@@ -68,6 +68,9 @@ class Parameters(FlaskForm):
     FastEMA = IntegerField("Fast EMA")
     SlowEMA = IntegerField("Slow EMA")
     OBV = IntegerField("OBV")
+    FastOBV = IntegerField("Fast OBV")
+    MediumOBV = IntegerField("Medium OBV")
+    SlowOBV = IntegerField("Slow OBV")
     ATR = IntegerField("ATR")
 
     PrevClose = IntegerField("Previous Close")
@@ -86,6 +89,9 @@ class Parameters(FlaskForm):
     PercentageFastEMA = DecimalField("Percentage Fast EMA")
     PercentageSlowEMA = DecimalField("Percentage Slow EMA")
     PercentageOBV = DecimalField("Percentage OBV")
+    PercentageFastOBV = DecimalField("Percentage Fast OBV")
+    PercentageMediumOBV = DecimalField("Percentage Medium OBV")
+    PercentageSlowOBV = DecimalField("Percentage Slow OBV")
     PercentageATR = DecimalField("Percentage ATR")
 
     PercentagePrevClose = DecimalField("Percentage Previous Close")
@@ -162,6 +168,21 @@ class Parameters(FlaskForm):
         choices=_STANDARD_COMPARISON_CHOICES,
     )
 
+    ComparisonFastOBV = SelectField(
+        "Programming Language",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
+    ComparisonMediumOBV = SelectField(
+        "Programming Language",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
+    ComparisonSlowOBV = SelectField(
+        "Programming Language",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
     ComparisonATR = SelectField(
         "Programming Language",
         choices=_STANDARD_COMPARISON_CHOICES,
@@ -203,6 +224,9 @@ class Parameters(FlaskForm):
     booleanFastEMA = BooleanField("Add Indicator")
     booleanSlowEMA = BooleanField("Add Indicator")
     booleanOBV = BooleanField("Add Indicator")
+    booleanFastOBV = BooleanField("Add Indicator")
+    booleanMediumOBV = BooleanField("Add Indicator")
+    booleanSlowOBV = BooleanField("Add Indicator")
     booleanATR = BooleanField("Add Indicator")
 
     booleanPrevClose = BooleanField("Add Indicator")
@@ -598,6 +622,9 @@ class Parameters(FlaskForm):
     SlowEMA1_tf = SelectField("Slow EMA1 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     OBV_tf = SelectField("OBV Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     OBV1_tf = SelectField("OBV1 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    FastOBV_tf = SelectField("Fast OBV Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    MediumOBV_tf = SelectField("Medium OBV Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    SlowOBV_tf = SelectField("Slow OBV Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     ATR_tf = SelectField("ATR Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     ATR1_tf = SelectField("ATR1 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
 
@@ -969,46 +996,59 @@ class Parameters(FlaskForm):
         render_kw={"title": "Read stock name when price change exceeds threshold"}
     )
     
-    EnableVolumeMonitor = BooleanField(
-        "Enable Volume Monitoring",
+    EnableRVOLMonitor = BooleanField(
+        "Enable RVOL (Relative Volume) Monitoring",
         default=False,
-        render_kw={"title": "Monitor stocks by volume over time period"}
+        render_kw={"title": "Monitor stocks by relative volume (per-stock basis)"}
     )
     
-    VolumeLookbackMinutes = IntegerField(
-        "Volume Lookback (minutes)",
+    RVOLLookbackDays = IntegerField(
+        "RVOL Lookback (days)",
         default=5,
-        render_kw={"title": "Calculate volume for last X minutes", "min": 1, "max": 1440}
+        render_kw={"title": "Calculate RVOL based on average volume over past X days", "min": 1, "max": 60}
     )
     
-    VolumeThreshold = IntegerField(
-        "Volume Threshold (min)",
-        default=50000,
-        render_kw={"title": "Alert when volume in period exceeds this amount", "min": 1000}
+    RVOLThreshold = FloatField(
+        "RVOL Threshold (multiplier)",
+        default=1.5,
+        render_kw={"title": "Alert when RVOL exceeds this multiplier (e.g., 1.5 = 150% of average)", "min": 0.5, "max": 10.0, "step": 0.1}
     )
     
-    EnableVolumeTTS = BooleanField(
-        "Read Alert on Volume Spike",
+    EnableRVOLTTS = BooleanField(
+        "Read Alert on RVOL Spike",
         default=True,
-        render_kw={"title": "Read stock name when volume exceeds threshold"}
+        render_kw={"title": "Read stock name and RVOL value when RVOL exceeds threshold"}
     )
     
     EnableKeyLevelDetection = BooleanField(
         "Enable Key Level Detection",
         default=False,
-        render_kw={"title": "Highlight stocks near key support/resistance/pivot levels"}
+        render_kw={"title": "Highlight stocks near selected key level (VWAP, Gap Close, or Pivot)"}
+    )
+    
+    KeyLevelType = SelectField(
+        "Key Level Type",
+        default="vwap",
+        choices=[
+            ("vwap", "VWAP (Volume Weighted Average Price)"),
+            ("gapclose", "Gap Close Level"),
+            ("pivot1", "Pivot Point (Primary)"),
+            ("pivot2", "Pivot Point 2 (Secondary)"),
+            ("pivot3", "Pivot Point 3 (Tertiary)")
+        ],
+        render_kw={"title": "Select the key level type to monitor"}
     )
     
     KeyLevelProximityPercent = FloatField(
         "Key Level Proximity %",
         default=1.0,
-        render_kw={"title": "Highlight when within X% of key level", "min": 0.1, "max": 5.0, "step": 0.1}
+        render_kw={"title": "Highlight when within X% of selected key level", "min": 0.1, "max": 5.0, "step": 0.1}
     )
     
-    PlayKeyLevelSound = BooleanField(
-        "Play Sound on Key Level Hit",
+    EnableKeyLevelTTS = BooleanField(
+        "Read Alert on Key Level Hit",
         default=True,
-        render_kw={"title": "Play custom sound when stock approaches key level"}
+        render_kw={"title": "Read stock name and which key level was hit"}
     )
 
     # ------------------------------------------------------------------
@@ -1062,6 +1102,34 @@ class Parameters(FlaskForm):
     )
 
     # ------------------------------------------------------------------
+    # MULTI-OBV ANALYSIS (Fast, Medium, Slow OBV)
+    # ------------------------------------------------------------------
+    
+    EnableMultiOBVAnalysis = BooleanField(
+        "Enable Multi-OBV Analysis",
+        default=False,
+        render_kw={"title": "Analyze Fast, Medium, and Slow OBV alignment for momentum signals"}
+    )
+    
+    MultiOBVChangeThreshold = FloatField(
+        "Multi-OBV Change Threshold (%)",
+        default=5.0,
+        render_kw={"title": "Minimum % change between OBVs to signal 'strong' momentum", "min": 0.1, "max": 50.0, "step": 0.5}
+    )
+    
+    EnableMultiOBVAudio = BooleanField(
+        "Enable Multi-OBV Audio Alerts",
+        default=True,
+        render_kw={"title": "Play audio signal (triumphant arpeggio for bullish, descending for bearish)"}
+    )
+    
+    EnableMultiOBVTTS = BooleanField(
+        "Enable Multi-OBV Text-to-Speech",
+        default=True,
+        render_kw={"title": "Read stock symbol and bullish/bearish description when strong multi-OBV signals detected"}
+    )
+
+    # ------------------------------------------------------------------
     # ETF processing mode
     # ------------------------------------------------------------------
 
@@ -1088,6 +1156,9 @@ class Parameters(FlaskForm):
     filterFastEMA = BooleanField("Filter by Fast EMA", default=False)
     filterSlowEMA = BooleanField("Filter by Slow EMA", default=False)
     filterOBV = BooleanField("Filter by OBV", default=False)
+    filterFastOBV = BooleanField("Filter by Fast OBV", default=False)
+    filterMediumOBV = BooleanField("Filter by Medium OBV", default=False)
+    filterSlowOBV = BooleanField("Filter by Slow OBV", default=False)
     filterATR = BooleanField("Filter by ATR", default=False)
     filterAverageVolume = BooleanField("Filter by Average Volume", default=False)
     filterRelativeVolume = BooleanField("Filter by Relative Volume", default=False)

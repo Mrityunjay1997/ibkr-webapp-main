@@ -6,6 +6,7 @@ Verifies the keyword matching logic in ibkr_signal_engine.py
 
 import sys
 import os
+import re
 
 # Mock logger for testing
 class MockLogger:
@@ -51,7 +52,7 @@ test_cases = [
             {"headline": "Earning potential high"},
             {"headline": "Learn more about stock"},
         ],
-        "expected_matches": 2,
+        "expected_matches": 0,
     },
     {
         "name": "Empty keywords",
@@ -103,26 +104,34 @@ def test_keyword_matching():
         if keywords_raw:
             keywords = [k.strip().lower() for k in keywords_raw.split(",") if k.strip()]
             logger.debug(f"Parsed keywords list: {keywords}")
-            
+
             if keywords:
+                # compile whole-word regex patterns for this test case
+                patterns = [re.compile(r"\b" + re.escape(k) + r"\b", re.IGNORECASE) for k in keywords]
+                logger.debug(f"Compiled patterns: {patterns}")
                 logger.debug(f"Total headlines available: {len(headlines)}")
-                
+
                 filtered_headlines = []
                 matched_keyword_headlines = []
                 match_count = 0
-                
+
                 for idx, h in enumerate(headlines):
-                    headline_text = (h.get("headline") or "").lower()
-                    logger.debug(f"Headline {idx}: '{headline_text}'")
-                    
-                    for kw in keywords:
-                        if kw in headline_text:
+                    headline_text = (h.get("headline") or "")
+                    logger.debug(f"Headline {idx}: '{headline_text.lower()}'")
+
+                    matched = False
+                    for pat in patterns:
+                        if pat.search(headline_text):
                             filtered_headlines.append(h)
                             matched_keyword_headlines.append(h.get("headline", ""))
                             match_count += 1
-                            logger.info(f"✓ Found keyword '{kw}' in headline: '{headline_text}'")
+                            logger.info(f"✓ Found keyword pattern '{pat.pattern}' in headline: '{headline_text}'")
+                            print(f"[DEBUG MATCH] pattern={pat.pattern} headline='{headline_text}'")
+                            matched = True
                             break
-                
+                    if matched:
+                        continue
+
                 logger.debug(f"Match results: {match_count} matches found out of {len(headlines)} headlines")
         else:
             logger.debug("No keywords provided in form")

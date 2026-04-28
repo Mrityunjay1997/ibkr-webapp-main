@@ -458,6 +458,66 @@
 											<td style="text-align:center; padding:6px;">{{ Param.filterOBV(style="cursor:pointer;") }}</td>
 										</tr>
 										<tr>
+											<th>{{ Param.FastOBV.label(class_="LabelHead") }}</th>
+                                            <!-- Fast OBV: 5-bar MA -->
+                                            <td>
+                                                <div id="tf_fast_obv">{{ Param.FastOBV_tf(class_="FastOBV_tf") }}</div>
+                                            </td>
+											<td>
+												<div id = "nchangeinput_fast_obv"> {{ Param.FastOBV(class_="FastOBV", value = 5) }} </div>
+											</td>
+											<th>{{ Param.ComparisonFastOBV(class_="ComparisonFastOBV") }}</th>
+											<td>
+												<div id = "changeinput_fast_obv"> {{ Param.PercentageFastOBV(class_="PercentageFastOBV", value = '0' ) }} </div>
+											</td>
+											<td>
+												<div class="formatingyesno">
+													<div class="yesno"> {{ Param.booleanFastOBV() }} </div><div class="yesno"> {{ Param.booleanFastOBV.label }} </div>
+												</div>
+											</td>
+											<td style="text-align:center; padding:6px;">{{ Param.filterFastOBV(style="cursor:pointer;") }}</td>
+										</tr>
+										<tr>
+											<th>{{ Param.MediumOBV.label(class_="LabelHead") }}</th>
+                                            <!-- Medium OBV: 10-bar MA -->
+                                            <td>
+                                                <div id="tf_medium_obv">{{ Param.MediumOBV_tf(class_="MediumOBV_tf") }}</div>
+                                            </td>
+											<td>
+												<div id = "nchangeinput_medium_obv"> {{ Param.MediumOBV(class_="MediumOBV", value = 10) }} </div>
+											</td>
+											<th>{{ Param.ComparisonMediumOBV(class_="ComparisonMediumOBV") }}</th>
+											<td>
+												<div id = "changeinput_medium_obv"> {{ Param.PercentageMediumOBV(class_="PercentageMediumOBV", value = '0' ) }} </div>
+											</td>
+											<td>
+												<div class="formatingyesno">
+													<div class="yesno"> {{ Param.booleanMediumOBV() }} </div><div class="yesno"> {{ Param.booleanMediumOBV.label }} </div>
+												</div>
+											</td>
+											<td style="text-align:center; padding:6px;">{{ Param.filterMediumOBV(style="cursor:pointer;") }}</td>
+										</tr>
+										<tr>
+											<th>{{ Param.SlowOBV.label(class_="LabelHead") }}</th>
+                                            <!-- Slow OBV: 20-bar MA -->
+                                            <td>
+                                                <div id="tf_slow_obv">{{ Param.SlowOBV_tf(class_="SlowOBV_tf") }}</div>
+                                            </td>
+											<td>
+												<div id = "nchangeinput_slow_obv"> {{ Param.SlowOBV(class_="SlowOBV", value = 20) }} </div>
+											</td>
+											<th>{{ Param.ComparisonSlowOBV(class_="ComparisonSlowOBV") }}</th>
+											<td>
+												<div id = "changeinput_slow_obv"> {{ Param.PercentageSlowOBV(class_="PercentageSlowOBV", value = '0' ) }} </div>
+											</td>
+											<td>
+												<div class="formatingyesno">
+													<div class="yesno"> {{ Param.booleanSlowOBV() }} </div><div class="yesno"> {{ Param.booleanSlowOBV.label }} </div>
+												</div>
+											</td>
+											<td style="text-align:center; padding:6px;">{{ Param.filterSlowOBV(style="cursor:pointer;") }}</td>
+										</tr>
+										<tr>
 											<th>{{ Param.ATR.label(class_="LabelHead") }}</th>
                                             <!-- NEW: time frame column for this indicator -->
                                             <td>
@@ -905,11 +965,11 @@
 									</tbody>
 								</table>
 
-								<!-- Price/Volume Monitoring Configuration -->
+								<!-- Price/RVOL Monitoring Configuration -->
 								<table class="table table-bordered" style="margin-top:0;">
 									<thead>
 										<tr style="background:#1a5f7a; color:#fff;">
-											<th style="padding:10px" colspan="5">Price &amp; Volume Monitoring</th>
+											<th style="padding:10px" colspan="5">Price &amp; RVOL Monitoring</th>
 										</tr>
 										<tr>
 											<th style="padding:10px">Setting</th>
@@ -925,7 +985,7 @@
 										<tr>
 											<th style="padding:10px">% Change Threshold</th>
 											<td style="padding:10px" colspan="2">{{ Param.PctChangeThreshold(class_="PctChangeThreshold", value='3.0', style="width:80px") }}%</td>
-											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Alert on price changes above this %</span></td>
+											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Alert on price changes above this % (Green)</span></td>
 										</tr>
 										<tr>
 											<th style="padding:10px">% Change Lookback Period</th>
@@ -937,35 +997,39 @@
 											<td style="padding:10px" colspan="4">{{ Param.EnablePctChangeTTS(class_="EnablePctChangeTTS") }}</td>
 										</tr>
 										<tr style="background:#f0f0f0">
-											<th style="padding:10px">Enable Volume Monitoring</th>
-											<td style="padding:10px" colspan="4">{{ Param.EnableVolumeMonitor(class_="EnableVolumeMonitor") }}</td>
+											<th style="padding:10px">Enable RVOL (Relative Volume) Monitoring</th>
+											<td style="padding:10px" colspan="4">{{ Param.EnableRVOLMonitor(class_="EnableRVOLMonitor") }}</td>
 										</tr>
 										<tr>
-											<th style="padding:10px">Volume Lookback Period</th>
-											<td style="padding:10px" colspan="2">{{ Param.VolumeLookbackMinutes(class_="VolumeLookbackMinutes", value='5', style="width:80px") }} min</td>
-											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Calculate volume total over this period</span></td>
+											<th style="padding:10px">RVOL Lookback Period</th>
+											<td style="padding:10px" colspan="2">{{ Param.RVOLLookbackDays(class_="RVOLLookbackDays", value='5', style="width:80px") }} days</td>
+											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Calculate RVOL based on average volume over past X days (Brown)</span></td>
 										</tr>
 										<tr>
-											<th style="padding:10px">Volume Threshold</th>
-											<td style="padding:10px" colspan="2">{{ Param.VolumeThreshold(class_="VolumeThreshold", value='50000', style="width:100px") }} shares</td>
-											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Alert when volume exceeds this amount</span></td>
+											<th style="padding:10px">RVOL Threshold</th>
+											<td style="padding:10px" colspan="2">{{ Param.RVOLThreshold(class_="RVOLThreshold", value='1.5', style="width:80px") }}x</td>
+											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Alert when RVOL exceeds this multiplier (e.g., 1.5 = 150% of average volume)</span></td>
 										</tr>
 										<tr>
-											<th style="padding:10px">Read Alert on Volume Spike</th>
-											<td style="padding:10px" colspan="4">{{ Param.EnableVolumeTTS(class_="EnableVolumeTTS") }}</td>
+											<th style="padding:10px">Read Alert on RVOL Spike</th>
+											<td style="padding:10px" colspan="4">{{ Param.EnableRVOLTTS(class_="EnableRVOLTTS") }}</td>
 										</tr>
 										<tr style="background:#f0f0f0">
 											<th style="padding:10px">Enable Key Level Detection</th>
 											<td style="padding:10px" colspan="4">{{ Param.EnableKeyLevelDetection(class_="EnableKeyLevelDetection") }}</td>
 										</tr>
 										<tr>
-											<th style="padding:10px">Key Level Proximity</th>
-											<td style="padding:10px" colspan="2">{{ Param.KeyLevelProximityPercent(class_="KeyLevelProximityPercent", value='1.0', style="width:80px") }}%</td>
-											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Highlight when within % of key level</span></td>
+											<th style="padding:10px">Key Level Type</th>
+											<td style="padding:10px" colspan="4">{{ Param.KeyLevelType(class_="KeyLevelType") }}</td>
 										</tr>
 										<tr>
-											<th style="padding:10px">Play Key Level Sound</th>
-											<td style="padding:10px" colspan="4">{{ Param.PlayKeyLevelSound(class_="PlayKeyLevelSound") }}</td>
+											<th style="padding:10px">Key Level Proximity</th>
+											<td style="padding:10px" colspan="2">{{ Param.KeyLevelProximityPercent(class_="KeyLevelProximityPercent", value='1.0', style="width:80px") }}%</td>
+											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Highlight when within % of selected key level (Yellow)</span></td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Read Alert on Key Level Hit</th>
+											<td style="padding:10px" colspan="4">{{ Param.EnableKeyLevelTTS(class_="EnableKeyLevelTTS") }}</td>
 										</tr>
 									</tbody>
 								</table>
@@ -1029,6 +1093,23 @@
 										<tr>
 											<th style="padding:10px">Play Sound on Strong OBV Changes</th>
 											<td style="padding:10px" colspan="4">{{ Param.EnableOBVTTS(class_="EnableOBVTTS") }}</td>
+										</tr>
+										<tr style="border-top:2px solid #0066cc;">
+											<th style="padding:10px; background:#e6f2ff; font-weight:bold;">MULTI-OBV ANALYSIS (Fast | Medium | Slow)</th>
+											<td style="padding:10px; background:#e6f2ff;" colspan="4">{{ Param.EnableMultiOBVAnalysis(class_="EnableMultiOBVAnalysis") }}</td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Multi-OBV Change Threshold</th>
+											<td style="padding:10px" colspan="2">{{ Param.MultiOBVChangeThreshold(class_="MultiOBVChangeThreshold", value='5.0', style="width:80px") }}%</td>
+											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Min % change to signal 'strong' (0.1-50)</span></td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Multi-OBV Audio Alerts</th>
+											<td style="padding:10px" colspan="4">{{ Param.EnableMultiOBVAudio(class_="EnableMultiOBVAudio") }} <span style="font-size:11px;color:#888; margin-left:10px;">Play triumphant arpeggio for bullish, descending for bearish</span></td>
+										</tr>
+										<tr>
+											<th style="padding:10px">Multi-OBV Text-to-Speech</th>
+											<td style="padding:10px" colspan="4">{{ Param.EnableMultiOBVTTS(class_="EnableMultiOBVTTS") }} <span style="font-size:11px;color:#888; margin-left:10px;">Read stock symbol + bullish/bearish description</span></td>
 										</tr>
 									</tbody>
 								</table>
@@ -1148,6 +1229,256 @@
 
 							<!-- Multi-Level Order Builder Modal -->
 							{% include 'multi_level_order_modal.html' %}
+
+							<!-- ===== HOLD ORDERS OFF-MARKET PANEL ===== -->
+							<div class="ao-panel" id="ho_panel">
+								<div class="ao-panel-header">
+									<span class="ao-status-dot" id="ho_status_dot"></span>
+									<h6>Hold Orders Off-Market</h6>
+									<div class="ao-toggle-label" style="margin-left:auto;display:flex;gap:8px;">
+										<button type="button" class="oe-btn oe-btn-sm" onclick="_hoOpenSettings()">Settings</button>
+										<label class="ao-toggle-label"><input type="checkbox" id="ho_enabled" onchange="_hoTogglePanel()"> Enable</label>
+									</div>
+								</div>
+								<div class="ao-body" id="ho_body">
+									<!-- Create New Order Section -->
+									<div class="ao-section-title">Create New Held Order</div>
+									<div class="ao-row">
+										<div class="ao-field">
+											<label class="ao-label">Symbol</label>
+											<input type="text" id="ho_symbol" class="ao-input" placeholder="e.g., AAPL" style="text-transform:uppercase;">
+										</div>
+										<div class="ao-field">
+											<label class="ao-label">Side</label>
+											<select id="ho_side" class="ao-select">
+												<option value="long" selected>Long (Buy)</option>
+												<option value="short">Short (Sell)</option>
+											</select>
+										</div>
+										<div class="ao-field">
+											<label class="ao-label">Quantity</label>
+											<input type="number" id="ho_quantity" class="ao-input" value="100" min="1" step="1">
+										</div>
+										<div class="ao-field">
+											<label class="ao-label">Order Type</label>
+											<select id="ho_order_type" class="ao-select" onchange="_hoToggleOrderType()">
+												<option value="limit" selected>Limit</option>
+												<option value="market">Market</option>
+											</select>
+										</div>
+										<div class="ao-field" id="ho_limit_price_field">
+											<label class="ao-label">Limit Price</label>
+											<input type="number" id="ho_limit_price" class="ao-input" value="0" min="0" step="0.01">
+										</div>
+									</div>
+
+									<!-- Entry Condition: Candle Breakout -->
+									<details class="ao-collapsible" open>
+										<summary class="ao-section-title" style="cursor:pointer;user-select:none;padding:8px;">▶ Entry: Candle Breakout</summary>
+										<div style="padding:10px;">
+											<div class="ao-row">
+												<div class="ao-field">
+													<label class="ao-chk-label"><input type="checkbox" id="ho_use_candle_entry" onchange="_hoToggleCandleEntry()"> Use Candle Breakout for Entry</label>
+												</div>
+											</div>
+											<div id="ho_candle_entry_config" style="display:none;background:#f9f9f9;padding:10px;border-radius:4px;">
+												<div class="ao-row">
+													<div class="ao-field">
+														<label class="ao-label">Timeframe</label>
+														<select id="ho_candle_tf" class="ao-select">
+															<option value="1min">1 Min</option>
+															<option value="5min" selected>5 Min</option>
+															<option value="15min">15 Min</option>
+															<option value="1h">1 Hour</option>
+															<option value="daily">Daily</option>
+														</select>
+													</div>
+													<div class="ao-field">
+														<label class="ao-label">Lookback Bars</label>
+														<input type="number" id="ho_candle_lookback" class="ao-input" value="5" min="1" max="100" step="1">
+														<span style="font-size:11px;color:#666;margin-left:6px;"># of recent candles for high/low reference</span>
+													</div>
+												</div>
+												<div class="ao-row">
+													<div class="ao-field">
+														<label class="ao-label">Break Direction</label>
+														<select id="ho_candle_direction" class="ao-select">
+															<option value="above_high" selected>Break Above Recent High</option>
+															<option value="below_low">Break Below Recent Low</option>
+														</select>
+													</div>
+													<div class="ao-field">
+														<label class="ao-label">Entry Offset (%)</label>
+														<input type="number" id="ho_candle_offset" class="ao-input" value="0.5" min="0" step="0.1">
+														<span style="font-size:11px;color:#666;margin-left:6px;">% above/below breakout level for limit order</span>
+													</div>
+												</div>
+											</div>
+										</div>
+									</details>
+
+									<!-- Entry Condition: MA Crossover -->
+									<details class="ao-collapsible" open>
+										<summary class="ao-section-title" style="cursor:pointer;user-select:none;padding:8px;">▶ Entry: Moving Average Crossover</summary>
+										<div style="padding:10px;">
+											<div class="ao-row">
+												<div class="ao-field">
+													<label class="ao-chk-label"><input type="checkbox" id="ho_use_ma_entry" onchange="_hoToggleMaEntry()"> Use MA Crossover for Entry</label>
+												</div>
+											</div>
+											<div id="ho_ma_entry_config" style="display:none;background:#f9f9f9;padding:10px;border-radius:4px;">
+												<div class="ao-row">
+													<div class="ao-field">
+														<label class="ao-label">Timeframe</label>
+														<select id="ho_ma_tf" class="ao-select">
+															<option value="1min">1 Min</option>
+															<option value="5min" selected>5 Min</option>
+															<option value="15min">15 Min</option>
+															<option value="1h">1 Hour</option>
+															<option value="daily">Daily</option>
+														</select>
+													</div>
+													<div class="ao-field">
+														<label class="ao-label">MA Type</label>
+														<select id="ho_ma_type" class="ao-select">
+															<option value="sma" selected>SMA (Simple)</option>
+															<option value="ema">EMA (Exponential)</option>
+														</select>
+													</div>
+												</div>
+												<div class="ao-row">
+													<div class="ao-field">
+														<label class="ao-label">MA Period</label>
+														<input type="number" id="ho_ma_period" class="ao-input" value="20" min="2" max="500" step="1">
+													</div>
+													<div class="ao-field">
+														<label class="ao-label">Cross Direction</label>
+														<select id="ho_ma_direction" class="ao-select">
+															<option value="above" selected>Cross Above MA (Bullish)</option>
+															<option value="below">Cross Below MA (Bearish)</option>
+														</select>
+													</div>
+												</div>
+												<div class="ao-row">
+													<div class="ao-field">
+														<label class="ao-label">Cross Offset (%)</label>
+														<input type="number" id="ho_ma_offset" class="ao-input" value="0" min="0" step="0.1">
+														<span style="font-size:11px;color:#666;margin-left:6px;">% offset from MA level</span>
+													</div>
+												</div>
+											</div>
+										</div>
+									</details>
+
+									<!-- Exit Condition: Candle Breakout (for exits) -->
+									<details class="ao-collapsible">
+										<summary class="ao-section-title" style="cursor:pointer;user-select:none;padding:8px;">▶ Exit: Candle Breakout</summary>
+										<div style="padding:10px;">
+											<div class="ao-row">
+												<div class="ao-field">
+													<label class="ao-chk-label"><input type="checkbox" id="ho_use_candle_exit" onchange="_hoToggleCandleExit()"> Use Candle Breakout for Exit</label>
+												</div>
+											</div>
+											<div id="ho_candle_exit_config" style="display:none;background:#f9f9f9;padding:10px;border-radius:4px;">
+												<div class="ao-row">
+													<div class="ao-field">
+														<label class="ao-label">Timeframe</label>
+														<select id="ho_candle_exit_tf" class="ao-select">
+															<option value="1min">1 Min</option>
+															<option value="5min" selected>5 Min</option>
+															<option value="15min">15 Min</option>
+															<option value="1h">1 Hour</option>
+															<option value="daily">Daily</option>
+														</select>
+													</div>
+													<div class="ao-field">
+														<label class="ao-label">Lookback Bars</label>
+														<input type="number" id="ho_candle_exit_lookback" class="ao-input" value="5" min="1" max="100" step="1">
+													</div>
+												</div>
+												<div class="ao-row">
+													<div class="ao-field">
+														<label class="ao-label">Exit Break Direction</label>
+														<select id="ho_candle_exit_direction" class="ao-select">
+															<option value="above_high" selected>Break Above High (Exit Short)</option>
+															<option value="below_low">Break Below Low (Exit Long)</option>
+														</select>
+													</div>
+													<div class="ao-field">
+														<label class="ao-label">Exit Offset (%)</label>
+														<input type="number" id="ho_candle_exit_offset" class="ao-input" value="0" min="0" step="0.1">
+													</div>
+												</div>
+											</div>
+										</div>
+									</details>
+
+									<!-- Exit Condition: MA Crossover (for exits) -->
+									<details class="ao-collapsible">
+										<summary class="ao-section-title" style="cursor:pointer;user-select:none;padding:8px;">▶ Exit: Moving Average Crossover</summary>
+										<div style="padding:10px;">
+											<div class="ao-row">
+												<div class="ao-field">
+													<label class="ao-chk-label"><input type="checkbox" id="ho_use_ma_exit" onchange="_hoToggleMaExit()"> Use MA Crossover for Exit</label>
+												</div>
+											</div>
+											<div id="ho_ma_exit_config" style="display:none;background:#f9f9f9;padding:10px;border-radius:4px;">
+												<div class="ao-row">
+													<div class="ao-field">
+														<label class="ao-label">Timeframe</label>
+														<select id="ho_ma_exit_tf" class="ao-select">
+															<option value="1min">1 Min</option>
+															<option value="5min" selected>5 Min</option>
+															<option value="15min">15 Min</option>
+															<option value="1h">1 Hour</option>
+															<option value="daily">Daily</option>
+														</select>
+													</div>
+													<div class="ao-field">
+														<label class="ao-label">MA Type</label>
+														<select id="ho_ma_exit_type" class="ao-select">
+															<option value="sma" selected>SMA (Simple)</option>
+															<option value="ema">EMA (Exponential)</option>
+														</select>
+													</div>
+												</div>
+												<div class="ao-row">
+													<div class="ao-field">
+														<label class="ao-label">MA Period</label>
+														<input type="number" id="ho_ma_exit_period" class="ao-input" value="20" min="2" max="500" step="1">
+													</div>
+													<div class="ao-field">
+														<label class="ao-label">Exit Cross Direction</label>
+														<select id="ho_ma_exit_direction" class="ao-select">
+															<option value="above">Cross Above (Exit Short)</option>
+															<option value="below" selected>Cross Below (Exit Long)</option>
+														</select>
+													</div>
+												</div>
+												<div class="ao-row">
+													<div class="ao-field">
+														<label class="ao-label">Exit Offset (%)</label>
+														<input type="number" id="ho_ma_exit_offset" class="ao-input" value="0" min="0" step="0.1">
+													</div>
+												</div>
+											</div>
+										</div>
+									</details>
+
+									<!-- Order Management Buttons -->
+									<div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;">
+										<button type="button" class="oe-btn oe-btn-primary" onclick="_hoCreateOrder()">Create & Hold Order</button>
+										<button type="button" class="oe-btn oe-btn-sm" onclick="_hoClearForm()">Clear Form</button>
+									</div>
+
+									<!-- Active Orders List -->
+									<div class="ao-section-title" style="margin-top:14px;">Active Held Orders</div>
+									<div id="ho_orders_list" style="background:#f6f8fa;border:1px solid #d0d7de;border-radius:4px;padding:10px;max-height:300px;overflow-y:auto;font-size:12px;">
+										<div style="color:#999;text-align:center;padding:20px;">No held orders yet</div>
+									</div>
+								</div>
+							</div>
+							<!-- ===== END HOLD ORDERS PANEL ===== -->
 
 							<!-- ===== Auto-Order Panel ===== -->
 							<div class="ao-panel" id="ao_panel">
@@ -1907,6 +2238,32 @@ function cleanNewsArticleText(rawText) {
     announceStockAlert(symbol || "Unknown", `Volume spike ${volStr} shares`);
   }
 
+  /**
+   * Announce RVOL Spike Alert via TTS
+   * @param {string} symbol - Stock symbol
+   * @param {number} rvol - RVOL multiplier value (e.g., 1.5 = 150%)
+   */
+  function announceRVOLSpike(symbol, rvol) {
+    const rvolPercent = rvol ? Math.round(rvol * 100) : 0;
+    announceStockAlert(symbol || "Unknown", `Relative Volume ${rvolPercent} percent`);
+  }
+
+  /**
+   * Announce Key Level Hit Alert via TTS
+   * @param {string} symbol - Stock symbol
+   * @param {string} levelName - Name of the key level (e.g., "VWAP", "Pivot Point")
+   * @param {string} levelType - Type of level for reference
+   */
+  function announceKeyLevelHit(symbol, levelName, levelType) {
+    announceStockAlert(symbol || "Unknown", `${levelName} level hit`);
+  }
+
+  // COLOR SCHEME FOR MONITORING ALERTS (displayed in results with highlighting)
+  // Green - % Price Change threshold met
+  // Brown (#8b7355) - RVOL threshold exceeded
+  // Yellow (#ffffcc) - Key Level hit detected
+
+
 
   // Car horn beep for Fibonacci Pullback — loud, attention-grabbing pattern
   function playBeepCarHorn(){
@@ -2002,6 +2359,95 @@ function cleanNewsArticleText(rawText) {
         osc.stop(now + i*0.08 + 0.1);
       }
     } catch(e){ console.warn("OBV bearish beep failed", e); }
+  }
+
+  // ============================================================
+  // MULTI-OBV AUDIO ALERTS (Fast, Medium, Slow OBV Analysis)
+  // ============================================================
+  
+  // Multi-OBV Strong Bullish alert — triumphant arpeggio with extended sequence
+  function playBeepMultiOBVBullish(){
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = ctx.currentTime;
+      // Extended triumphant arpeggio: C-E-G-C-E-G-C (full octave)
+      const freqs = [523, 659, 784, 523, 659, 784, 1047];
+      for (let i=0; i<freqs.length; i++){
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = freqs[i];
+        gain.gain.value = 0.22;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + i*0.08);
+        osc.stop(now + i*0.08 + 0.1);
+      }
+    } catch(e){ console.warn("Multi-OBV bullish beep failed", e); }
+  }
+
+  // Multi-OBV Strong Bearish alert — extended descending alert
+  function playBeepMultiOBVBearish(){
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = ctx.currentTime;
+      // Extended descending: G-E-C-G-E-C-E
+      const freqs = [784, 659, 523, 784, 659, 523, 349];
+      for (let i=0; i<freqs.length; i++){
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = freqs[i];
+        gain.gain.value = 0.22;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + i*0.08);
+        osc.stop(now + i*0.08 + 0.1);
+      }
+    } catch(e){ console.warn("Multi-OBV bearish beep failed", e); }
+  }
+
+  /**
+   * Announce Multi-OBV Strong Bullish via TTS with full description
+   * @param {string} symbol - Stock symbol
+   * @param {string} description - Multi-OBV analysis description
+   * @param {string} equation - Multi-OBV equation display
+   */
+  function announceMultiOBVBullish(symbol, description, equation) {
+    const msg = `${symbol || "Unknown"} shows strong bullish multi OBV alignment. ${description || 'All OBV indicators positive with strong upward momentum.'}`;
+    announceStockAlert(symbol || "Unknown", msg);
+  }
+
+  /**
+   * Announce Multi-OBV Strong Bearish via TTS with full description
+   * @param {string} symbol - Stock symbol
+   * @param {string} description - Multi-OBV analysis description
+   * @param {string} equation - Multi-OBV equation display
+   */
+  function announceMultiOBVBearish(symbol, description, equation) {
+    const msg = `${symbol || "Unknown"} shows strong bearish multi OBV alignment. ${description || 'All OBV indicators negative with strong downward momentum.'}`;
+    announceStockAlert(symbol || "Unknown", msg);
+  }
+
+  /**
+   * Process Multi-OBV Analysis signal and trigger alerts
+   * @param {string} symbol - Stock symbol
+   * @param {object} multiOBVResult - Result from analyze_multi_obv function
+   * @param {boolean} enableAudio - Play audio beep
+   * @param {boolean} enableTTS - Read description aloud
+   */
+  function handleMultiOBVSignal(symbol, multiOBVResult, enableAudio = true, enableTTS = true) {
+    if (!multiOBVResult || !multiOBVResult.signal) return;
+    
+    const signal = multiOBVResult.signal;
+    const description = multiOBVResult.description || '';
+    const equation = multiOBVResult.equation || '';
+    
+    if (signal === 'strong_bullish' || signal === 'bullish') {
+      if (enableAudio) playBeepMultiOBVBullish();
+      if (enableTTS) announceMultiOBVBullish(symbol, description, equation);
+    } else if (signal === 'strong_bearish' || signal === 'bearish') {
+      if (enableAudio) playBeepMultiOBVBearish();
+      if (enableTTS) announceMultiOBVBearish(symbol, description, equation);
+    }
   }
 
   // TTS: read headline text aloud
@@ -2107,6 +2553,80 @@ function cleanNewsArticleText(rawText) {
     }
   }
 
+  /**
+   * Format headline text for natural TTS reading.
+   * Handles price targets and dollar amounts by converting plain numbers to words.
+   * E.g., "Price target raised to 280 from 260" → "Price target raised to two hundred eighty from two hundred sixty"
+   * @param {string} text - Raw headline text
+   * @returns {string} - Text optimized for TTS reading
+   */
+  function _formatHeadlineForTTS(text) {
+    if (!text) return text;
+    
+    // Replace price patterns like "280 from 260" or "280/share" or "280 per share"
+    // Pattern 1: "to 280 from 260" or "to $280 from $260"
+    text = text.replace(/\$?(\d{2,})\s+(?:from|versus)\s+\$?(\d{2,})/gi, (match, p1, p2) => {
+      const num1 = _numberToWords(parseInt(p1));
+      const num2 = _numberToWords(parseInt(p2));
+      return `${num1} from ${num2}`;
+    });
+    
+    // Pattern 2: "280 per share" or "280/share" or "280.xx/share"
+    text = text.replace(/\$?(\d+(?:\.\d{1,2})?)\s*(?:\/|per)\s*share/gi, (match, price) => {
+      const priceNum = parseFloat(price);
+      const priceWords = priceNum % 1 !== 0 ? priceNum.toFixed(2) : _numberToWords(parseInt(price));
+      return `${priceWords} per share`;
+    });
+    
+    // Pattern 3: Standalone price targets at beginning "280" (if preceded by "to" keyword)
+    text = text.replace(/to\s+(\$)?(\d+(?:\.\d{1,2})?)\b/gi, (match, dollar, num) => {
+      const numVal = parseFloat(num);
+      // If it has decimals or looks like a price, keep formatted; otherwise convert to words
+      if (numVal >= 10 && numVal <= 9999) {
+        const words = numVal % 1 !== 0 ? numVal.toFixed(2) : _numberToWords(parseInt(numVal));
+        return `to ${words}`;
+      }
+      return match;
+    });
+    
+    return text;
+  }
+
+  /**
+   * Convert numbers to spoken words (for prices/targets only, not general numbers)
+   * E.g., 280 → "two hundred eighty", 55 → "fifty five"
+   * @param {number} num - Number to convert
+   * @returns {string} - Number in words
+   */
+  function _numberToWords(num) {
+    if (num === null || num === undefined) return "";
+    
+    const ones = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+    const teens = ['ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 
+                   'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+    const tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+    
+    num = Math.floor(num); // Round down to integer
+    
+    if (num === 0) return 'zero';
+    if (num < 0) return 'minus ' + _numberToWords(-num);
+    if (num < 10) return ones[num];
+    if (num < 20) return teens[num - 10];
+    if (num < 100) {
+      const tenPart = tens[Math.floor(num / 10)];
+      const onePart = num % 10 === 0 ? '' : ' ' + ones[num % 10];
+      return tenPart + onePart;
+    }
+    if (num < 1000) {
+      const hundredPart = ones[Math.floor(num / 100)] + ' hundred';
+      const remainder = num % 100;
+      if (remainder === 0) return hundredPart;
+      return hundredPart + ' ' + _numberToWords(remainder);
+    }
+    // For numbers >= 1000, just convert back to string (keep as numbers)
+    return num.toString();
+  }
+
   function readHeadlineAloud(text) {
     if (!text || text.trim() === "") return;
     
@@ -2120,10 +2640,13 @@ function cleanNewsArticleText(rawText) {
       return; // Already queued, skip duplicate
     }
     
+    // Format headline text for natural TTS reading (convert price numbers to words)
+    const formattedText = _formatHeadlineForTTS(text);
+    
     // Mark as read and as queued, then add to queue
     _readHeadlinesCache.add(text);
     _queuedHeadlines.add(text);
-    _headlineQueue.push(text);
+    _headlineQueue.push(formattedText);
     _processHeadlineQueue();
   }
   
@@ -2588,9 +3111,9 @@ function renderResultsFromBackend(response) {
                     if ("cross200SMA_value" in dta) headerCols.push({ key: "cross200SMA_value", label: "200 SMA", vrKey: "cross200SMA_val" });
                     if ("cross200SMA_pctFromSMA" in dta) headerCols.push({ key: "cross200SMA_pctFromSMA", label: "% from 200", vrKey: "cross200SMA" });
                     
-                    // Price/Volume monitoring columns
+                    // Price/RVOL monitoring columns
                     if ("pctChange" in dta) headerCols.push({ key: "pctChange", label: "% Chg", vrKey: "pctChange" });
-                    if ("volumeSum" in dta) headerCols.push({ key: "volumeSum", label: "Vol Sum", raw: true, vrKey: "volumeSum" });
+                    if ("rvol" in dta) headerCols.push({ key: "rvol", label: "RVOL", raw: true, vrKey: "rvol" });
                     if ("nearKeyLevel" in dta) headerCols.push({ key: "nearKeyLevel", label: "Key Level", vrKey: "keyLevel" });
                     
                     // SMA Crossover columns
@@ -2680,31 +3203,81 @@ function renderResultsFromBackend(response) {
                     return n.toFixed(maxDigits).replace(/\.?0+$/, "");
                 }
 
+                // ===== INDICATOR COLOR SCHEME BY FIELD TYPE =====
+                // Centralized color scheme for all indicators grouped by field type/category
+                // This makes it easy to add new indicators and maintain consistent coloring
+                const INDICATOR_COLOR_SCHEME = {
+                    // SMA/Trend Indicators - Orange
+                    "trend": {
+                        name: "Trend Indicators",
+                        bg: "#ffa500",
+                        text: "#fff",
+                        weight: "700",
+                        fields: ["sma200Crossover"]  // 200 SMA Bullish Crossover
+                    },
+                    // Momentum Indicators - Purple variants
+                    "momentum": {
+                        name: "Momentum Indicators",
+                        strong_bullish: { bg: "#e6d5f0", text: "#000", weight: "700" },  // OBV Strong Bullish
+                        bullish: { bg: "#f0e6ff", text: "#000", weight: "600" },  // OBV Bullish
+                        strong_bearish: { bg: "#ffe6e6", text: "#000", weight: "700" },  // OBV Strong Bearish
+                        bearish: { bg: "#fff0f0", text: "#000", weight: "600" },  // OBV Bearish
+                        fields: ["obvAnalysis"]
+                    },
+                    // Support/Resistance Levels - Blue
+                    "levels": {
+                        name: "Support/Resistance Levels",
+                        bg: "#d6eaf8",
+                        text: "#000",
+                        weight: "600",
+                        fields: ["keyLevel"]
+                    },
+                    // Price Action - Green/Red
+                    "priceAction": {
+                        name: "Price Action",
+                        bullish: { bg: "#d4edda", text: "#000", weight: "700" },
+                        bearish: { bg: "#f8d7da", text: "#000", weight: "700" },
+                        fields: ["priceAction"]
+                    },
+                    // Pivot Points - Purple accent
+                    "pivots": {
+                        name: "Pivot Points",
+                        bullish: { bg: "#d4edda", text: "#000", weight: "700" },
+                        bearish: { bg: "#f8d7da", text: "#000", weight: "700" },
+                        fields: ["Pivot"]
+                    },
+                    // Gap Analysis - Dark Purple
+                    "gaps": {
+                        name: "Gap Analysis",
+                        bg: "#9b59b6",
+                        text: "#fff",
+                        weight: "700",
+                        fields: ["fibGap"]
+                    },
+                    // News/Events - Yellow
+                    "news": {
+                        name: "News & Events",
+                        bg: "#f1c40f",
+                        text: "#000",
+                        weight: "700",
+                        fields: ["newsKeyword"]
+                    }
+                };
+                // ===== END COLOR SCHEME DEFINITION =====
+
                 // net position decision
                 const np = Number(dta.netPosition);
                 const decision = Number.isFinite(np) ? (np > 0 ? "UP" : np < 0 ? "DOWN" : "UNCHANGE") : "UNCHANGE";
                 const rowClass = dta.signal === "yes" ? `content${tableId} yescondition` : `content${tableId}`;
                 const _keywordRowStyle = dta.newsKeywordMatch ? " style='background:#fef9e7'" : "";
                 
-                // Check if near key level and apply blue highlighting
-                let keyLevelStyle = "";
-                if (dta.variableResults && dta.variableResults["keyLevel"]) {
-                    keyLevelStyle = " style='background:#d6eaf8;color:#000;font-weight:600'";
-                    // Play sound if enabled
-                    try {
-                        const playSound = document.querySelector('input[name="PlayKeyLevelSound"]');
-                        if (playSound && playSound.checked) {
-                            playBeepKeyLevel();
-                        }
-                    } catch(e) {
-                        console.warn("Key level sound playback error:", e);
-                    }
-                }
-
-                // Check if 200 SMA bullish crossover and apply orange highlighting
+                // Initialize style variables
                 let sma200CrossoverStyle = "";
+                let obvStyle = "";
+                
+                // Check if 200 SMA bullish crossover and apply orange highlighting
                 if (dta.variableResults && dta.variableResults["sma200Crossover"]) {
-                    sma200CrossoverStyle = " style='background:#ffa500;color:#fff;font-weight:700'";
+                    // No row-level style - highlighting is applied per-cell for smaSlow
                     // Read alert if enabled
                     try {
                         const enableTTS = document.querySelector('input[name="EnableSMA200TTS"]');
@@ -2717,7 +3290,6 @@ function renderResultsFromBackend(response) {
                 }
 
                 // Check OBV analysis and apply highlighting + TTS alerts
-                let obvStyle = "";
                 if (dta.obvAnalysis && dta.obvAnalysis.signal) {
                     const signal = dta.obvAnalysis.signal;
                     
@@ -2752,6 +3324,38 @@ function renderResultsFromBackend(response) {
                     }
                 }
                 
+                // Check if near key level and apply yellow highlighting
+                let keyLevelStyle = "";
+                if (dta.variableResults && dta.variableResults["keyLevel"]) {
+                    keyLevelStyle = " style='background:#ffffcc;color:#000;font-weight:600'";  // Yellow
+                    // Play sound if enabled - commented out per requirements (using TTS instead)
+                    try {
+                        const enableTTS = document.querySelector('input[name="EnableKeyLevelTTS"]');
+                        if (enableTTS && enableTTS.checked) {
+                            const levelDetails = dta.variableResults["keyLevelDetails"] || {};
+                            const levelName = levelDetails.name || "Key Level";
+                            announceKeyLevelHit(dta.symbol, levelName, dta.keyLevelType);
+                        }
+                    } catch(e) {
+                        console.warn("Key level TTS alert error:", e);
+                    }
+                }
+
+                // Check if RVOL spike and apply brown highlighting
+                let rvolStyle = "";
+                if (dta.variableResults && dta.variableResults["rvol"]) {
+                    rvolStyle = " style='background:#8b7355;color:#fff;font-weight:600'";  // Brown
+                    // Read alert if enabled
+                    try {
+                        const enableTTS = document.querySelector('input[name="EnableRVOLTTS"]');
+                        if (enableTTS && enableTTS.checked) {
+                            announceRVOLSpike(dta.symbol, dta.rvol);
+                        }
+                    } catch(e) {
+                        console.warn("RVOL TTS alert error:", e);
+                    }
+                }
+
                 // Check Price Change monitoring and announce TTS alert
                 if (dta.variableResults && dta.variableResults["pctChange"]) {
                     try {
@@ -2763,21 +3367,9 @@ function renderResultsFromBackend(response) {
                         console.warn("Price change TTS alert error:", e);
                     }
                 }
-                
-                // Check Volume monitoring and announce TTS alert
-                if (dta.variableResults && dta.variableResults["volumeSum"]) {
-                    try {
-                        const enableTTS = document.querySelector('input[name="EnableVolumeTTS"]');
-                        if (enableTTS && enableTTS.checked) {
-                            announceVolumeSpike(dta.symbol, dta.volumeSum);
-                        }
-                    } catch(e) {
-                        console.warn("Volume spike TTS alert error:", e);
-                    }
-                }
 
-                // Apply style in priority: OBV > sma200Crossover > keyLevel > newsKeyword
-                let appliedStyle = obvStyle || sma200CrossoverStyle || keyLevelStyle || _keywordRowStyle;
+                // Apply style in priority: RVOL (Brown) > Key Level (Yellow) > OBV > sma200Crossover > newsKeyword
+                let appliedStyle = rvolStyle || keyLevelStyle || obvStyle || sma200CrossoverStyle || _keywordRowStyle;
                 txt1 += `<tr class='${rowClass}'${appliedStyle}>`;
 
                 const headerCols = groupHeaderCols || [];
@@ -2826,6 +3418,12 @@ function renderResultsFromBackend(response) {
                             cellStyle = vr[vrLookup] ? " style='background:#d4edda;color:#000;font-weight:700'" : " style='background:#f8d7da;color:#000;font-weight:700'";
                         }
                     }
+                    
+                    // Check for 200 SMA bullish crossover highlighting (orange for smaSlow)
+                    if (col.key === "smaSlow" && dta.variableResults && dta.variableResults["sma200Crossover"]) {
+                        cellStyle = " style='background:#ffa500;color:#fff;font-weight:700'";
+                    }
+                    
                     const stickyClass = (col.key === 'symbol') ? ' sticky-col' : '';
                     if (col.key === "symbol") {
                         const displayVal = (v === null || v === undefined || v === "") ? "n.d" : v;
@@ -5045,14 +5643,15 @@ function _aoToggleMultiLevel() {
 
 function _aoOpenSettings() {
     // Open/toggle settings panel without requiring Enable checkbox
+    // This allows users to configure settings without accidentally enabling auto trading
     var body = document.getElementById("ao_body");
     if (body) {
-        var isHidden = body.style.display === "none";
-        body.style.display = isHidden ? "" : "none";
-        // Optional: Add visual feedback
-        if (!isHidden) {
-            body.style.opacity = "0.7";
-            setTimeout(function() { body.style.opacity = "1"; }, 100);
+        // Toggle the visibility by adding/removing the ao-active class
+        var isActive = body.classList.contains("ao-active");
+        if (isActive) {
+            body.classList.remove("ao-active");
+        } else {
+            body.classList.add("ao-active");
         }
     }
 }
@@ -5575,10 +6174,336 @@ function _aoProcessScanResults(msg) {
     }
 }
 
+// ===== HOLD ORDERS OFF-MARKET FUNCTIONS =====
+
+// Global storage for held orders (in browser)
+var _heldOrdersDB = {};
+
+function _hoTogglePanel() {
+    var on = document.getElementById("ho_enabled").checked;
+    var body = document.getElementById("ho_body");
+    var dot = document.getElementById("ho_status_dot");
+    if (on) {
+        body.classList.add("ao-active");
+        dot.classList.add("ao-on");
+    } else {
+        body.classList.remove("ao-active");
+        dot.classList.remove("ao-on");
+    }
+}
+
+function _hoOpenSettings() {
+    var body = document.getElementById("ho_body");
+    if (body) {
+        var isActive = body.classList.contains("ao-active");
+        if (isActive) {
+            body.classList.remove("ao-active");
+        } else {
+            body.classList.add("ao-active");
+        }
+    }
+}
+
+function _hoToggleOrderType() {
+    var orderType = document.getElementById("ho_order_type").value;
+    var limitPriceField = document.getElementById("ho_limit_price_field");
+    if (limitPriceField) {
+        limitPriceField.style.display = (orderType === 'limit') ? '' : 'none';
+    }
+}
+
+function _hoToggleCandleEntry() {
+    var enabled = document.getElementById("ho_use_candle_entry").checked;
+    var config = document.getElementById("ho_candle_entry_config");
+    if (config) config.style.display = enabled ? '' : 'none';
+}
+
+function _hoToggleCandleExit() {
+    var enabled = document.getElementById("ho_use_candle_exit").checked;
+    var config = document.getElementById("ho_candle_exit_config");
+    if (config) config.style.display = enabled ? '' : 'none';
+}
+
+function _hoToggleMaEntry() {
+    var enabled = document.getElementById("ho_use_ma_entry").checked;
+    var config = document.getElementById("ho_ma_entry_config");
+    if (config) config.style.display = enabled ? '' : 'none';
+}
+
+function _hoToggleMaExit() {
+    var enabled = document.getElementById("ho_use_ma_exit").checked;
+    var config = document.getElementById("ho_ma_exit_config");
+    if (config) config.style.display = enabled ? '' : 'none';
+}
+
+function _hoClearForm() {
+    document.getElementById("ho_symbol").value = "";
+    document.getElementById("ho_side").value = "long";
+    document.getElementById("ho_quantity").value = 100;
+    document.getElementById("ho_order_type").value = "limit";
+    document.getElementById("ho_limit_price").value = 0;
+    document.getElementById("ho_use_candle_entry").checked = false;
+    document.getElementById("ho_use_ma_entry").checked = false;
+    document.getElementById("ho_use_candle_exit").checked = false;
+    document.getElementById("ho_use_ma_exit").checked = false;
+    _hoToggleOrderType();
+    _hoToggleCandleEntry();
+    _hoToggleMaEntry();
+    _hoToggleCandleExit();
+    _hoToggleMaExit();
+}
+
+function _hoGetSettings() {
+    var symbol = (document.getElementById("ho_symbol").value || "").toUpperCase().trim();
+    var side = document.getElementById("ho_side").value;
+    var quantity = parseInt(document.getElementById("ho_quantity").value) || 1;
+    var orderType = document.getElementById("ho_order_type").value;
+    var limitPrice = parseFloat(document.getElementById("ho_limit_price").value) || null;
+    
+    var entryConds = [];
+    var exitConds = [];
+    
+    // Entry Candle Breakout
+    if (document.getElementById("ho_use_candle_entry").checked) {
+        entryConds.push({
+            type: "candle_breakout",
+            timeframe: document.getElementById("ho_candle_tf").value,
+            lookback_bars: parseInt(document.getElementById("ho_candle_lookback").value) || 5,
+            break_direction: document.getElementById("ho_candle_direction").value,
+            entry_offset_pct: parseFloat(document.getElementById("ho_candle_offset").value) || 0
+        });
+    }
+    
+    // Entry MA Crossover
+    if (document.getElementById("ho_use_ma_entry").checked) {
+        entryConds.push({
+            type: "ma_crossover",
+            timeframe: document.getElementById("ho_ma_tf").value,
+            ma_type: document.getElementById("ho_ma_type").value,
+            ma_period: parseInt(document.getElementById("ho_ma_period").value) || 20,
+            cross_direction: document.getElementById("ho_ma_direction").value,
+            cross_offset_pct: parseFloat(document.getElementById("ho_ma_offset").value) || 0
+        });
+    }
+    
+    // Exit Candle Breakout
+    if (document.getElementById("ho_use_candle_exit").checked) {
+        exitConds.push({
+            type: "candle_breakout",
+            timeframe: document.getElementById("ho_candle_exit_tf").value,
+            lookback_bars: parseInt(document.getElementById("ho_candle_exit_lookback").value) || 5,
+            break_direction: document.getElementById("ho_candle_exit_direction").value,
+            entry_offset_pct: parseFloat(document.getElementById("ho_candle_exit_offset").value) || 0
+        });
+    }
+    
+    // Exit MA Crossover
+    if (document.getElementById("ho_use_ma_exit").checked) {
+        exitConds.push({
+            type: "ma_crossover",
+            timeframe: document.getElementById("ho_ma_exit_tf").value,
+            ma_type: document.getElementById("ho_ma_exit_type").value,
+            ma_period: parseInt(document.getElementById("ho_ma_exit_period").value) || 20,
+            cross_direction: document.getElementById("ho_ma_exit_direction").value,
+            cross_offset_pct: parseFloat(document.getElementById("ho_ma_exit_offset").value) || 0
+        });
+    }
+    
+    return {
+        symbol: symbol,
+        side: side,
+        quantity: quantity,
+        order_type: orderType,
+        limit_price: limitPrice,
+        entry_conditions: entryConds,
+        exit_conditions: exitConds
+    };
+}
+
+function _hoCreateOrder() {
+    var settings = _hoGetSettings();
+    
+    if (!settings.symbol) {
+        alert("Please enter a symbol");
+        return;
+    }
+    
+    if (settings.entry_conditions.length === 0) {
+        alert("Please select at least one entry condition (Candle Breakout or MA Crossover)");
+        return;
+    }
+    
+    // Create order object
+    var orderId = "ho_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+    var order = {
+        order_id: orderId,
+        symbol: settings.symbol,
+        side: settings.side,
+        quantity: settings.quantity,
+        order_type: settings.order_type,
+        limit_price: settings.limit_price,
+        entry_conditions: settings.entry_conditions,
+        exit_conditions: settings.exit_conditions,
+        status: "active",
+        created_at: new Date().toISOString()
+    };
+    
+    // Store in local DB
+    _heldOrdersDB[orderId] = order;
+    
+    // Save to localStorage
+    _hoSaveOrders();
+    
+    // Update display
+    _hoRefreshOrdersList();
+    
+    // Clear form
+    _hoClearForm();
+    
+    alert("Held order created for " + settings.symbol + " (ID: " + orderId.substr(0, 20) + "...)");
+}
+
+function _hoSaveOrders() {
+    try {
+        localStorage.setItem("held_orders_db", JSON.stringify(_heldOrdersDB));
+    } catch(e) {
+        console.warn("Failed to save held orders:", e);
+    }
+}
+
+function _hoLoadOrders() {
+    try {
+        var saved = localStorage.getItem("held_orders_db");
+        if (saved) {
+            _heldOrdersDB = JSON.parse(saved);
+        }
+    } catch(e) {
+        console.warn("Failed to load held orders:", e);
+        _heldOrdersDB = {};
+    }
+}
+
+function _hoRefreshOrdersList() {
+    var listEl = document.getElementById("ho_orders_list");
+    if (!listEl) return;
+    
+    var activeOrders = Object.values(_heldOrdersDB).filter(o => o.status === "active");
+    
+    if (activeOrders.length === 0) {
+        listEl.innerHTML = '<div style="color:#999;text-align:center;padding:20px;">No held orders yet</div>';
+        return;
+    }
+    
+    var html = '<table style="width:100%;border-collapse:collapse;font-size:11px;">';
+    html += '<tr style="background:#e8f4f8;font-weight:bold;"><th style="padding:4px;border:1px solid #d0d7de;">Symbol</th><th style="padding:4px;border:1px solid #d0d7de;">Side</th><th style="padding:4px;border:1px solid #d0d7de;">Qty</th><th style="padding:4px;border:1px solid #d0d7de;">Conditions</th><th style="padding:4px;border:1px solid #d0d7de;">Actions</th></tr>';
+    
+    for (var i = 0; i < activeOrders.length; i++) {
+        var order = activeOrders[i];
+        var condLabels = [];
+        for (var j = 0; j < order.entry_conditions.length; j++) {
+            var c = order.entry_conditions[j];
+            if (c.type === "candle_breakout") {
+                condLabels.push("Candle:" + c.timeframe);
+            } else if (c.type === "ma_crossover") {
+                condLabels.push(c.ma_type.toUpperCase() + c.ma_period + ":" + c.timeframe);
+            }
+        }
+        
+        html += '<tr style="border-bottom:1px solid #d0d7de;">';
+        html += '<td style="padding:4px;border:1px solid #d0d7de;font-weight:bold;">' + order.symbol + '</td>';
+        html += '<td style="padding:4px;border:1px solid #d0d7de;">' + (order.side === 'long' ? '📈' : '📉') + ' ' + order.side.toUpperCase() + '</td>';
+        html += '<td style="padding:4px;border:1px solid #d0d7de;">' + order.quantity + '</td>';
+        html += '<td style="padding:4px;border:1px solid #d0d7de;font-size:10px;">' + condLabels.join(', ') + '</td>';
+        html += '<td style="padding:4px;border:1px solid #d0d7de;">';
+        html += '<button class="oe-btn oe-btn-sm" onclick="_hoEditOrder(\'' + order.order_id + '\')">Edit</button> ';
+        html += '<button class="oe-btn oe-btn-sm oe-btn-danger" onclick="_hoCancelOrder(\'' + order.order_id + '\')">Cancel</button>';
+        html += '</td></tr>';
+    }
+    
+    html += '</table>';
+    listEl.innerHTML = html;
+}
+
+function _hoCancelOrder(orderId) {
+    if (!confirm("Cancel this held order?")) return;
+    
+    if (_heldOrdersDB[orderId]) {
+        _heldOrdersDB[orderId].status = "cancelled";
+        _hoSaveOrders();
+        _hoRefreshOrdersList();
+        alert("Order cancelled");
+    }
+}
+
+function _hoEditOrder(orderId) {
+    var order = _heldOrdersDB[orderId];
+    if (!order) return;
+    
+    // Populate form with order data
+    document.getElementById("ho_symbol").value = order.symbol;
+    document.getElementById("ho_side").value = order.side;
+    document.getElementById("ho_quantity").value = order.quantity;
+    document.getElementById("ho_order_type").value = order.order_type;
+    document.getElementById("ho_limit_price").value = order.limit_price || 0;
+    
+    // Load entry conditions
+    for (var i = 0; i < order.entry_conditions.length; i++) {
+        var cond = order.entry_conditions[i];
+        if (cond.type === "candle_breakout") {
+            document.getElementById("ho_use_candle_entry").checked = true;
+            document.getElementById("ho_candle_tf").value = cond.timeframe;
+            document.getElementById("ho_candle_lookback").value = cond.lookback_bars;
+            document.getElementById("ho_candle_direction").value = cond.break_direction;
+            document.getElementById("ho_candle_offset").value = cond.entry_offset_pct;
+            _hoToggleCandleEntry();
+        } else if (cond.type === "ma_crossover") {
+            document.getElementById("ho_use_ma_entry").checked = true;
+            document.getElementById("ho_ma_tf").value = cond.timeframe;
+            document.getElementById("ho_ma_type").value = cond.ma_type;
+            document.getElementById("ho_ma_period").value = cond.ma_period;
+            document.getElementById("ho_ma_direction").value = cond.cross_direction;
+            document.getElementById("ho_ma_offset").value = cond.cross_offset_pct;
+            _hoToggleMaEntry();
+        }
+    }
+    
+    // Load exit conditions
+    for (var j = 0; j < order.exit_conditions.length; j++) {
+        var exitCond = order.exit_conditions[j];
+        if (exitCond.type === "candle_breakout") {
+            document.getElementById("ho_use_candle_exit").checked = true;
+            document.getElementById("ho_candle_exit_tf").value = exitCond.timeframe;
+            document.getElementById("ho_candle_exit_lookback").value = exitCond.lookback_bars;
+            document.getElementById("ho_candle_exit_direction").value = exitCond.break_direction;
+            document.getElementById("ho_candle_exit_offset").value = exitCond.entry_offset_pct;
+            _hoToggleCandleExit();
+        } else if (exitCond.type === "ma_crossover") {
+            document.getElementById("ho_use_ma_exit").checked = true;
+            document.getElementById("ho_ma_exit_tf").value = exitCond.timeframe;
+            document.getElementById("ho_ma_exit_type").value = exitCond.ma_type;
+            document.getElementById("ho_ma_exit_period").value = exitCond.ma_period;
+            document.getElementById("ho_ma_exit_direction").value = exitCond.cross_direction;
+            document.getElementById("ho_ma_exit_offset").value = exitCond.cross_offset_pct;
+            _hoToggleMaExit();
+        }
+    }
+    
+    _hoToggleOrderType();
+    
+    // Delete old order  
+    delete _heldOrdersDB[orderId];
+    _hoSaveOrders();
+    _hoRefreshOrdersList();
+}
+
 // Initialize auto-order panel on page load
 $(function() {
     _aoRefreshPresetDropdown();
     _aoLoadDefaultPreset();
+    
+    // Load held orders from localStorage
+    _hoLoadOrders();
+    _hoRefreshOrdersList();
 });
 
 

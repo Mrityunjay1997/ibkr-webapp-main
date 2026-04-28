@@ -28,16 +28,25 @@ logger = logging.getLogger("order_manager")
 
 @dataclass
 class PriceReference:
-    """Represents a price reference (entry/exit/stop point)."""
+    """
+    Represents a price reference (entry/exit/stop point).
     
-    type: str  # 'vwap', 'sma_fast', 'sma_medium', 'sma_slow', 'ema_fast', 'ema_slow',
-               # 'fibonacci_23.6', 'fibonacci_38.2', 'fibonacci_50.0', 'fibonacci_61.8',
-               # 'fibonacci_78.6', 'prev_close', 'support_1', 'resistance_1', 'custom'
+    Supported types:
+    - Indicators: vwap, sma_fast, sma_medium, sma_slow, ema_fast, ema_slow, rsi, atr
+    - Fibonacci: fibonacci_23.6, fibonacci_38.2, fibonacci_50.0, fibonacci_61.8, fibonacci_78.6
+    - Pivot Points: pivot, support_1, support_2, resistance_1, resistance_2
+    - Price Levels: prev_close, day_high, day_low, high_of_day, low_of_day
+    - Price Targets: percent_target (% above/below prev_close)
+    - Special: custom, trailing_stop, trailing_percent, trailing_candle
+    """
+    
+    type: str  # Price reference type (see above)
     offset_pct: float  # Percentage offset (positive = up, negative = down)
-    order_type: str = 'limit'  # 'limit', 'market', 'stop', 'trail'
+    order_type: str = 'limit'  # 'limit', 'market', 'stop', 'stop_limit', 'bracket', 'trail', 'trail_percent', 'trail_candle'
     trailing_amount: Optional[float] = None  # For trailing stops/candles
-    trailing_type: str = 'amount'  # 'amount' or 'percent'
+    trailing_type: str = 'amount'  # 'amount', 'percent', or 'candles'
     custom_price: Optional[float] = None  # For custom price references
+    notes: str = ""  # Optional notes for this reference
 
     def resolve_price(self, indicator_value: float) -> float:
         """
@@ -62,14 +71,63 @@ class PriceReference:
 
 
 @dataclass
+class SellTarget:
+    """
+    Represents a single profit target within an order level.
+    
+    Allows multiple exit points per level with allocation percentages.
+    Example: Sell 50% at Fib 61.8%, 30% at 30% above prev_close, 20% on trailing stop.
+    """
+    
+    type: str  # Price reference type (same as PriceReference)
+    offset_pct: float  # Percentage offset
+    order_type: str = 'limit'  # 'limit', 'market', 'stop', 'stop_limit', 'bracket', 'trail', 'trail_percent'
+    percent_of_position: float = 100.0  # % of position to allocate to this target (should sum to ~100%)
+    trailing_amount: Optional[float] = None  # For trailing stops
+    trailing_type: str = 'amount'  # 'amount', 'percent', or 'candles'
+    notes: str = ""  # Optional notes for this target
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            'type': self.type,
+            'offset_pct': self.offset_pct,
+            'order_type': self.order_type,
+            'percent_of_position': self.percent_of_position,
+            'trailing_amount': self.trailing_amount,
+            'trailing_type': self.trailing_type,
+            'notes': self.notes,
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'SellTarget':
+        """Create SellTarget from dictionary."""
+        return cls(
+            type=data['type'],
+            offset_pct=data['offset_pct'],
+            order_type=data.get('order_type', 'limit'),
+            percent_of_position=data.get('percent_of_position', 100.0),
+            trailing_amount=data.get('trailing_amount'),
+            trailing_type=data.get('trailing_type', 'amount'),
+            notes=data.get('notes', ''),
+        )
+
+
+@dataclass
+
+@dataclass
 class OrderLevel:
-    """Represents a single level in a multi-level order."""
+    """
+    Represents a single level in a multi-level order.
+    
+    Supports multiple sell targets per level, allowing complex exit strategies.
+    """
     
     level_num: int
     quantity: int
     entry: PriceReference
-    exit: PriceReference
     stop_loss: Optional[PriceReference] = None
+    sell_targets: List[SellTarget] = field(default_factory=list)  # Multiple exit points
     notes: str = ""
     
     def to_dict(self) -> Dict[str, Any]:
@@ -78,12 +136,33 @@ class OrderLevel:
             'level_num': self.level_num,
             'quantity': self.quantity,
             'entry': asdict(self.entry),
-            'exit': asdict(self.exit),
+            'sell_targets': [st.to_dict() for st in self.sell_targets],
             'notes': self.notes,
         }
         if self.stop_loss:
             result['stop_loss'] = asdict(self.stop_loss)
         return result
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'OrderLevel':
+        """Create OrderLevel from dictionary."""
+        entry = PriceReference(**data['entry'])
+        stop_loss = None
+        if 'stop_loss' in data and data['stop_loss']:
+            stop_loss = PriceReference(**data['stop_loss'])
+        
+        sell_targets = []
+        for st_data in data.get('sell_targets', []):
+            sell_targets.append(SellTarget.from_dict(st_data))
+        
+        return cls(
+            level_num=data['level_num'],
+            quantity=data['quantity'],
+            entry=entry,
+            stop_loss=stop_loss,
+            sell_targets=sell_targets,
+            notes=data.get('notes', '')
+        )
 
 
 @dataclass
@@ -118,8 +197,24 @@ class MultiLevelOrder:
         """Create MultiLevelOrder from dictionary."""
         levels = []
         for level_data in data.get('levels', []):
+            # Support both old format (with 'exit') and new format (with 'sell_targets')
+            sell_targets = []
+            if 'sell_targets' in level_data and level_data['sell_targets']:
+                for st_data in level_data['sell_targets']:
+                    sell_targets.append(SellTarget.from_dict(st_data))
+            elif 'exit' in level_data and level_data['exit']:
+                # Convert old 'exit' to new 'sell_targets' format for backwards compatibility
+                exit_ref = level_data['exit']
+                sell_targets.append(SellTarget(
+                    type=exit_ref['type'],
+                    offset_pct=exit_ref['offset_pct'],
+                    order_type=exit_ref.get('order_type', 'limit'),
+                    percent_of_position=100.0,
+                    trailing_amount=exit_ref.get('trailing_amount'),
+                    trailing_type=exit_ref.get('trailing_type', 'amount'),
+                ))
+            
             entry = PriceReference(**level_data['entry'])
-            exit_ref = PriceReference(**level_data['exit'])
             stop_loss = None
             if 'stop_loss' in level_data and level_data['stop_loss']:
                 stop_loss = PriceReference(**level_data['stop_loss'])
@@ -128,8 +223,8 @@ class MultiLevelOrder:
                 level_num=level_data['level_num'],
                 quantity=level_data['quantity'],
                 entry=entry,
-                exit=exit_ref,
                 stop_loss=stop_loss,
+                sell_targets=sell_targets,
                 notes=level_data.get('notes', '')
             )
             levels.append(level)
@@ -334,13 +429,39 @@ class PriceReferenceResolver:
             'sma_slow': 'sma_slow',
             'ema_fast': 'ema_fast',
             'ema_slow': 'ema_slow',
+            'rsi': 'rsi',
+            'atr': 'atr',
             'prev_close': 'prev_close',
             'current_price': 'current_price',
             'day_high': 'day_high',
+            'high_of_day': 'day_high',
             'day_low': 'day_low',
-            'support_1': 'day_low',  # Simple support = day low
-            'resistance_1': 'day_high',  # Simple resistance = day high
+            'low_of_day': 'day_low',
         }
+        
+        # Support/Resistance (based on simple day high/low)
+        if ref_type == 'support_1':
+            return self.indicator_values.get('day_low')
+        elif ref_type == 'support_2':
+            # Support 2 = lower of support 1 and previous day's low
+            return self.indicator_values.get('day_low')
+        elif ref_type == 'resistance_1':
+            return self.indicator_values.get('day_high')
+        elif ref_type == 'resistance_2':
+            # Resistance 2 = higher of resistance 1 and previous day's high
+            return self.indicator_values.get('day_high')
+        elif ref_type == 'pivot':
+            # Pivot = (High + Low + Close) / 3
+            high = self.indicator_values.get('day_high')
+            low = self.indicator_values.get('day_low')
+            close = self.indicator_values.get('prev_close')
+            if all([high, low, close]):
+                return round((high + low + close) / 3, 2)
+            return None
+        
+        # Percent target from previous close
+        if ref_type == 'percent_target':
+            return self.indicator_values.get('prev_close')
         
         # Fibonacci levels are calculated from swing high/low
         if ref_type.startswith('fibonacci_'):
@@ -410,56 +531,89 @@ class PriceReferenceResolver:
 def create_sample_preset() -> MultiLevelOrder:
     """Create a sample multi-level order for testing."""
     
-    # First level: Entry at VWAP - 2%, Target at Fibonacci 61.8% + 1%, Stop below support
+    # First level: Entry at VWAP - 2%, Multiple sell targets
     level1 = OrderLevel(
         level_num=1,
         quantity=100,
         entry=PriceReference(
             type='vwap',
             offset_pct=-2.0,
-            order_type='limit'
-        ),
-        exit=PriceReference(
-            type='fibonacci_61.8',
-            offset_pct=1.0,
-            order_type='limit'
+            order_type='limit',
+            notes="Entry at VWAP support"
         ),
         stop_loss=PriceReference(
-            type='support_1',
+            type='pivot',
             offset_pct=-0.5,
-            order_type='stop'
+            order_type='stop',
+            notes="Stop below pivot"
         ),
-        notes="Initial entry at VWAP support"
+        sell_targets=[
+            SellTarget(
+                type='fibonacci_61.8',
+                offset_pct=1.0,
+                order_type='limit',
+                percent_of_position=50.0,
+                notes="Sell 50% at Fib 61.8% + 1%"
+            ),
+            SellTarget(
+                type='percent_target',
+                offset_pct=30.0,
+                order_type='limit',
+                percent_of_position=30.0,
+                notes="Sell 30% at 30% above previous close"
+            ),
+            SellTarget(
+                type='resistance_1',
+                offset_pct=0.0,
+                order_type='limit',
+                percent_of_position=20.0,
+                notes="Sell remaining 20% at resistance"
+            ),
+        ],
+        notes="Initial entry with three profit targets"
     )
     
-    # Second level: Entry at Fibonacci 50% - 1%, Target trailing stop, Stop same as level 1
+    # Second level: Entry at Fibonacci 50% - 1%, Different exit strategy
     level2 = OrderLevel(
         level_num=2,
         quantity=50,
         entry=PriceReference(
             type='fibonacci_50.0',
             offset_pct=-1.0,
-            order_type='limit'
-        ),
-        exit=PriceReference(
-            type='trailing_stop',
-            trailing_amount=0.50,
-            trailing_type='amount',
-            order_type='trail'
+            order_type='limit',
+            notes="Scaled entry at Fib pullback"
         ),
         stop_loss=PriceReference(
-            type='support_1',
+            type='pivot',
             offset_pct=-0.5,
             order_type='stop'
         ),
-        notes="Scaled entry at Fib pullback"
+        sell_targets=[
+            SellTarget(
+                type='day_high',
+                offset_pct=0.0,
+                order_type='limit',
+                percent_of_position=50.0,
+                notes="Sell 50% at High of Day"
+            ),
+            SellTarget(
+                type='trailing_percent',
+                offset_pct=0.0,
+                order_type='trail',
+                percent_of_position=50.0,
+                trailing_amount=5.0,
+                trailing_type='percent',
+                notes="Sell 50% on 5% trailing stop"
+            ),
+        ],
+        notes="Scaled entry with mixed exit types"
     )
     
     order = MultiLevelOrder(
-        name="Fibonacci Reversal 2-Level",
+        name="Advanced Multi-Target Strategy",
         symbol="AAPL",
         levels=[level1, level2],
-        strategy_notes="Two-level entry using Fibonacci pullback levels with mixed exit strategies"
+        strategy_notes="Two-level entry using Fibonacci with multiple profit targets per level"
     )
     
     return order

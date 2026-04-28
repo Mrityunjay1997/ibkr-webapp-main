@@ -577,9 +577,97 @@ def sendorders():
         # ===== MULTI-LEVEL ORDER HANDLING =====
         if is_multi_level:
             try:
+                from order_manager import MultiLevelOrder, PriceReferenceResolver
+                
                 # Parse multi-level order configuration
                 multi_level_json = asset.get("multiLevelConfig", "{}")
                 multi_level_config = json.loads(multi_level_json)
+                
+                # Build price indicator values from available data
+                # These would normally come from real-time market data
+                indicator_values = {
+                    'vwap': getattr(IBAPI, 'vwap', 0),
+                    'sma_fast': getattr(IBAPI, 'fast_sma', 0),
+                    'sma_medium': getattr(IBAPI, 'medium_sma', 0),
+                    'sma_slow': getattr(IBAPI, 'slow_sma', 0),
+                    'ema_fast': getattr(IBAPI, 'fast_ema', 0),
+                    'ema_slow': getattr(IBAPI, 'slow_ema', 0),
+                    'rsi': getattr(IBAPI, 'rsi', 50),
+                    'atr': getattr(IBAPI, 'atr', 0),
+                    'prev_close': getattr(IBAPI, 'lastPrice', 0),
+                    'current_price': getattr(IBAPI, 'lastPrice', 0),
+                    'day_high': getattr(IBAPI, 'day_high', 0),
+                    'day_low': getattr(IBAPI, 'day_low', 0),
+                }
+                
+                resolver = PriceReferenceResolver(indicator_values)
+                
+                # Process levels and resolve price references
+                expanded_levels = []
+                for level_config in multi_level_config.get('levels', []):
+                    level_qty = level_config.get('quantity', 100)
+                    
+                    # Resolve entry price
+                    entry_ref = level_config.get('entry', {})
+                    from order_manager import PriceReference
+                    entry_price_ref = PriceReference(**entry_ref)
+                    entry_price = resolver.resolve(entry_price_ref)
+                    entry_type = entry_ref.get('order_type', 'limit').upper()
+                    if entry_type == 'LIMIT':
+                        entry_type = 'LMT'
+                    elif entry_type == 'MARKET':
+                        entry_type = 'MKT'
+                    
+                    # Resolve stop loss price
+                    stop_price = None
+                    stop_loss_ref = level_config.get('stop_loss')
+                    if stop_loss_ref:
+                        stop_loss_price_ref = PriceReference(**stop_loss_ref)
+                        stop_price = resolver.resolve(stop_loss_price_ref)
+                    
+                    # Process multiple sell targets
+                    sell_targets = level_config.get('sell_targets', [])
+                    if not sell_targets:
+                        # If no sell targets, create a default one at +1%
+                        sell_targets = [{
+                            'type': 'percent_target',
+                            'offset_pct': 1.0,
+                            'order_type': 'limit',
+                            'percent_of_position': 100.0,
+                        }]
+                    
+                    for target_config in sell_targets:
+                        # Resolve sell target price
+                        target_price_ref = PriceReference(**target_config)
+                        target_price = resolver.resolve(target_price_ref)
+                        
+                        # Calculate quantity for this target
+                        target_qty = int(level_qty * (target_config.get('percent_of_position', 100) / 100))
+                        if target_qty < 1:
+                            target_qty = 1
+                        
+                        # Determine order type
+                        target_order_type = target_config.get('order_type', 'limit').upper()
+                        if target_order_type == 'LIMIT':
+                            target_order_type = 'LMT'
+                        elif target_order_type == 'MARKET':
+                            target_order_type = 'MKT'
+                        elif target_order_type in ('TRAIL', 'TRAIL_PERCENT', 'TRAIL_CANDLE'):
+                            target_order_type = 'TRAIL'
+                        elif target_order_type in ('STOP_LIMIT',):
+                            target_order_type = 'STP'
+                        
+                        # Add expanded level
+                        expanded_levels.append({
+                            'quantity': target_qty,
+                            'entry_price': entry_price,
+                            'entry_type': entry_type,
+                            'exit_price': target_price if target_order_type == 'LMT' else None,
+                            'stop_price': stop_price,
+                            'use_trailing_stop': target_order_type == 'TRAIL',
+                            'trailing_amount': target_config.get('trailing_amount'),
+                            'trailing_type': target_config.get('trailing_type', 'amount'),
+                        })
                 
                 # Build order specification
                 order_spec = {
@@ -587,8 +675,10 @@ def sendorders():
                     'tif': tif,
                     'outside_rth': allow_outside_rth,
                     'start_order_id': orders_id,
-                    'levels': multi_level_config.get('levels', [])
+                    'levels': expanded_levels
                 }
+                
+                logger.info(f"Multi-level order spec: {order_spec}")
                 
                 # Create multi-level orders
                 orders = IBAPI.multiLevelOrder(order_spec)

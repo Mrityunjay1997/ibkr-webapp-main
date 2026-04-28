@@ -27,6 +27,9 @@ from indicators import (
     RSIIndicator,
     EMAIndicator,
     OBVIndicator,
+    FastOBVIndicator,
+    MediumOBVIndicator,
+    SlowOBVIndicator,
     ATRIndicator,
     GapAnalyzer,
     # pivot_points,
@@ -259,6 +262,44 @@ def calculate_volume_sum(data: pd.DataFrame, lookback_bars: int = 5) -> float:
         return 0.0
 
 
+def calculate_rvol(hist_data: pd.DataFrame, lookback_days: int = 5) -> float:
+    """
+    Calculate Relative Volume (RVOL) for the current bar.
+    RVOL = Current Bar Volume / Average Volume
+    
+    Args:
+        hist_data: DataFrame with historical OHLC and volume data
+        lookback_days: Number of days to look back for average volume
+    
+    Returns:
+        float: RVOL multiplier (e.g., 1.5 means 150% of average volume)
+    """
+    if hist_data is None or len(hist_data) == 0:
+        return 0.0
+    
+    try:
+        current_volume = float(hist_data["volume"].iloc[-1])
+        
+        # Get average volume from lookback period (excluding current bar)
+        lookback_bars = max(1, min(lookback_days * 6, len(hist_data) - 1))  # ~6 bars per hour, 1 day = ~39 bars
+        
+        if lookback_bars > 0 and len(hist_data) > lookback_bars:
+            avg_volume = float(hist_data["volume"].iloc[-lookback_bars-1:-1].mean())
+        elif len(hist_data) > 1:
+            avg_volume = float(hist_data["volume"].iloc[:-1].mean())
+        else:
+            avg_volume = current_volume
+        
+        if avg_volume <= 0:
+            return 0.0
+        
+        rvol = current_volume / avg_volume
+        return float(rvol)
+    except Exception as e:
+        logger.warning(f"Error calculating RVOL: {e}")
+        return 0.0
+
+
 def _safe_to_float(value) -> Optional[float]:
     """
     Safely convert any value to float, handling numpy types and None.
@@ -382,6 +423,9 @@ def apply_result_filters(stock_data: dict, form: dict) -> bool:
         ("filterFastEMA", "emaFast", "ComparisonFastEMA", "FastEMA", "PercentageFastEMA"),
         ("filterSlowEMA", "emaSlow", "ComparisonSlowEMA", "SlowEMA", "PercentageSlowEMA"),
         ("filterOBV", "obv", "ComparisonOBV", "OBV", "PercentageOBV"),
+        ("filterFastOBV", "fast_obv", "ComparisonFastOBV", "FastOBV", "PercentageFastOBV"),
+        ("filterMediumOBV", "medium_obv", "ComparisonMediumOBV", "MediumOBV", "PercentageMediumOBV"),
+        ("filterSlowOBV", "slow_obv", "ComparisonSlowOBV", "SlowOBV", "PercentageSlowOBV"),
         ("filterATR", "atr", "ComparisonATR", "ATR", "PercentageATR"),
         
         # Volume indicators
@@ -449,78 +493,74 @@ def apply_result_filters(stock_data: dict, form: dict) -> bool:
     return True
 
 
-def detect_nearby_key_levels(data: dict, proximity_pct: float = 1.0) -> bool:
+def detect_nearby_key_levels(data: dict, proximity_pct: float = 1.0, level_type: str = "vwap") -> tuple:
     """
-    Detect if current price is near any key support/resistance/pivot levels.
+    Detect if current price is near a specific key level.
     
     Args:
-        data: Dictionary with stock data (close, Pivot, etc.)
+        data: Dictionary with stock data (close, Pivot, VWAP, etc.)
         proximity_pct: How close (in %) to consider "near" a level
+        level_type: Type of level to check: "vwap", "gapclose", "pivot1", "pivot2", "pivot3"
     
     Returns:
-        True if near a key level, False otherwise
+        tuple: (is_near_level: bool, level_name: str, level_value: float or None)
     """
     if not data or "close" not in data:
-        return False
+        return (False, "", None)
     
     try:
         current = float(data.get("close", 0))
         if current <= 0:
-            return False
+            return (False, "", None)
         
-        # Define key levels to check
-        key_levels = []
+        target_level = None
+        level_name = ""
         
-        # Pivot point levels
-        pivot_sources = ["PivotLevels", "Pivot", "Pivot1", "Pivot2", "Pivot3"]
-        for source in pivot_sources:
-            if source in data and isinstance(data[source], dict):
-                for val in data[source].values():
-                    try:
-                        level_val = float(val)
-                        if level_val > 0:
-                            key_levels.append(level_val)
-                    except (ValueError, TypeError):
-                        pass
-        
-        # SMA levels
-        for sma_key in ["smaFast", "smaMedium", "smaSlow"]:
-            if sma_key in data:
+        # Get the target level based on type
+        if level_type == "vwap":
+            level_name = "VWAP"
+            if "vwap" in data:
                 try:
-                    val = float(data[sma_key])
-                    if val > 0:
-                        key_levels.append(val)
+                    target_level = float(data["vwap"])
                 except (ValueError, TypeError):
                     pass
         
-        # Support and resistance
-        if "lowOfDay" in data:
-            try:
-                val = float(data["lowOfDay"])
-                if val > 0:
-                    key_levels.append(val)
-            except (ValueError, TypeError):
-                pass
+        elif level_type == "gapclose":
+            level_name = "Gap Close"
+            # Gap close is typically stored in gap data or calculated from previous close and current open
+            if "gapCloseLevel" in data:
+                try:
+                    target_level = float(data["gapCloseLevel"])
+                except (ValueError, TypeError):
+                    pass
         
-        if "highOfDay" in data:
-            try:
-                val = float(data["highOfDay"])
-                if val > 0:
-                    key_levels.append(val)
-            except (ValueError, TypeError):
-                pass
+        elif level_type.startswith("pivot"):
+            # Extract pivot level: pivot1, pivot2, pivot3
+            pivot_num = level_type[-1]  # Get the last character (1, 2, or 3)
+            pivot_source_key = f"Pivot{pivot_num}" if pivot_num != "1" else "Pivot"
+            level_name = f"Pivot {pivot_num}"
+            
+            if pivot_source_key in data and isinstance(data[pivot_source_key], dict):
+                pivot_dict = data[pivot_source_key]
+                # Try to get the main pivot point value
+                if "PP" in pivot_dict:
+                    try:
+                        target_level = float(pivot_dict["PP"])
+                    except (ValueError, TypeError):
+                        pass
         
-        # Check proximity to each key level
-        proximity_threshold = current * (proximity_pct / 100.0)
-        for level in key_levels:
-            distance = abs(current - level)
-            if distance <= proximity_threshold:
-                return True
+        # Check if we found a valid level and if price is near it
+        if target_level is not None and target_level > 0:
+            proximity_threshold = current * (proximity_pct / 100.0)
+            distance = abs(current - target_level)
+            
+            is_near = distance <= proximity_threshold
+            return (is_near, level_name, target_level if is_near else None)
         
-        return False
+        return (False, level_name, None)
     except Exception as e:
         logger.warning(f"Error in detect_nearby_key_levels: {e}")
-        return False
+        return (False, "", None)
 
 
 def detect_200sma_bullish_crossover(data: dict, form: dict = None, hist_data=None) -> bool:
@@ -2642,6 +2682,75 @@ class IBapi(EWrapper, EClient):
                 except Exception:
                     indicators["obv1"] = None
 
+        # --- Fast OBV (5-bar MA) ---
+        if form.get("ComparisonFastOBV", "Not used") != "Not used":
+            try:
+                fast_obv = FastOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=5)
+                try:
+                    fast_obv_series = fast_obv.fast_obv()
+                except Exception:
+                    fast_obv_series = fast_obv.obv()
+                indicators["fast_obv"] = last_value(fast_obv_series)
+            except Exception:
+                indicators["fast_obv"] = None
+
+            if form.get("ComparisonFastOBV") == "between":
+                try:
+                    fast_obv1 = FastOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=5)
+                    try:
+                        fast_obv1_series = fast_obv1.fast_obv()
+                    except Exception:
+                        fast_obv1_series = fast_obv1.obv()
+                    indicators["fast_obv1"] = last_value(fast_obv1_series)
+                except Exception:
+                    indicators["fast_obv1"] = None
+
+        # --- Medium OBV (10-bar MA) ---
+        if form.get("ComparisonMediumOBV", "Not used") != "Not used":
+            try:
+                medium_obv = MediumOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=10)
+                try:
+                    medium_obv_series = medium_obv.medium_obv()
+                except Exception:
+                    medium_obv_series = medium_obv.obv()
+                indicators["medium_obv"] = last_value(medium_obv_series)
+            except Exception:
+                indicators["medium_obv"] = None
+
+            if form.get("ComparisonMediumOBV") == "between":
+                try:
+                    medium_obv1 = MediumOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=10)
+                    try:
+                        medium_obv1_series = medium_obv1.medium_obv()
+                    except Exception:
+                        medium_obv1_series = medium_obv1.obv()
+                    indicators["medium_obv1"] = last_value(medium_obv1_series)
+                except Exception:
+                    indicators["medium_obv1"] = None
+
+        # --- Slow OBV (20-bar MA) ---
+        if form.get("ComparisonSlowOBV", "Not used") != "Not used":
+            try:
+                slow_obv = SlowOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=20)
+                try:
+                    slow_obv_series = slow_obv.slow_obv()
+                except Exception:
+                    slow_obv_series = slow_obv.obv()
+                indicators["slow_obv"] = last_value(slow_obv_series)
+            except Exception:
+                indicators["slow_obv"] = None
+
+            if form.get("ComparisonSlowOBV") == "between":
+                try:
+                    slow_obv1 = SlowOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=20)
+                    try:
+                        slow_obv1_series = slow_obv1.slow_obv()
+                    except Exception:
+                        slow_obv1_series = slow_obv1.obv()
+                    indicators["slow_obv1"] = last_value(slow_obv1_series)
+                except Exception:
+                    indicators["slow_obv1"] = None
+
         # --- ATR ---
         if form.get("ComparisonATR", "Not used") != "Not used":
             try:
@@ -2681,22 +2790,21 @@ class IBapi(EWrapper, EClient):
                 except Exception:
                     indicators["atr1"] = None
 
-        # --- Previous Close (explicit) ---
-        if form.get("ComparisonPrevClose", "Not used") != "Not used":
-            try:
-                # previous session close = last bar close from previous date (not the current session)
-                if len(unique_dates) >= 2:
-                    prev_date = unique_dates[-2]
-                    prev_mask = result_full.index.normalize() == prev_date
-                    prev_close = float(result_full.loc[prev_mask]["close"].iloc[-1])
-                else:
-                    prev_close = float(result_full["close"].iloc[-2]) if len(result_full) >= 2 else float(
-                        result_full["close"].iloc[-1])
-                indicators["prevClose"] = prev_close
-                if form.get("ComparisonPrevClose") == "between":
-                    indicators["prevClose1"] = prev_close
-            except Exception:
-                indicators["prevClose"] = None
+        # --- Previous Close (always calculated for 200 SMA crossover detection) ---
+        try:
+            # previous session close = last bar close from previous date (not the current session)
+            if len(unique_dates) >= 2:
+                prev_date = unique_dates[-2]
+                prev_mask = result_full.index.normalize() == prev_date
+                prev_close = float(result_full.loc[prev_mask]["close"].iloc[-1])
+            else:
+                prev_close = float(result_full["close"].iloc[-2]) if len(result_full) >= 2 else float(
+                    result_full["close"].iloc[-1])
+            indicators["prevClose"] = prev_close
+            if form.get("ComparisonPrevClose") == "between":
+                indicators["prevClose1"] = prev_close
+        except Exception:
+            indicators["prevClose"] = None
 
         # --- LowOfDay / HighOfDay (session-only) ---
         if form.get("ComparisonLowOfDay", "Not used") != "Not used":
@@ -3176,10 +3284,30 @@ class IBapi(EWrapper, EClient):
                 indicators["downGap1"] = None
 
         # --- Fibonacci Gap (daily gap vs Fib retracement levels) ---
+        # Uses RTH (9:30 AM - 4 PM EST) data only, excluding pre/post-market
         if form.get("ComparisonFibGap", "Not used") != "Not used":
             try:
                 close_price_fg = float(result_full["close"].iloc[-1])
-                open_price_fg = float(result_full["open"].iloc[-1])
+                
+                # Filter to 9:30 AM - 4 PM EST only (Regular Trading Hours) for gap calculation
+                eastern = pytz.timezone('US/Eastern')
+                result_rth_fg = result_full.copy()
+                
+                if hasattr(result_rth_fg.index, 'tz_localize'):
+                    # Make timezone-aware if needed
+                    if result_rth_fg.index.tz is None:
+                        result_rth_fg.index = result_rth_fg.index.tz_localize('UTC').tz_convert(eastern)
+                    else:
+                        result_rth_fg.index = result_rth_fg.index.tz_convert(eastern)
+                
+                # Extract trading hours (9:30 AM - 4 PM)
+                result_rth_fg = result_rth_fg.between_time('09:30', '16:00')
+                
+                # Get RTH open price (first bar after 9:30 AM)
+                if len(result_rth_fg) > 0:
+                    open_price_fg = float(result_rth_fg["open"].iloc[0])
+                else:
+                    open_price_fg = float(result_full["open"].iloc[-1])
 
                 if len(unique_dates) >= 2:
                     prev_date_fg = unique_dates[-2]
@@ -5061,15 +5189,28 @@ class IBapi(EWrapper, EClient):
 
         # Apply keyword filtering REGARDLESS of whether News signal is enabled
         keywords_raw = form.get("NewsKeywords", "").strip()
+        logger.debug(f"[KEYWORDS DEBUG] form keys: {list(form.keys()) if isinstance(form, dict) else 'not dict'}")
+        logger.debug(f"[KEYWORDS DEBUG] NewsKeywords value: '{keywords_raw}'")
+        logger.debug(f"[KEYWORDS DEBUG] Available headlines: {len(data.get('newsHeadlines', []) or [])} headlines")
         if keywords_raw:
             keywords = [k.strip().lower() for k in keywords_raw.split(",") if k.strip()]
+            logger.debug(f"[KEYWORDS DEBUG] Parsed keywords: {keywords}")
             if keywords:
                 headlines = data.get("newsHeadlines", [])
+                # Handle case where headlines might be None instead of list
+                if headlines is None:
+                    headlines = []
+                    logger.debug("[KEYWORDS DEBUG] newsHeadlines was None, using empty list")
+                    
+                # Use whole-word matching to avoid unintended partial matches
+                import re as _re_kw
                 filtered_headlines = []
+                # compile patterns once for performance
+                patterns = [_re_kw.compile(r"\b" + _re_kw.escape(k) + r"\b", _re_kw.IGNORECASE) for k in keywords]
                 for h in headlines:
-                    headline_text = (h.get("headline") or "").lower()
-                    for kw in keywords:
-                        if kw in headline_text:
+                    headline_text = (h.get("headline") or "")
+                    for pat in patterns:
+                        if pat.search(headline_text):
                             filtered_headlines.append(h)
                             matched_keyword_headlines.append(h.get("headline", ""))
                             break
@@ -5077,12 +5218,16 @@ class IBapi(EWrapper, EClient):
                 # Replace newsHeadlines with only those containing keywords
                 data["newsHeadlines"] = filtered_headlines
                 news_keyword_match = len(filtered_headlines) > 0
+                logger.debug(f"[KEYWORDS DEBUG] Matched {len(filtered_headlines)} out of {len(headlines)} headlines")
+        else:
+            logger.debug("[KEYWORDS DEBUG] No keywords entered")
 
         if news_keyword_match is not None:
             variable_results["newsKeyword"] = bool(news_keyword_match)
 
         data["newsKeywordMatch"] = bool(news_keyword_match) if news_keyword_match else False
         data["matchedKeywordHeadlines"] = matched_keyword_headlines
+        logger.debug(f"[KEYWORDS DEBUG] Final result: news_keyword_match={news_keyword_match}")
 
         # -------------------------
         # FINAL
@@ -5251,61 +5396,70 @@ class IBapi(EWrapper, EClient):
                     data["pctChange"] = 0.0
             except Exception as e:
                 logger.warning(f"% Change monitoring failed: {e}")
-                pct_change_condition = False
+        pct_change_condition = False
         
         if pct_change_condition is not None:
             variable_results["pctChange"] = bool(pct_change_condition)
 
         # -------------------------
-        # VOLUME MONITORING
+        # RVOL MONITORING
         # -------------------------
-        volume_monitor_condition = None
-        if form.get("EnableVolumeMonitor"):
+        rvol_monitor_condition = None
+        if form.get("EnableRVOLMonitor"):
             try:
-                lookback_minutes = int(form.get("VolumeLookbackMinutes", 5))
-                volume_threshold = float(form.get("VolumeThreshold", 50000))
-                
-                # Convert minutes to bars
-                lookback_bars = max(1, lookback_minutes)
+                lookback_days = int(form.get("RVOLLookbackDays", 5))
+                rvol_threshold = float(form.get("RVOLThreshold", 1.5))
                 
                 # Get historical data
                 symbol = data.get("symbol")
                 if symbol and symbol in self.HistoricalDt:
                     hist_data = self.HistoricalDt[symbol]
-                    if isinstance(hist_data, pd.DataFrame) and len(hist_data) >= lookback_bars:
-                        vol_sum = calculate_volume_sum(hist_data, lookback_bars)
-                        volume_monitor_condition = vol_sum >= volume_threshold
-                        data["volumeSum"] = vol_sum
-                        data["volumeThreshold"] = volume_threshold
+                    if isinstance(hist_data, pd.DataFrame) and len(hist_data) >= 1:
+                        rvol_value = calculate_rvol(hist_data, lookback_days)
+                        rvol_monitor_condition = rvol_value >= rvol_threshold
+                        data["rvol"] = rvol_value
+                        data["rvolThreshold"] = rvol_threshold
                     else:
-                        volume_monitor_condition = False
-                        data["volumeSum"] = 0.0
+                        rvol_monitor_condition = False
+                        data["rvol"] = 0.0
                 else:
-                    volume_monitor_condition = False
-                    data["volumeSum"] = 0.0
+                    rvol_monitor_condition = False
+                    data["rvol"] = 0.0
             except Exception as e:
-                logger.warning(f"Volume monitoring failed: {e}")
-                volume_monitor_condition = False
+                logger.warning(f"RVOL monitoring failed: {e}")
+                rvol_monitor_condition = False
         
-        if volume_monitor_condition is not None:
-            variable_results["volumeSum"] = bool(volume_monitor_condition)
+        if rvol_monitor_condition is not None:
+            variable_results["rvol"] = bool(rvol_monitor_condition)
 
         # -------------------------
         # KEY LEVEL DETECTION
         # -------------------------
         key_level_condition = None
+        key_level_details = {}
         if form.get("EnableKeyLevelDetection"):
             try:
                 proximity_pct = float(form.get("KeyLevelProximityPercent", 1.0))
-                key_level_condition = detect_nearby_key_levels(data, proximity_pct)
+                level_type = form.get("KeyLevelType", "vwap")
+                
+                is_near, level_name, level_value = detect_nearby_key_levels(data, proximity_pct, level_type)
+                key_level_condition = is_near
                 data["nearKeyLevel"] = key_level_condition
                 data["keyLevelProximity"] = proximity_pct
+                data["keyLevelType"] = level_type
+                key_level_details = {
+                    "name": level_name,
+                    "value": level_value,
+                    "type": level_type
+                }
             except Exception as e:
                 logger.warning(f"Key level detection failed: {e}")
                 key_level_condition = False
         
         if key_level_condition is not None:
             variable_results["keyLevel"] = bool(key_level_condition)
+            if key_level_condition:
+                variable_results["keyLevelDetails"] = key_level_details
 
         # -------------------------
         # 200 SMA BULLISH CROSSOVER DETECTION
@@ -6833,3 +6987,186 @@ class IBapi(EWrapper, EClient):
 
         # Reset custom symbol counter to avoid unbounded growth
         self.customSymbol = 0
+
+
+# =============================================================================
+# MULTI-OBV ANALYSIS FUNCTIONS
+# =============================================================================
+
+def analyze_multi_obv(
+    fast_obv: float = None,
+    medium_obv: float = None, 
+    slow_obv: float = None,
+    prev_fast: float = None,
+    prev_medium: float = None,
+    prev_slow: float = None,
+    change_threshold: float = 5.0
+) -> dict:
+    """
+    Analyze three OBV indicators (Fast, Medium, Slow) to generate trading signals.
+    
+    Detects:
+    - Alignment: bullish (all positive), bearish (all negative), misaligned (mixed)
+    - Divergence: when OBVs move in opposite directions
+    - Transitions: when OBV changes sign (positive to negative or vice versa)
+    - Strength: based on alignment and % changes
+    - % changes: between pairs (Fast→Medium, Medium→Slow, Fast→Slow)
+    
+    Args:
+        fast_obv: Current Fast OBV value
+        medium_obv: Current Medium OBV value
+        slow_obv: Current Slow OBV value
+        prev_fast: Previous Fast OBV value
+        prev_medium: Previous Medium OBV value
+        prev_slow: Previous Slow OBV value
+        change_threshold: Minimum % change to trigger "strong" signal (default 5.0%)
+    
+    Returns:
+        dict with keys:
+            - signal: strong_bullish/bullish/neutral/bearish/strong_bearish
+            - alignment: aligned_bullish/aligned_bearish/misaligned/neutral
+            - strength: very_strong/strong/moderate/weak
+            - divergence: bool (True if OBVs diverge)
+            - fast_transition: bool (True if Fast OBV changes sign)
+            - medium_transition: bool (True if Medium OBV changes sign)
+            - slow_transition: bool (True if Slow OBV changes sign)
+            - fast_medium_pct_change: % change from Fast to Medium
+            - medium_slow_pct_change: % change from Medium to Slow
+            - fast_slow_pct_change: % change from Fast to Slow
+            - equation: Formatted display equation
+            - description: Natural language description for TTS
+    """
+    
+    # Handle None values - return neutral
+    if fast_obv is None or medium_obv is None or slow_obv is None:
+        return {
+            'signal': 'neutral',
+            'alignment': 'neutral',
+            'strength': 'weak',
+            'divergence': False,
+            'fast_transition': False,
+            'medium_transition': False,
+            'slow_transition': False,
+            'fast_medium_pct_change': 0.0,
+            'medium_slow_pct_change': 0.0,
+            'fast_slow_pct_change': 0.0,
+            'equation': 'Insufficient data for analysis',
+            'description': 'Cannot analyze OBV with missing data'
+        }
+    
+    # Calculate % changes with safe division
+    def safe_pct_change(current: float, reference: float) -> float:
+        """Calculate % change safely, handling zero/None values."""
+        if reference is None or reference == 0:
+            return 0.0
+        try:
+            return ((current - reference) / abs(reference)) * 100.0
+        except (ValueError, ZeroDivisionError):
+            return 0.0
+    
+    # Calculate % changes
+    fast_medium_pct = safe_pct_change(medium_obv, fast_obv)
+    medium_slow_pct = safe_pct_change(slow_obv, medium_obv)
+    fast_slow_pct = safe_pct_change(slow_obv, fast_obv)
+    
+    # Detect transitions (sign changes)
+    fast_transition = (prev_fast is not None and 
+                      ((prev_fast > 0 and fast_obv <= 0) or (prev_fast < 0 and fast_obv >= 0)))
+    medium_transition = (prev_medium is not None and 
+                        ((prev_medium > 0 and medium_obv <= 0) or (prev_medium < 0 and medium_obv >= 0)))
+    slow_transition = (prev_slow is not None and 
+                      ((prev_slow > 0 and slow_obv <= 0) or (prev_slow < 0 and slow_obv >= 0)))
+    
+    # Detect alignment
+    all_positive = fast_obv > 0 and medium_obv > 0 and slow_obv > 0
+    all_negative = fast_obv < 0 and medium_obv < 0 and slow_obv < 0
+    
+    if all_positive:
+        alignment = 'aligned_bullish'
+    elif all_negative:
+        alignment = 'aligned_bearish'
+    else:
+        alignment = 'misaligned'
+    
+    # Detect divergence (mixed signs)
+    divergence = not (all_positive or all_negative)
+    
+    # Determine signal based on alignment and transitions
+    if all_positive:
+        if fast_transition or medium_transition:
+            # Was bearish, now turning bullish
+            signal = 'strong_bullish'
+            strength = 'very_strong'
+        elif abs(fast_medium_pct) > change_threshold or abs(medium_slow_pct) > change_threshold:
+            signal = 'strong_bullish'
+            strength = 'strong'
+        else:
+            signal = 'bullish'
+            strength = 'moderate'
+    elif all_negative:
+        if fast_transition or medium_transition:
+            # Was bullish, now turning bearish
+            signal = 'strong_bearish'
+            strength = 'very_strong'
+        elif abs(fast_medium_pct) > change_threshold or abs(medium_slow_pct) > change_threshold:
+            signal = 'strong_bearish'
+            strength = 'strong'
+        else:
+            signal = 'bearish'
+            strength = 'moderate'
+    else:
+        # Misaligned
+        if divergence and (fast_transition or medium_transition or slow_transition):
+            signal = 'neutral'  # Conflicting signals
+            strength = 'weak'
+        else:
+            signal = 'neutral'
+            strength = 'weak'
+    
+    # Build equation display with direction indicators
+    fast_dir = '↑' if fast_obv > 0 else '↓'
+    medium_dir = '↑' if medium_obv > 0 else '↓'
+    slow_dir = '↑' if slow_obv > 0 else '↓'
+    
+    equation = (
+        f"Fast: {fast_obv:,.0f}{fast_dir} | "
+        f"Medium: {medium_obv:,.0f}{medium_dir} | "
+        f"Slow: {slow_obv:,.0f}{slow_dir} | "
+        f"Changes: F-M:{fast_medium_pct:+.1f}%, M-S:{medium_slow_pct:+.1f}%, F-S:{fast_slow_pct:+.1f}%"
+    )
+    
+    # Build natural language description
+    if signal == 'strong_bullish':
+        if fast_transition:
+            description = f"Strong bullish momentum detected! Fast OBV transitioned from bearish to bullish with Medium OBV rising {fast_medium_pct:+.1f}%."
+        else:
+            description = f"Very strong bullish alignment detected. All OBV indicators positive with significant upward momentum. Fast to Medium change: {fast_medium_pct:+.1f}%."
+    elif signal == 'bullish':
+        description = f"Bullish OBV alignment detected. All indicators positive with moderate growth. Fast to Medium: {fast_medium_pct:+.1f}%, Medium to Slow: {medium_slow_pct:+.1f}%."
+    elif signal == 'strong_bearish':
+        if fast_transition:
+            description = f"Strong bearish momentum detected! Fast OBV transitioned from bullish to bearish with Medium OBV falling {fast_medium_pct:+.1f}%."
+        else:
+            description = f"Very strong bearish alignment detected. All OBV indicators negative with significant downward momentum. Fast to Medium change: {fast_medium_pct:+.1f}%."
+    elif signal == 'bearish':
+        description = f"Bearish OBV alignment detected. All indicators negative with moderate decline. Fast to Medium: {fast_medium_pct:+.1f}%, Medium to Slow: {medium_slow_pct:+.1f}%."
+    else:  # neutral
+        if divergence:
+            description = f"OBV divergence detected. Mixed signals between indicators - Fast OBV is {('bullish' if fast_obv > 0 else 'bearish')} while Slow OBV is {('bullish' if slow_obv > 0 else 'bearish')}. Exercise caution."
+        else:
+            description = f"Neutral OBV signal. Insufficient momentum or conflicting indicators. Monitor for clearer direction."
+    
+    return {
+        'signal': signal,
+        'alignment': alignment,
+        'strength': strength,
+        'divergence': divergence,
+        'fast_transition': fast_transition,
+        'medium_transition': medium_transition,
+        'slow_transition': slow_transition,
+        'fast_medium_pct_change': fast_medium_pct,
+        'medium_slow_pct_change': medium_slow_pct,
+        'fast_slow_pct_change': fast_slow_pct,
+        'equation': equation,
+        'description': description
+    }

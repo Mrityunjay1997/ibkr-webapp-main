@@ -386,8 +386,8 @@ table[id^="responsive-data-table"] {
     z-index: 10;
     background: #ffffff;
     border-right: 2px solid #d0d7de;
-    min-width: 40px;
-    max-width: 60px;
+    min-width: 60px;
+    max-width: 100px;
 }
 
 .data-table-wrapper thead th.sticky-col {

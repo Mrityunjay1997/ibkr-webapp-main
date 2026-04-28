@@ -82,10 +82,12 @@
         <div style="padding:12px;background:#e8f4f8;border-radius:6px;border-left:4px solid #0099cc;font-size:12px;margin-bottom:15px;">
           <strong>Available Price References:</strong>
           <div style="margin-top:8px;column-count:2;gap:15px;">
-            <div><strong>Indicators:</strong> VWAP, SMA Fast/Med/Slow, EMA Fast/Slow, Previous Close</div>
+            <div><strong>Indicators:</strong> VWAP, SMA Fast/Med/Slow, EMA Fast/Slow, RSI, ATR</div>
             <div><strong>Fibonacci:</strong> 23.6%, 38.2%, 50%, 61.8%, 78.6%</div>
-            <div><strong>Levels:</strong> Support 1, Resistance 1, Day High, Day Low</div>
-            <div><strong>Special:</strong> Trailing Stop ($ or %), Trailing Candle</div>
+            <div><strong>Pivot Points:</strong> Pivot, Support 1/2, Resistance 1/2</div>
+            <div><strong>Levels:</strong> Day High/Low, Previous Close</div>
+            <div><strong>Price Targets:</strong> % Target from Previous Close, Custom Price</div>
+            <div><strong>Order Types:</strong> Limit, Market, Stop, Stop-Limit, Bracket, Trailing Stop ($/%)/Candle</div>
           </div>
         </div>
 
@@ -249,24 +251,54 @@ let mloLevelCounter = 0;
 
 // Available price references
 const MlopriceReferences = {
+  // Indicators
   'vwap': 'VWAP',
   'sma_fast': 'SMA Fast',
   'sma_medium': 'SMA Medium',
   'sma_slow': 'SMA Slow',
   'ema_fast': 'EMA Fast',
   'ema_slow': 'EMA Slow',
-  'prev_close': 'Previous Close',
+  'rsi': 'RSI',
+  'atr': 'ATR',
+  
+  // Fibonacci Levels
   'fibonacci_23.6': 'Fibonacci 23.6%',
   'fibonacci_38.2': 'Fibonacci 38.2%',
   'fibonacci_50.0': 'Fibonacci 50%',
   'fibonacci_61.8': 'Fibonacci 61.8%',
   'fibonacci_78.6': 'Fibonacci 78.6%',
+  
+  // Pivot Points
+  'pivot': 'Pivot Point',
   'support_1': 'Support Level 1',
+  'support_2': 'Support Level 2',
   'resistance_1': 'Resistance Level 1',
+  'resistance_2': 'Resistance Level 2',
+  
+  // Price Levels
+  'prev_close': 'Previous Close',
   'day_high': 'Day High',
+  'high_of_day': 'High of Day',
   'day_low': 'Day Low',
+  'low_of_day': 'Low of Day',
+  
+  // Price Targets (100% = prev_close + X%)
+  'percent_target': '% Price Target from Prev Close',
+  
+  // Special / Manual
   'custom': 'Custom Price',
-  'trailing_stop': 'Trailing Stop',
+};
+
+// Available order types
+const MloOrderTypes = {
+  'limit': 'Limit Order',
+  'market': 'Market Order',
+  'stop': 'Stop Order',
+  'stop_limit': 'Stop-Limit Order',
+  'bracket': 'Bracket Order',
+  'trail': 'Trailing Stop ($)',
+  'trail_percent': 'Trailing Stop (%)',
+  'trail_candle': 'Trailing Candle',
 };
 
 /**
@@ -297,16 +329,20 @@ function mloAddLevel() {
       offset: -2,
       type: 'limit',
     },
-    exit: {
-      ref: 'fibonacci_61.8',
-      offset: 1,
-      type: 'limit',
-    },
     stop: {
-      ref: 'support_1',
+      ref: 'pivot',
       offset: -0.5,
       type: 'stop',
     },
+    sell_targets: [
+      {
+        id: `target_${levelNum}_0`,
+        ref: 'fibonacci_61.8',
+        offset: 1,
+        type: 'limit',
+        percent: 100,  // Default: 100% of position
+      }
+    ],
   };
 
   mloLevels.push(level);
@@ -319,11 +355,16 @@ function mloAddLevel() {
 function mloRenderLevelUI(level) {
   const container = document.getElementById('mlo_levels_container');
   
+  // Render all sell targets
+  const sellTargetsHtml = level.sell_targets.map((target, idx) => 
+    mloRenderSellTargetUI(level.id, idx, target)
+  ).join('');
+  
   const levelHtml = `
     <div class="mlo-level" id="${level.id}">
       <div class="mlo-level-header">
         <div class="mlo-level-title">Level ${level.num}</div>
-        <button type="button" class="mlo-level-delete" onclick="mloDeleteLevel('${level.id}')">Delete</button>
+        <button type="button" class="mlo-level-delete" onclick="mloDeleteLevel('${level.id}')">Delete Level</button>
       </div>
 
       <div class="mlo-section">
@@ -343,17 +384,22 @@ function mloRenderLevelUI(level) {
       </div>
 
       <div class="mlo-section">
-        <div class="mlo-section-title">Exit / Take Profit Configuration</div>
-        ${mloRenderPriceRefUI(level.id, 'exit', level.exit)}
-      </div>
-
-      <div class="mlo-section">
         <div class="mlo-section-title">Stop Loss Configuration</div>
         ${mloRenderPriceRefUI(level.id, 'stop', level.stop)}
       </div>
 
+      <div class="mlo-section">
+        <div class="mlo-section-title">Sell Targets / Take Profit (Multiple Exits)</div>
+        <div style="background:#f9f9f9;padding:12px;border-radius:6px;margin-bottom:12px;">
+          ${sellTargetsHtml}
+        </div>
+        <button type="button" class="btn btn-sm btn-info" onclick="mloAddSellTarget('${level.id}')">
+          <i class="icon-plus"></i> Add Sell Target
+        </button>
+      </div>
+
       <div class="mlo-summary">
-        <strong>Level Summary:</strong> Buy ${level.quantity} shares
+        <strong>Level Summary:</strong> Buy ${level.quantity} shares with ${level.sell_targets.length} profit target(s)
       </div>
     </div>
   `;
@@ -385,11 +431,51 @@ function mloRenderPriceRefUI(levelId, refType, refConfig) {
       <div class="mlo-field">
         <label class="mlo-label">Order Type:</label>
         <select class="mlo-select mlo-input-small" onchange="mloUpdateLevel('${levelId}', '${refType}_type', this.value)">
-          <option value="limit" ${refConfig.type === 'limit' ? 'selected' : ''}>Limit</option>
-          <option value="market" ${refConfig.type === 'market' ? 'selected' : ''}>Market</option>
-          <option value="stop" ${refConfig.type === 'stop' ? 'selected' : ''}>Stop</option>
-          <option value="trail" ${refConfig.type === 'trail' ? 'selected' : ''}>Trailing</option>
+          ${Object.entries(MloOrderTypes).map(([key, label]) => 
+            `<option value="${key}" ${refConfig.type === key ? 'selected' : ''}>${label}</option>`
+          ).join('')}
         </select>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Render a single sell target UI
+ */
+function mloRenderSellTargetUI(levelId, targetIdx, target) {
+  return `
+    <div style="background:white;padding:10px;margin-bottom:10px;border-radius:4px;border:1px solid #ddd;">
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:8px;align-items:end;">
+        <div class="mlo-field">
+          <label class="mlo-label">Price Reference:</label>
+          <select class="mlo-select mlo-input-small" onchange="mloUpdateSellTarget('${levelId}', ${targetIdx}, 'ref', this.value)">
+            ${Object.entries(MlopriceReferences).map(([key, label]) => 
+              `<option value="${key}" ${target.ref === key ? 'selected' : ''}>${label}</option>`
+            ).join('')}
+          </select>
+        </div>
+        <div class="mlo-field">
+          <label class="mlo-label">Offset (%):</label>
+          <input type="number" class="mlo-input mlo-input-small" value="${target.offset}" step="0.1"
+                 onchange="mloUpdateSellTarget('${levelId}', ${targetIdx}, 'offset', this.value)">
+        </div>
+        <div class="mlo-field">
+          <label class="mlo-label">Order Type:</label>
+          <select class="mlo-select mlo-input-small" onchange="mloUpdateSellTarget('${levelId}', ${targetIdx}, 'type', this.value)">
+            ${Object.entries(MloOrderTypes).map(([key, label]) => 
+              `<option value="${key}" ${target.type === key ? 'selected' : ''}>${label}</option>`
+            ).join('')}
+          </select>
+        </div>
+        <div class="mlo-field">
+          <label class="mlo-label">% of Position:</label>
+          <input type="number" class="mlo-input mlo-input-small" value="${target.percent}" step="0.1" min="0" max="100"
+                 onchange="mloUpdateSellTarget('${levelId}', ${targetIdx}, 'percent', this.value)">
+        </div>
+        <button type="button" class="btn btn-sm btn-danger" onclick="mloDeleteSellTarget('${levelId}', ${targetIdx})">
+          Delete
+        </button>
       </div>
     </div>
   `;
@@ -405,7 +491,7 @@ function mloUpdateLevel(levelId, field, value) {
   if (field === 'quantity') {
     level.quantity = parseInt(value) || 100;
   } else if (field.includes('_ref')) {
-    const refType = field.split('_')[0]; // 'entry', 'exit', 'stop'
+    const refType = field.split('_')[0]; // 'entry', 'stop'
     level[refType].ref = value;
   } else if (field.includes('_offset')) {
     const refType = field.split('_')[0];
@@ -413,6 +499,73 @@ function mloUpdateLevel(levelId, field, value) {
   } else if (field.includes('_type')) {
     const refType = field.split('_')[0];
     level[refType].type = value;
+  }
+}
+
+/**
+ * Add a new sell target to a level
+ */
+function mloAddSellTarget(levelId) {
+  const level = mloLevels.find(l => l.id === levelId);
+  if (!level) return;
+  
+  const newTarget = {
+    id: `target_${levelId}_${level.sell_targets.length}`,
+    ref: 'fibonacci_61.8',
+    offset: 0,
+    type: 'limit',
+    percent: 0,
+  };
+  
+  level.sell_targets.push(newTarget);
+  
+  // Re-render the level to show the new target
+  const levelElem = document.getElementById(levelId);
+  if (levelElem) {
+    levelElem.remove();
+    mloRenderLevelUI(level);
+  }
+}
+
+/**
+ * Update a sell target's configuration
+ */
+function mloUpdateSellTarget(levelId, targetIdx, field, value) {
+  const level = mloLevels.find(l => l.id === levelId);
+  if (!level || !level.sell_targets[targetIdx]) return;
+  
+  const target = level.sell_targets[targetIdx];
+  
+  if (field === 'ref') {
+    target.ref = value;
+  } else if (field === 'offset') {
+    target.offset = parseFloat(value) || 0;
+  } else if (field === 'type') {
+    target.type = value;
+  } else if (field === 'percent') {
+    target.percent = parseFloat(value) || 0;
+  }
+}
+
+/**
+ * Delete a sell target from a level
+ */
+function mloDeleteSellTarget(levelId, targetIdx) {
+  const level = mloLevels.find(l => l.id === levelId);
+  if (!level) return;
+  
+  if (level.sell_targets.length <= 1) {
+    alert('Each level must have at least one sell target');
+    return;
+  }
+  
+  level.sell_targets.splice(targetIdx, 1);
+  
+  // Re-render the level
+  const levelElem = document.getElementById(levelId);
+  if (levelElem) {
+    levelElem.remove();
+    mloRenderLevelUI(level);
   }
 }
 
@@ -458,16 +611,17 @@ function mloSavePreset() {
         offset_pct: parseFloat(level.entry.offset),
         order_type: level.entry.type,
       },
-      exit: {
-        type: level.exit.ref,
-        offset_pct: parseFloat(level.exit.offset),
-        order_type: level.exit.type,
-      },
       stop_loss: level.stop ? {
         type: level.stop.ref,
         offset_pct: parseFloat(level.stop.offset),
         order_type: level.stop.type,
       } : null,
+      sell_targets: level.sell_targets.map(target => ({
+        type: target.ref,
+        offset_pct: parseFloat(target.offset),
+        order_type: target.type,
+        percent_of_position: parseFloat(target.percent),
+      })),
     }))
   };
 
@@ -529,6 +683,29 @@ function mloLoadPresetData(preset) {
 
   // Load levels
   preset.levels.forEach(levelData => {
+    // Handle both old format (with 'exit') and new format (with 'sell_targets')
+    let sell_targets = [];
+    
+    if (levelData.sell_targets && levelData.sell_targets.length > 0) {
+      // New format
+      sell_targets = levelData.sell_targets.map((st, idx) => ({
+        id: `target_${mloLevelCounter + 1}_${idx}`,
+        ref: st.type,
+        offset: st.offset_pct,
+        type: st.order_type,
+        percent: st.percent_of_position,
+      }));
+    } else if (levelData.exit) {
+      // Old format - convert to new
+      sell_targets = [{
+        id: `target_${mloLevelCounter + 1}_0`,
+        ref: levelData.exit.type,
+        offset: levelData.exit.offset_pct,
+        type: levelData.exit.order_type,
+        percent: 100,
+      }];
+    }
+    
     const level = {
       id: `level_${++mloLevelCounter}`,
       num: mloLevelCounter,
@@ -538,16 +715,16 @@ function mloLoadPresetData(preset) {
         offset: levelData.entry.offset_pct,
         type: levelData.entry.order_type,
       },
-      exit: {
-        ref: levelData.exit.type,
-        offset: levelData.exit.offset_pct,
-        type: levelData.exit.order_type,
-      },
       stop: levelData.stop_loss ? {
         ref: levelData.stop_loss.type,
         offset: levelData.stop_loss.offset_pct,
         type: levelData.stop_loss.order_type,
-      } : null,
+      } : {
+        ref: 'pivot',
+        offset: -0.5,
+        type: 'stop',
+      },
+      sell_targets: sell_targets,
     };
     mloLevels.push(level);
     mloRenderLevelUI(level);
@@ -622,16 +799,25 @@ function mloSubmitOrders() {
     return;
   }
 
-  // Build multi-level order configuration
+  // Build multi-level order configuration with new structure
   const levelConfigs = mloLevels.map(level => ({
     quantity: level.quantity,
-    entry_price: null, // Will be calculated from price reference
-    entry_type: level.entry.type === 'market' ? 'MKT' : 'LMT',
-    exit_price: null,   // Will be calculated
-    stop_price: null,   // Will be calculated
-    use_trailing_stop: level.stop.type === 'trail',
-    trailing_amount: level.stop.offset,
-    trailing_type: 'amount', // For now, using absolute amount
+    entry: {
+      type: level.entry.ref,
+      offset_pct: parseFloat(level.entry.offset),
+      order_type: level.entry.type,
+    },
+    stop_loss: level.stop ? {
+      type: level.stop.ref,
+      offset_pct: parseFloat(level.stop.offset),
+      order_type: level.stop.type,
+    } : null,
+    sell_targets: level.sell_targets.map(target => ({
+      type: target.ref,
+      offset_pct: parseFloat(target.offset),
+      order_type: target.type,
+      percent_of_position: parseFloat(target.percent),
+    })),
   }));
 
   const formData = new FormData();
