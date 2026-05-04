@@ -72,8 +72,24 @@ class Parameters(FlaskForm):
     MediumOBV = IntegerField("Medium OBV")
     SlowOBV = IntegerField("Slow OBV")
     ATR = IntegerField("ATR")
+    
+    # Additional SMA fields for multi-timeframe analysis
+    SMA1 = IntegerField("Additional SMA 1")
+    SMA2 = IntegerField("Additional SMA 2")
+    SMA3 = IntegerField("Additional SMA 3")
+    
+    # Additional EMA fields for multi-timeframe analysis
+    EMA1 = IntegerField("Additional EMA 1")
+    EMA2 = IntegerField("Additional EMA 2")
+    
+    # Candlestick indicators with lookback periods
+    Candlestick1 = IntegerField("Candlestick 1 Lookback")
+    Candlestick2 = IntegerField("Candlestick 2 Lookback")
+    Candlestick3 = IntegerField("Candlestick 3 Lookback")
+    Candlestick4 = IntegerField("Candlestick 4 Lookback")
 
     PrevClose = IntegerField("Previous Close")
+    PctChange = DecimalField("% CHG (Percentage Change)")
     LowOfDay = IntegerField("Low of Day")
     HighOfDay = IntegerField("High of Day")
 
@@ -85,17 +101,28 @@ class Parameters(FlaskForm):
     PercentageFastSMA = DecimalField("Percentage Fast SMA")
     PercentageMediumSMA = DecimalField("Percentage Medium SMA")
     PercentageSlowSMA = DecimalField("Percentage Slow SMA")
+    PercentageSMA1 = DecimalField("Percentage SMA1")
+    PercentageSMA2 = DecimalField("Percentage SMA2")
+    PercentageSMA3 = DecimalField("Percentage SMA3")
     PercentageRSI = DecimalField("Percentage RSI")
     PercentageFastEMA = DecimalField("Percentage Fast EMA")
     PercentageSlowEMA = DecimalField("Percentage Slow EMA")
+    PercentageEMA1 = DecimalField("Percentage EMA1")
+    PercentageEMA2 = DecimalField("Percentage EMA2")
     PercentageOBV = DecimalField("Percentage OBV")
     PercentageFastOBV = DecimalField("Percentage Fast OBV")
     PercentageMediumOBV = DecimalField("Percentage Medium OBV")
     PercentageSlowOBV = DecimalField("Percentage Slow OBV")
     PercentageATR = DecimalField("Percentage ATR")
+    PercentageCandlestick1 = DecimalField("Percentage Candlestick 1")
+    PercentageCandlestick2 = DecimalField("Percentage Candlestick 2")
+    PercentageCandlestick3 = DecimalField("Percentage Candlestick 3")
+    PercentageCandlestick4 = DecimalField("Percentage Candlestick 4")
 
     PercentagePrevClose = DecimalField("Percentage Previous Close")
     PercentagePrevClose1 = DecimalField("Percentage Previous Close1")
+    PercentagePctChange = DecimalField("Percentage % CHG")
+    PercentagePctChange1 = DecimalField("Percentage % CHG 1")
     PercentageLowOfDay = DecimalField("Percentage Low Of Day")
     PercentageLowOfDay1 = DecimalField("Percentage Low Of Day1")
     PercentageHighOfDay = DecimalField("Percentage High Of Day")
@@ -188,7 +215,57 @@ class Parameters(FlaskForm):
         choices=_STANDARD_COMPARISON_CHOICES,
     )
 
+    ComparisonSMA1 = SelectField(
+        "Programming Language",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
+    ComparisonSMA2 = SelectField(
+        "Programming Language",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
+    ComparisonSMA3 = SelectField(
+        "Programming Language",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
+    ComparisonEMA1 = SelectField(
+        "Programming Language",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
+    ComparisonEMA2 = SelectField(
+        "Programming Language",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
+    ComparisonCandlestick1 = SelectField(
+        "Programming Language",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
+    ComparisonCandlestick2 = SelectField(
+        "Programming Language",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
+    ComparisonCandlestick3 = SelectField(
+        "Programming Language",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
+    ComparisonCandlestick4 = SelectField(
+        "Programming Language",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
     ComparisonPrevClose = SelectField(
+        "Programming Language",
+        choices=_STANDARD_COMPARISON_CHOICES,
+    )
+
+    ComparisonPctChange = SelectField(
         "Programming Language",
         choices=_STANDARD_COMPARISON_CHOICES,
     )
@@ -228,8 +305,18 @@ class Parameters(FlaskForm):
     booleanMediumOBV = BooleanField("Add Indicator")
     booleanSlowOBV = BooleanField("Add Indicator")
     booleanATR = BooleanField("Add Indicator")
+    booleanSMA1 = BooleanField("Add Indicator")
+    booleanSMA2 = BooleanField("Add Indicator")
+    booleanSMA3 = BooleanField("Add Indicator")
+    booleanEMA1 = BooleanField("Add Indicator")
+    booleanEMA2 = BooleanField("Add Indicator")
+    booleanCandlestick1 = BooleanField("Add Indicator")
+    booleanCandlestick2 = BooleanField("Add Indicator")
+    booleanCandlestick3 = BooleanField("Add Indicator")
+    booleanCandlestick4 = BooleanField("Add Indicator")
 
     booleanPrevClose = BooleanField("Add Indicator")
+    booleanPctChange = BooleanField("Add Indicator")
     booleanLowOfDay = BooleanField("Add Indicator")
     booleanHighOfDay = BooleanField("Add Indicator")
 
@@ -459,8 +546,133 @@ class Parameters(FlaskForm):
     )
 
     # ------------------------------------------------------------------
+    # Advanced Fibonacci Gap Pullback (v2 - Intelligent Level Selection)
     # ------------------------------------------------------------------
-    # Up Gap (daily gap up from previous close 9:30 AM - 4 PM EST)
+    # Enhanced gap pullback analysis with:
+    # - Smart Fib level selection based on risk/reward
+    # - Recent peak/valley context (configurable lookback)
+    # - Multiple level analysis with confidence scoring
+    # - Support for gap up and gap down strategies
+    #
+    # Features:
+    # - Automatic level ranking by quality
+    # - Recent high/low context from N-day lookback
+    # - Risk/reward ratio filtering
+    # - Confidence score threshold
+    # - Entry offset and stop/target configuration
+
+    # Lookback period for recent peaks/valleys
+    FibGapLookbackDays = IntegerField(
+        "Lookback Days",
+        render_kw={
+            "title": "Number of days to look back for recent peaks/valleys",
+            "placeholder": "e.g., 20 for 20-day lookback"
+        }
+    )
+
+    # Gap size filters (%)
+    FibGapMinGapPct = DecimalField(
+        "Min Gap %",
+        render_kw={
+            "title": "Minimum gap size to consider (e.g., 1.0 for 1%)",
+            "placeholder": "e.g., 1.0"
+        }
+    )
+
+    FibGapMaxGapPct = DecimalField(
+        "Max Gap %",
+        render_kw={
+            "title": "Maximum gap size to consider (e.g., 10.0 for 10%)",
+            "placeholder": "e.g., 10.0"
+        }
+    )
+
+    # Risk/reward requirement
+    FibGapMinRewardRiskRatio = DecimalField(
+        "Min R:R Ratio",
+        render_kw={
+            "title": "Minimum reward:risk ratio required (e.g., 1.5 for 1.5:1)",
+            "placeholder": "e.g., 1.5"
+        }
+    )
+
+    # Confidence score threshold
+    FibGapMinConfidence = DecimalField(
+        "Min Confidence %",
+        render_kw={
+            "title": "Minimum confidence score (0-100)",
+            "placeholder": "e.g., 70.0"
+        }
+    )
+
+    # Preferred Fibonacci levels (multi-select via options)
+    FibGapPreferredLevels = SelectField(
+        "Preferred Levels",
+        choices=[
+            ("236", "23.6% (Shallow)"),
+            ("382", "38.2% (Light)"),
+            ("500", "50.0% (Mid)"),
+            ("618", "61.8% (Deep)"),
+            ("786", "78.6% (Full)"),
+            ("1000", "100% (Complete)"),
+        ],
+        render_kw={"multiple": True},
+    )
+
+    # Entry offset from calculated level (%)
+    FibGapEntryOffset = DecimalField(
+        "Entry Offset %",
+        render_kw={
+            "title": "Offset from calculated Fib level (+/- %)",
+            "placeholder": "e.g., 0.0 or -0.5"
+        }
+    )
+
+    # Stop loss as % of gap move
+    FibGapStopLossPct = DecimalField(
+        "Stop Loss %",
+        render_kw={
+            "title": "Stop loss as % of gap move (e.g., 2.0)",
+            "placeholder": "e.g., 2.0"
+        }
+    )
+
+    # Target profit as % of gap move
+    FibGapTargetProfitPct = DecimalField(
+        "Target Profit %",
+        render_kw={
+            "title": "Target profit as % of gap move (e.g., 2.0)",
+            "placeholder": "e.g., 2.0"
+        }
+    )
+
+    # Gap direction preference
+    FibGapDirection = SelectField(
+        "Gap Direction",
+        choices=[
+            ("long", "Long (Gap Up)"),
+            ("short", "Short (Gap Down)"),
+            ("both", "Both"),
+        ],
+        default="long",
+    )
+
+    # Use recent peak/valley context
+    FibGapUseRecentContext = BooleanField(
+        "Use Recent Context",
+        render_kw={
+            "title": "Consider recent peaks/valleys in level selection"
+        }
+    )
+
+    # Time frame for gap analysis
+    FibGap_tf = SelectField(
+        "Gap Analysis TF",
+        choices=TIMEFRAME_CHOICES,
+        default="1 day",
+    )
+
+    # ------------------------------------------------------------------
     # ------------------------------------------------------------------
     # WHAT IS A GAP UP?
     # A gap up occurs when today's opening price is HIGHER than yesterday's
@@ -627,6 +839,16 @@ class Parameters(FlaskForm):
     SlowOBV_tf = SelectField("Slow OBV Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     ATR_tf = SelectField("ATR Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     ATR1_tf = SelectField("ATR1 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    
+    SMA1_tf = SelectField("SMA1 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    SMA2_tf = SelectField("SMA2 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    SMA3_tf = SelectField("SMA3 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    EMA1_tf = SelectField("EMA1 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    EMA2_tf = SelectField("EMA2 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    Candlestick1_tf = SelectField("Candlestick 1 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    Candlestick2_tf = SelectField("Candlestick 2 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    Candlestick3_tf = SelectField("Candlestick 3 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    Candlestick4_tf = SelectField("Candlestick 4 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
 
     PrevClose_tf = SelectField("Previous Close Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     PrevClose1_tf = SelectField("Previous Close1 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
@@ -780,6 +1002,60 @@ class Parameters(FlaskForm):
     )
 
     ATRBool = RadioField(
+        "",
+        choices=[("percentage", "%"), ("value", "val")],
+        default="value",
+    )
+
+    SMA1Bool = RadioField(
+        "",
+        choices=[("percentage", "%"), ("value", "val")],
+        default="value",
+    )
+
+    SMA2Bool = RadioField(
+        "",
+        choices=[("percentage", "%"), ("value", "val")],
+        default="value",
+    )
+
+    SMA3Bool = RadioField(
+        "",
+        choices=[("percentage", "%"), ("value", "val")],
+        default="value",
+    )
+
+    EMA1Bool = RadioField(
+        "",
+        choices=[("percentage", "%"), ("value", "val")],
+        default="value",
+    )
+
+    EMA2Bool = RadioField(
+        "",
+        choices=[("percentage", "%"), ("value", "val")],
+        default="value",
+    )
+
+    CandlestickBool1 = RadioField(
+        "",
+        choices=[("percentage", "%"), ("value", "val")],
+        default="value",
+    )
+
+    CandlestickBool2 = RadioField(
+        "",
+        choices=[("percentage", "%"), ("value", "val")],
+        default="value",
+    )
+
+    CandlestickBool3 = RadioField(
+        "",
+        choices=[("percentage", "%"), ("value", "val")],
+        default="value",
+    )
+
+    CandlestickBool4 = RadioField(
         "",
         choices=[("percentage", "%"), ("value", "val")],
         default="value",
@@ -1160,9 +1436,47 @@ class Parameters(FlaskForm):
     filterMediumOBV = BooleanField("Filter by Medium OBV", default=False)
     filterSlowOBV = BooleanField("Filter by Slow OBV", default=False)
     filterATR = BooleanField("Filter by ATR", default=False)
+    filterSMA1 = BooleanField("Filter by SMA1", default=False)
+    filterSMA2 = BooleanField("Filter by SMA2", default=False)
+    filterSMA3 = BooleanField("Filter by SMA3", default=False)
+    filterEMA1 = BooleanField("Filter by EMA1", default=False)
+    filterEMA2 = BooleanField("Filter by EMA2", default=False)
+    filterCandlestick1 = BooleanField("Filter by Candlestick 1", default=False)
+    filterCandlestick2 = BooleanField("Filter by Candlestick 2", default=False)
+    filterCandlestick3 = BooleanField("Filter by Candlestick 3", default=False)
+    filterCandlestick4 = BooleanField("Filter by Candlestick 4", default=False)
     filterAverageVolume = BooleanField("Filter by Average Volume", default=False)
+
+    # ------------------------------------------------------------------
+    # Candlestick Search Result Fields (4 fields per candlestick indicator)
+    # ------------------------------------------------------------------
+    
+    # Candlestick 1 Search Results
+    Candlestick1_SearchResult1 = DecimalField("CS1 Search Result 1")
+    Candlestick1_SearchResult2 = DecimalField("CS1 Search Result 2")
+    Candlestick1_SearchResult3 = DecimalField("CS1 Search Result 3")
+    Candlestick1_SearchResult4 = DecimalField("CS1 Search Result 4")
+    
+    # Candlestick 2 Search Results
+    Candlestick2_SearchResult1 = DecimalField("CS2 Search Result 1")
+    Candlestick2_SearchResult2 = DecimalField("CS2 Search Result 2")
+    Candlestick2_SearchResult3 = DecimalField("CS2 Search Result 3")
+    Candlestick2_SearchResult4 = DecimalField("CS2 Search Result 4")
+    
+    # Candlestick 3 Search Results
+    Candlestick3_SearchResult1 = DecimalField("CS3 Search Result 1")
+    Candlestick3_SearchResult2 = DecimalField("CS3 Search Result 2")
+    Candlestick3_SearchResult3 = DecimalField("CS3 Search Result 3")
+    Candlestick3_SearchResult4 = DecimalField("CS3 Search Result 4")
+    
+    # Candlestick 4 Search Results
+    Candlestick4_SearchResult1 = DecimalField("CS4 Search Result 1")
+    Candlestick4_SearchResult2 = DecimalField("CS4 Search Result 2")
+    Candlestick4_SearchResult3 = DecimalField("CS4 Search Result 3")
+    Candlestick4_SearchResult4 = DecimalField("CS4 Search Result 4")
     filterRelativeVolume = BooleanField("Filter by Relative Volume", default=False)
     filterPrevClose = BooleanField("Filter by Previous Close", default=False)
+    filterPctChange = BooleanField("Filter by % CHG", default=False)
     filterLowOfDay = BooleanField("Filter by Low of Day", default=False)
     filterHighOfDay = BooleanField("Filter by High of Day", default=False)
     filterCross50SMA = BooleanField("Filter by Cross 50 SMA", default=False)

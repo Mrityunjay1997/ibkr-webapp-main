@@ -227,6 +227,12 @@ def micelania():
     return render_template("micelanias.html", ssubimit=ssubmit)
 
 
+@app.route("/exclude-stocks", methods=["GET"])
+def exclude_stocks_page():
+    """Render the exclude stocks management page."""
+    return render_template("exclude_stocks.html")
+
+
 @app.route("/updatepdf", methods=["GET", "POST"])
 def updatepdf():
     # import when used
@@ -577,7 +583,7 @@ def sendorders():
         # ===== MULTI-LEVEL ORDER HANDLING =====
         if is_multi_level:
             try:
-                from order_manager import MultiLevelOrder, PriceReferenceResolver
+                from order_manager import PriceReferenceResolver, PriceReference
                 
                 # Parse multi-level order configuration
                 multi_level_json = asset.get("multiLevelConfig", "{}")
@@ -586,32 +592,45 @@ def sendorders():
                 # Build price indicator values from available data
                 # These would normally come from real-time market data
                 indicator_values = {
-                    'vwap': getattr(IBAPI, 'vwap', 0),
-                    'sma_fast': getattr(IBAPI, 'fast_sma', 0),
-                    'sma_medium': getattr(IBAPI, 'medium_sma', 0),
-                    'sma_slow': getattr(IBAPI, 'slow_sma', 0),
-                    'ema_fast': getattr(IBAPI, 'fast_ema', 0),
-                    'ema_slow': getattr(IBAPI, 'slow_ema', 0),
-                    'rsi': getattr(IBAPI, 'rsi', 50),
-                    'atr': getattr(IBAPI, 'atr', 0),
-                    'prev_close': getattr(IBAPI, 'lastPrice', 0),
-                    'current_price': getattr(IBAPI, 'lastPrice', 0),
-                    'day_high': getattr(IBAPI, 'day_high', 0),
-                    'day_low': getattr(IBAPI, 'day_low', 0),
+                    'vwap': getattr(IBAPI, 'vwap', 0) or 0,
+                    'sma_fast': getattr(IBAPI, 'fast_sma', 0) or 0,
+                    'sma_medium': getattr(IBAPI, 'medium_sma', 0) or 0,
+                    'sma_slow': getattr(IBAPI, 'slow_sma', 0) or 0,
+                    'ema_fast': getattr(IBAPI, 'fast_ema', 0) or 0,
+                    'ema_slow': getattr(IBAPI, 'slow_ema', 0) or 0,
+                    'rsi': getattr(IBAPI, 'rsi', 50) or 50,
+                    'atr': getattr(IBAPI, 'atr', 0) or 0,
+                    'prev_close': getattr(IBAPI, 'lastPrice', 0) or 0,
+                    'current_price': getattr(IBAPI, 'lastPrice', 0) or 0,
+                    'day_high': getattr(IBAPI, 'day_high', 0) or 0,
+                    'day_low': getattr(IBAPI, 'day_low', 0) or 0,
                 }
+                
+                # Get current price as backup for missing indicators
+                current_price = getattr(IBAPI, 'lastPrice', None)
+                if current_price and current_price > 0:
+                    # Fill in missing indicators with current price as default
+                    for key in indicator_values:
+                        if indicator_values[key] <= 0:
+                            indicator_values[key] = current_price
                 
                 resolver = PriceReferenceResolver(indicator_values)
                 
                 # Process levels and resolve price references
-                expanded_levels = []
-                for level_config in multi_level_config.get('levels', []):
+                # Important: Each level in the config becomes ONE entry order with MULTIPLE exit orders
+                levels_for_ib = []
+                
+                for level_idx, level_config in enumerate(multi_level_config.get('levels', [])):
                     level_qty = level_config.get('quantity', 100)
                     
                     # Resolve entry price
                     entry_ref = level_config.get('entry', {})
-                    from order_manager import PriceReference
                     entry_price_ref = PriceReference(**entry_ref)
                     entry_price = resolver.resolve(entry_price_ref)
+                    
+                    if entry_price is None or entry_price <= 0:
+                        raise ValueError(f"Level {level_idx+1}: Could not resolve entry price for {entry_ref.get('type', 'unknown')}")
+                    
                     entry_type = entry_ref.get('order_type', 'limit').upper()
                     if entry_type == 'LIMIT':
                         entry_type = 'LMT'
@@ -624,50 +643,67 @@ def sendorders():
                     if stop_loss_ref:
                         stop_loss_price_ref = PriceReference(**stop_loss_ref)
                         stop_price = resolver.resolve(stop_loss_price_ref)
+                        
+                        if stop_price is None or stop_price <= 0:
+                            logger.warning(f"Level {level_idx+1}: Could not resolve stop price, ignoring")
+                            stop_price = None
                     
-                    # Process multiple sell targets
-                    sell_targets = level_config.get('sell_targets', [])
-                    if not sell_targets:
+                    # Collect ALL sell targets for this level
+                    sell_targets_data = level_config.get('sell_targets', [])
+                    if not sell_targets_data:
                         # If no sell targets, create a default one at +1%
-                        sell_targets = [{
+                        sell_targets_data = [{
                             'type': 'percent_target',
                             'offset_pct': 1.0,
                             'order_type': 'limit',
                             'percent_of_position': 100.0,
                         }]
                     
-                    for target_config in sell_targets:
+                    # Resolve all target prices
+                    resolved_targets = []
+                    total_position_pct = 0
+                    
+                    for target_config in sell_targets_data:
                         # Resolve sell target price
                         target_price_ref = PriceReference(**target_config)
                         target_price = resolver.resolve(target_price_ref)
                         
-                        # Calculate quantity for this target
-                        target_qty = int(level_qty * (target_config.get('percent_of_position', 100) / 100))
-                        if target_qty < 1:
-                            target_qty = 1
+                        if target_price is None or target_price <= 0:
+                            logger.warning(f"Level {level_idx+1}: Could not resolve target price for {target_config.get('type')}, skipping")
+                            continue
                         
-                        # Determine order type
-                        target_order_type = target_config.get('order_type', 'limit').upper()
-                        if target_order_type == 'LIMIT':
-                            target_order_type = 'LMT'
-                        elif target_order_type == 'MARKET':
-                            target_order_type = 'MKT'
-                        elif target_order_type in ('TRAIL', 'TRAIL_PERCENT', 'TRAIL_CANDLE'):
-                            target_order_type = 'TRAIL'
-                        elif target_order_type in ('STOP_LIMIT',):
-                            target_order_type = 'STP'
+                        pct_of_position = target_config.get('percent_of_position', 100.0)
+                        total_position_pct += pct_of_position
                         
-                        # Add expanded level
-                        expanded_levels.append({
-                            'quantity': target_qty,
-                            'entry_price': entry_price,
-                            'entry_type': entry_type,
-                            'exit_price': target_price if target_order_type == 'LMT' else None,
-                            'stop_price': stop_price,
-                            'use_trailing_stop': target_order_type == 'TRAIL',
+                        resolved_targets.append({
+                            'price': target_price,
+                            'percent_of_position': pct_of_position,
+                            'order_type': target_config.get('order_type', 'limit'),
                             'trailing_amount': target_config.get('trailing_amount'),
                             'trailing_type': target_config.get('trailing_type', 'amount'),
                         })
+                    
+                    if not resolved_targets:
+                        raise ValueError(f"Level {level_idx+1}: No valid sell targets could be resolved")
+                    
+                    # Normalize position percentages if they don't add up to 100%
+                    if total_position_pct != 100.0 and total_position_pct > 0:
+                        for target in resolved_targets:
+                            target['percent_of_position'] = (target['percent_of_position'] / total_position_pct) * 100.0
+                    
+                    # Create ONE level entry with ALL the exit targets attached
+                    level_for_ib = {
+                        'quantity': level_qty,
+                        'entry_price': round(entry_price, 2),
+                        'entry_type': entry_type,
+                        'exit_prices': resolved_targets,  # NEW: List of exit targets
+                        'stop_price': round(stop_price, 2) if stop_price else None,
+                    }
+                    
+                    levels_for_ib.append(level_for_ib)
+                    
+                    logger.info(f"Level {level_idx+1}: Entry @{level_for_ib['entry_price']} ({level_qty} shares) → "
+                              f"{len(resolved_targets)} exit targets, Stop @{level_for_ib['stop_price']}")
                 
                 # Build order specification
                 order_spec = {
@@ -675,13 +711,13 @@ def sendorders():
                     'tif': tif,
                     'outside_rth': allow_outside_rth,
                     'start_order_id': orders_id,
-                    'levels': expanded_levels
+                    'levels': levels_for_ib
                 }
                 
-                logger.info(f"Multi-level order spec: {order_spec}")
+                logger.info(f"Multi-level order spec prepared: {len(levels_for_ib)} levels")
                 
                 # Create multi-level orders
-                orders = IBAPI.multiLevelOrder(order_spec)
+                orders = IBAPI.multiLevelOrderAdvanced(order_spec)
                 
             except Exception as e:
                 logger.exception("Error processing multi-level orders")
@@ -1356,6 +1392,211 @@ def exclude_clear():
     except Exception as e:
         logger.exception("Failed to clear excluded stocks: %s", e)
         return jsonify({"error": "failed to clear"}), 500
+
+
+# -------------------------------------------------------------------------
+# Exclusion Lists - Named Presets (Save/Load/List)
+# -------------------------------------------------------------------------
+
+def _exclusion_list_path(name: str) -> Path:
+    """Get path for a named exclusion list."""
+    return cfg.watchlists_dir / ("exclude_" + _sanitize_name(name) + ".json")
+
+
+def list_exclusion_lists():
+    """List all saved exclusion lists."""
+    out = []
+    try:
+        for p in sorted(cfg.watchlists_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+            if p.is_file() and p.suffix == ".json" and p.stem.startswith("exclude_"):
+                try:
+                    with p.open("r", encoding="utf-8") as fh:
+                        doc = json.load(fh)
+                        meta = doc.get("meta", {})
+                        count = len(doc.get("symbols", []))
+                except Exception:
+                    meta = {}
+                    count = 0
+                
+                # Remove "exclude_" prefix for display
+                display_name = p.stem[8:] if p.stem.startswith("exclude_") else p.stem
+                out.append({
+                    "name": display_name,
+                    "filename": p.name,
+                    "created": meta.get("created_at") or datetime.fromtimestamp(p.stat().st_mtime).isoformat(),
+                    "title": meta.get("title") or display_name,
+                    "count": count
+                })
+    except Exception:
+        pass
+    return out
+
+
+@app.route("/exclude/lists", methods=["GET"])
+def exclude_lists():
+    """Get list of all saved exclusion lists."""
+    try:
+        lists = list_exclusion_lists()
+        return jsonify({"ok": True, "lists": lists}), 200
+    except Exception as e:
+        logger.exception("Failed to list exclusion lists: %s", e)
+        return jsonify({"error": "failed to list exclusion lists"}), 500
+
+
+@app.route("/exclude/save", methods=["POST"])
+def exclude_save():
+    """
+    Save the current exclusion list with a name.
+    
+    Expects JSON:
+    {
+        "name": "My Exclusion List",
+        "symbols": ["AAPL", "MSFT"],
+        "overwrite": true|false
+    }
+    """
+    try:
+        payload = request.get_json(silent=True)
+        if not payload:
+            return jsonify({"error": "JSON payload required"}), 400
+
+        name = payload.get("name", "").strip()
+        overwrite = bool(payload.get("overwrite", False))
+        symbols = payload.get("symbols", [])
+
+        if not name:
+            return jsonify({"error": "name is required"}), 400
+
+        # If no symbols provided, get from current exclusion list
+        if not symbols:
+            IBAPI = _get_excluded_api()
+            symbols = sorted(list(IBAPI.get_excluded_stocks()))
+        
+        if not isinstance(symbols, (list, tuple, set)):
+            return jsonify({"error": "symbols must be a list"}), 400
+
+        safe = _sanitize_name(name)
+        p = _exclusion_list_path(safe)
+        
+        if p.exists() and not overwrite:
+            return jsonify({"error": "exclusion list already exists", "exists": True}), 409
+
+        doc = {
+            "meta": {
+                "title": name,
+                "created_at": datetime.now(UTC).isoformat(),
+            },
+            "symbols": sorted([str(s).upper() for s in symbols if str(s).strip()])
+        }
+
+        with p.open("w", encoding="utf-8") as fh:
+            json.dump(doc, fh, ensure_ascii=False, indent=2)
+
+        logger.info("Saved exclusion list: %s -> %s (%d symbols)", name, p, len(doc["symbols"]))
+        return jsonify({
+            "ok": True,
+            "name": safe,
+            "count": len(doc["symbols"])
+        }), 200
+
+    except Exception as e:
+        logger.exception("Failed to save exclusion list: %s", e)
+        return jsonify({"error": "failed to save exclusion list"}), 500
+
+
+@app.route("/exclude/load/<list_name>", methods=["GET"])
+def exclude_load(list_name: str):
+    """Load a saved exclusion list by name."""
+    try:
+        safe = _sanitize_name(list_name.strip())
+        p = _exclusion_list_path(safe)
+        
+        if not p.exists():
+            # Try with the full filename
+            alt = cfg.watchlists_dir / list_name
+            if alt.exists() and alt.stem.startswith("exclude_"):
+                p = alt
+            else:
+                return jsonify({"error": "exclusion list not found"}), 404
+
+        with p.open("r", encoding="utf-8") as fh:
+            doc = json.load(fh)
+
+        return jsonify({
+            "ok": True,
+            "name": p.stem[8:],  # Remove "exclude_" prefix
+            "meta": doc.get("meta", {}),
+            "symbols": doc.get("symbols", []),
+            "count": len(doc.get("symbols", []))
+        }), 200
+
+    except Exception as e:
+        logger.exception("Failed to load exclusion list: %s", e)
+        return jsonify({"error": "failed to load exclusion list"}), 500
+
+
+@app.route("/exclude/apply/<list_name>", methods=["POST"])
+def exclude_apply(list_name: str):
+    """Apply a saved exclusion list (load and set as current)."""
+    try:
+        IBAPI = _get_excluded_api()
+        
+        safe = _sanitize_name(list_name.strip())
+        p = _exclusion_list_path(safe)
+        
+        if not p.exists():
+            alt = cfg.watchlists_dir / list_name
+            if alt.exists() and alt.stem.startswith("exclude_"):
+                p = alt
+            else:
+                return jsonify({"error": "exclusion list not found"}), 404
+
+        with p.open("r", encoding="utf-8") as fh:
+            doc = json.load(fh)
+        
+        symbols = doc.get("symbols", [])
+        success = IBAPI.save_excluded_stocks(symbols)
+        
+        if success:
+            return jsonify({
+                "ok": True,
+                "message": f"Applied exclusion list: {list_name}",
+                "excluded": sorted(list(IBAPI.get_excluded_stocks())),
+                "count": len(symbols)
+            }), 200
+        else:
+            return jsonify({"error": "failed to apply exclusion list"}), 500
+
+    except Exception as e:
+        logger.exception("Failed to apply exclusion list: %s", e)
+        return jsonify({"error": "failed to apply exclusion list"}), 500
+
+
+@app.route("/exclude/delete/<list_name>", methods=["DELETE", "POST"])
+def exclude_delete(list_name: str):
+    """Delete a saved exclusion list."""
+    try:
+        safe = _sanitize_name(list_name.strip())
+        p = _exclusion_list_path(safe)
+        
+        if not p.exists():
+            alt = cfg.watchlists_dir / list_name
+            if alt.exists() and alt.stem.startswith("exclude_"):
+                p = alt
+            else:
+                return jsonify({"error": "exclusion list not found"}), 404
+
+        p.unlink()
+        logger.info("Deleted exclusion list: %s", p)
+        
+        return jsonify({
+            "ok": True,
+            "message": f"Deleted exclusion list: {list_name}"
+        }), 200
+
+    except Exception as e:
+        logger.exception("Failed to delete exclusion list: %s", e)
+        return jsonify({"error": "failed to delete exclusion list"}), 500
 
 
 # -------------------------------------------------------------------------

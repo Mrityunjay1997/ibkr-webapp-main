@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Exclude Stocks from Scans</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans|Playfair+Display" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static',filename='css/animate.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static',filename='css/icomoon.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static',filename='css/bootstrap.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static',filename='css/style.css') }}">
+    
+    <style>
+        body {
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        .container-main {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 20px;
+        }
+        .section:last-child {
+            border-bottom: none;
+        }
+        .section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            font-weight: 500;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        .input-group-custom {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .input-group-custom input {
+            flex: 1;
+        }
+        .input-group-custom textarea {
+            flex: 1;
+            resize: vertical;
+            min-height: 100px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        button {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #1e7e34;
+        }
+        .btn-warning {
+            background-color: #ffc107;
+            color: #333;
+        }
+        .btn-warning:hover {
+            background-color: #e0a800;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        .list-container {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .stock-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            background-color: white;
+            border: 1px solid #eee;
+            border-radius: 3px;
+            margin-bottom: 5px;
+        }
+        .stock-item span {
+            font-weight: 600;
+            color: #007bff;
+        }
+        .stock-item button {
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+        .empty-message {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+            font-style: italic;
+        }
+        .message {
+            padding: 12px 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+        .message.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            display: block;
+        }
+        .saved-lists {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .list-card {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .list-card:hover {
+            background-color: #f0f0f0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .list-card h5 {
+            margin: 0 0 5px 0;
+            color: #333;
+            font-weight: 600;
+        }
+        .list-card .count {
+            color: #999;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+        .list-card .date {
+            color: #999;
+            font-size: 11px;
+            margin-bottom: 10px;
+        }
+        .card-actions {
+            display: flex;
+            gap: 5px;
+        }
+        .card-actions button {
+            flex: 1;
+            padding: 6px 8px;
+            font-size: 12px;
+        }
+        .checkbox-group {
+            margin: 10px 0;
+        }
+        .checkbox-group input[type="checkbox"] {
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-main">
+        <h1>Exclude Stocks from Scans</h1>
+        <p style="color: #666; margin-bottom: 20px;">Manage stocks to exclude from your scanner.</p>
+        
+        <!-- Messages -->
+        <div id="message" class="message"></div>
+        
+        <!-- Current Exclusion List Section -->
+        <div class="section">
+            <h3>Current Exclusion List</h3>
+            <div class="form-group">
+                <label>Add Stocks (comma-separated)</label>
+                <div class="input-group-custom">
+                    <input type="text" id="newStocks" placeholder="e.g. AAPL, MSFT, GOOGL" />
+                    <button class="btn-success" onclick="addStocks()">Add Stocks</button>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Current Excluded Stocks (<span id="stockCount">0</span>)</label>
+                <div class="list-container" id="stockList">
+                    <div class="empty-message">No stocks excluded yet</div>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-warning" onclick="exportCSV()">Export to CSV</button>
+                <button class="btn-danger" onclick="clearList()">Clear All</button>
+            </div>
+        </div>
+        
+        <!-- Save/Load Section -->
+        <div class="section">
+            <h3>Save & Load Exclusion Lists</h3>
+            
+            <div class="form-group">
+                <label>Save Current List</label>
+                <div class="input-group-custom">
+                    <input type="text" id="listName" placeholder="e.g. My Exclusions, Penny Stocks" />
+                    <div style="display: flex; gap: 5px;">
+                        <button class="btn-primary" onclick="saveList()">Save List</button>
+                        <button class="btn-primary" onclick="saveListAsNew()">Save As New</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Saved Lists</label>
+                <div id="savedLists" class="saved-lists">
+                    <div class="empty-message" style="grid-column: 1/-1;">No saved lists yet</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Import Section -->
+        <div class="section">
+            <h3>Import/Export</h3>
+            <div class="form-group">
+                <label>Import from CSV</label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="file" id="csvFile" accept=".csv" />
+                    <button class="btn-primary" onclick="importCSV()">Import CSV</button>
+                </div>
+                <small style="color: #999; display: block; margin-top: 5px;">
+                    CSV should have one ticker per line, or a "Symbol" column
+                </small>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Load the current exclusion list on page load
+        window.addEventListener('load', function() {
+            loadCurrentList();
+            loadSavedLists();
+        });
+        
+        function showMessage(text, type = 'info') {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.className = `message ${type}`;
+            setTimeout(() => {
+                msg.className = 'message';
+            }, 5000);
+        }
+        
+        function loadCurrentList() {
+            fetch('/exclude/list')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        const list = document.getElementById('stockList');
+                        const count = data.count;
+                        document.getElementById('stockCount').textContent = count;
+                        
+                        if (count === 0) {
+                            list.innerHTML = '<div class="empty-message">No stocks excluded yet</div>';
+                        } else {
+                            list.innerHTML = data.excluded.map(stock => `
+                                <div class="stock-item">
+                                    <span>${stock}</span>
+                                    <button class="btn-danger btn-sm" onclick="removeStock('${stock}')">Remove</button>
+                                </div>
+                            `).join('');
+                        }
+                    }
+                })
+                .catch(err => showMessage(`Error loading list: ${err}`, 'error'));
+        }
+        
+        function addStocks() {
+            const input = document.getElementById('newStocks');
+            const symbols = input.value.trim();
+            
+            if (!symbols) {
+                showMessage('Please enter stock symbols', 'error');
+                return;
+            }
+            
+            fetch('/exclude/add', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({symbols: symbols})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    showMessage(`Added ${data.excluded.length - document.getElementById('stockCount').textContent} stock(s)`, 'success');
+                    input.value = '';
+                    loadCurrentList();
+                } else {
+                    showMessage(`Error: ${data.error}`, 'error');
+                }
+            })
+            .catch(err => showMessage(`Error: ${err}`, 'error'));
+        }
+        
+        function removeStock(symbol) {
+            fetch('/exclude/remove', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({symbol: symbol})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    showMessage(`Removed ${symbol}`, 'success');
+                    loadCurrentList();
+                } else {
+                    showMessage(`Error: ${data.error}`, 'error');
+                }
+            })
+            .catch(err => showMessage(`Error: ${err}`, 'error'));
+        }
+        
+        function saveList() {
+            const name = document.getElementById('listName').value.trim();
+            if (!name) {
+                showMessage('Please enter a list name', 'error');
+                return;
+            }
+            
+            fetch('/exclude/save', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    name: name,
+                    overwrite: true
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    showMessage(`Saved exclusion list: ${name}`, 'success');
+                    loadSavedLists();
+                } else {
+                    showMessage(`Error: ${data.error}`, 'error');
+                }
+            })
+            .catch(err => showMessage(`Error: ${err}`, 'error'));
+        }
+        
+        function saveListAsNew() {
+            const name = document.getElementById('listName').value.trim();
+            if (!name) {
+                showMessage('Please enter a list name', 'error');
+                return;
+            }
+            
+            fetch('/exclude/save', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    name: name,
+                    overwrite: false
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    showMessage(`Saved exclusion list: ${name}`, 'success');
+                    loadSavedLists();
+                } else if (data.exists) {
+                    showMessage(`List already exists. Use "Save List" to overwrite.`, 'error');
+                } else {
+                    showMessage(`Error: ${data.error}`, 'error');
+                }
+            })
+            .catch(err => showMessage(`Error: ${err}`, 'error'));
+        }
+        
+        function loadSavedLists() {
+            fetch('/exclude/lists')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        const lists = data.lists;
+                        const container = document.getElementById('savedLists');
+                        
+                        if (lists.length === 0) {
+                            container.innerHTML = '<div class="empty-message" style="grid-column: 1/-1;">No saved lists yet</div>';
+                        } else {
+                            container.innerHTML = lists.map(list => `
+                                <div class="list-card">
+                                    <h5>${list.title}</h5>
+                                    <div class="count">${list.count} stocks</div>
+                                    <div class="date">${new Date(list.created).toLocaleDateString()}</div>
+                                    <div class="card-actions">
+                                        <button class="btn-success btn-sm" onclick="applyList('${list.name}')">Apply</button>
+                                        <button class="btn-warning btn-sm" onclick="loadList('${list.name}')">View</button>
+                                        <button class="btn-danger btn-sm" onclick="deleteList('${list.name}')">Delete</button>
+                                    </div>
+                                </div>
+                            `).join('');
+                        }
+                    }
+                })
+                .catch(err => console.error('Error loading saved lists:', err));
+        }
+        
+        function applyList(name) {
+            fetch(`/exclude/apply/${name}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    showMessage(`Applied list: ${name}`, 'success');
+                    loadCurrentList();
+                } else {
+                    showMessage(`Error: ${data.error}`, 'error');
+                }
+            })
+            .catch(err => showMessage(`Error: ${err}`, 'error'));
+        }
+        
+        function loadList(name) {
+            fetch(`/exclude/load/${name}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        document.getElementById('listName').value = data.name;
+                        showMessage(`Loaded list: ${name} (${data.count} stocks)`, 'info');
+                    } else {
+                        showMessage(`Error: ${data.error}`, 'error');
+                    }
+                })
+                .catch(err => showMessage(`Error: ${err}`, 'error'));
+        }
+        
+        function deleteList(name) {
+            if (!confirm(`Delete exclusion list: ${name}?`)) return;
+            
+            fetch(`/exclude/delete/${name}`, {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    showMessage(`Deleted list: ${name}`, 'success');
+                    loadSavedLists();
+                } else {
+                    showMessage(`Error: ${data.error}`, 'error');
+                }
+            })
+            .catch(err => showMessage(`Error: ${err}`, 'error'));
+        }
+        
+        function clearList() {
+            if (!confirm('Clear all excluded stocks?')) return;
+            
+            fetch('/exclude/clear', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    showMessage('Cleared exclusion list', 'success');
+                    loadCurrentList();
+                } else {
+                    showMessage(`Error: ${data.error}`, 'error');
+                }
+            })
+            .catch(err => showMessage(`Error: ${err}`, 'error'));
+        }
+        
+        function exportCSV() {
+            window.location.href = '/exclude/export-csv';
+        }
+        
+        function importCSV() {
+            const file = document.getElementById('csvFile').files[0];
+            if (!file) {
+                showMessage('Please select a CSV file', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('csvfile', file);
+            
+            fetch('/exclude/import-csv', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    showMessage(`Imported ${data.count} stocks from CSV`, 'success');
+                    document.getElementById('csvFile').value = '';
+                    loadCurrentList();
+                } else {
+                    showMessage(`Error: ${data.error}`, 'error');
+                }
+            })
+            .catch(err => showMessage(`Error: ${err}`, 'error'));
+        }
+    </script>
+</body>
+</html>

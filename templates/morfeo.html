@@ -420,6 +420,46 @@
 											</td>
 											<td style="text-align:center; padding:6px;">{{ Param.filterSlowEMA(style="cursor:pointer;") }}</td>
 										</tr>
+										<!-- Additional EMA 1 -->
+										<tr>
+											<th>{{ Param.EMA1.label(class_="LabelHead") }}</th>
+                                            <td>
+                                                <div id="tf_ema1">{{ Param.EMA1_tf(class_="EMA1_tf") }}</div>
+                                            </td>
+											<td>
+												<div id = "nchangeinput_ema1"> {{ Param.EMA1(class_="EMA1", value = 12) }} </div>
+											</td>
+											<th>{{ Param.ComparisonEMA1(class_="ComparisonEMA1") }}</th>
+											<td>
+												<div id = "changeinput_ema1"> {{ Param.PercentageEMA1(class_="PercentageEMA1", value = '0' ) }} </div>
+											</td>
+											<td>
+												<div class="formatingyesno">
+													<div class="yesno"> {{ Param.booleanEMA1() }} </div><div class="yesno"> {{ Param.booleanEMA1.label }} </div>
+												</div>
+											</td>
+											<td style="text-align:center; padding:6px;">{{ Param.filterEMA1(style="cursor:pointer;") }}</td>
+										</tr>
+										<!-- Additional EMA 2 -->
+										<tr>
+											<th>{{ Param.EMA2.label(class_="LabelHead") }}</th>
+                                            <td>
+                                                <div id="tf_ema2">{{ Param.EMA2_tf(class_="EMA2_tf") }}</div>
+                                            </td>
+											<td>
+												<div id = "nchangeinput_ema2"> {{ Param.EMA2(class_="EMA2", value = 26) }} </div>
+											</td>
+											<th>{{ Param.ComparisonEMA2(class_="ComparisonEMA2") }}</th>
+											<td>
+												<div id = "changeinput_ema2"> {{ Param.PercentageEMA2(class_="PercentageEMA2", value = '0' ) }} </div>
+											</td>
+											<td>
+												<div class="formatingyesno">
+													<div class="yesno"> {{ Param.booleanEMA2() }} </div><div class="yesno"> {{ Param.booleanEMA2.label }} </div>
+												</div>
+											</td>
+											<td style="text-align:center; padding:6px;">{{ Param.filterEMA2(style="cursor:pointer;") }}</td>
+										</tr>
 									</tbody>
 								</table>
 								<table class = "firstTable">
@@ -539,6 +579,147 @@
 											</td>
 											<td style="text-align:center; padding:6px;">{{ Param.filterATR(style="cursor:pointer;") }}</td>
 										</tr>
+                                        <!-- Additional SMA 1 -->
+                                        <tr>
+                                            <th>{{ Param.SMA1.label(class_="LabelHead") }}</th>
+                                            <td>
+                                                <div id="tf_sma1">{{ Param.SMA1_tf(class_="SMA1_tf") }}</div>
+                                            </td>
+                                            <td>
+                                                <div id="nchangeinput_sma1"> {{ Param.SMA1(class_="SMA1", value = 30) }} </div>
+                                            </td>
+                                            <th>{{ Param.ComparisonSMA1(class_="ComparisonSMA1") }}</th>
+                                            <td>
+                                                <div id="changeinput_sma1"> {{ Param.PercentageSMA1(class_="PercentageSMA1", value = 0) }} </div>
+                                            </td>
+                                            <td>
+                                                <div class="formatingyesno">
+                                                    <div class="yesno"> {{ Param.booleanSMA1() }} </div><div class="yesno"> {{ Param.booleanSMA1.label }} </div>
+                                                </div>
+                                            </td>
+                                            <td style="text-align:center; padding:6px;">{{ Param.filterSMA1(style="cursor:pointer;") }}</td>
+                                        </tr>
+                                        <!-- Additional SMA 2 -->
+                                        <tr>
+                                            <th>{{ Param.SMA2.label(class_="LabelHead") }}</th>
+                                            <td>
+                                                <div id="tf_sma2">{{ Param.SMA2_tf(class_="SMA2_tf") }}</div>
+                                            </td>
+                                            <td>
+                                                <div id="nchangeinput_sma2"> {{ Param.SMA2(class_="SMA2", value = 50) }} </div>
+                                            </td>
+                                            <th>{{ Param.ComparisonSMA2(class_="ComparisonSMA2") }}</th>
+                                            <td>
+                                                <div id="changeinput_sma2"> {{ Param.PercentageSMA2(class_="PercentageSMA2", value = 0) }} </div>
+                                            </td>
+                                            <td>
+                                                <div class="formatingyesno">
+                                                    <div class="yesno"> {{ Param.booleanSMA2() }} </div><div class="yesno"> {{ Param.booleanSMA2.label }} </div>
+                                                </div>
+                                            </td>
+                                            <td style="text-align:center; padding:6px;">{{ Param.filterSMA2(style="cursor:pointer;") }}</td>
+                                        </tr>
+                                        <!-- Additional SMA 3 -->
+                                        <tr>
+                                            <th>{{ Param.SMA3.label(class_="LabelHead") }}</th>
+                                            <td>
+                                                <div id="tf_sma3">{{ Param.SMA3_tf(class_="SMA3_tf") }}</div>
+                                            </td>
+                                            <td>
+                                                <div id="nchangeinput_sma3"> {{ Param.SMA3(class_="SMA3", value = 100) }} </div>
+                                            </td>
+                                            <th>{{ Param.ComparisonSMA3(class_="ComparisonSMA3") }}</th>
+                                            <td>
+                                                <div id="changeinput_sma3"> {{ Param.PercentageSMA3(class_="PercentageSMA3", value = 0) }} </div>
+                                            </td>
+                                            <td>
+                                                <div class="formatingyesno">
+                                                    <div class="yesno"> {{ Param.booleanSMA3() }} </div><div class="yesno"> {{ Param.booleanSMA3.label }} </div>
+                                                </div>
+                                            </td>
+                                            <td style="text-align:center; padding:6px;">{{ Param.filterSMA3(style="cursor:pointer;") }}</td>
+                                        </tr>
+                                        <!-- Candlestick 1 -->
+                                        <tr>
+                                            <th>{{ Param.Candlestick1.label(class_="LabelHead") }}</th>
+                                            <td>
+                                                <div id="tf_candlestick1">{{ Param.Candlestick1_tf(class_="Candlestick1_tf") }}</div>
+                                            </td>
+                                            <td>
+                                                <div id="nchangeinput_cs1"> {{ Param.Candlestick1(class_="Candlestick1", value = 5) }} </div>
+                                            </td>
+                                            <th>{{ Param.ComparisonCandlestick1(class_="ComparisonCandlestick1") }}</th>
+                                            <td>
+                                                <div id="changeinput_cs1"> {{ Param.PercentageCandlestick1(class_="PercentageCandlestick1", value = 0) }} </div>
+                                            </td>
+                                            <td>
+                                                <div class="formatingyesno">
+                                                    <div class="yesno"> {{ Param.booleanCandlestick1() }} </div><div class="yesno"> {{ Param.booleanCandlestick1.label }} </div>
+                                                </div>
+                                            </td>
+                                            <td style="text-align:center; padding:6px;">{{ Param.filterCandlestick1(style="cursor:pointer;") }}</td>
+                                        </tr>
+                                        <!-- Candlestick 2 -->
+                                        <tr>
+                                            <th>{{ Param.Candlestick2.label(class_="LabelHead") }}</th>
+                                            <td>
+                                                <div id="tf_candlestick2">{{ Param.Candlestick2_tf(class_="Candlestick2_tf") }}</div>
+                                            </td>
+                                            <td>
+                                                <div id="nchangeinput_cs2"> {{ Param.Candlestick2(class_="Candlestick2", value = 10) }} </div>
+                                            </td>
+                                            <th>{{ Param.ComparisonCandlestick2(class_="ComparisonCandlestick2") }}</th>
+                                            <td>
+                                                <div id="changeinput_cs2"> {{ Param.PercentageCandlestick2(class_="PercentageCandlestick2", value = 0) }} </div>
+                                            </td>
+                                            <td>
+                                                <div class="formatingyesno">
+                                                    <div class="yesno"> {{ Param.booleanCandlestick2() }} </div><div class="yesno"> {{ Param.booleanCandlestick2.label }} </div>
+                                                </div>
+                                            </td>
+                                            <td style="text-align:center; padding:6px;">{{ Param.filterCandlestick2(style="cursor:pointer;") }}</td>
+                                        </tr>
+                                        <!-- Candlestick 3 -->
+                                        <tr>
+                                            <th>{{ Param.Candlestick3.label(class_="LabelHead") }}</th>
+                                            <td>
+                                                <div id="tf_candlestick3">{{ Param.Candlestick3_tf(class_="Candlestick3_tf") }}</div>
+                                            </td>
+                                            <td>
+                                                <div id="nchangeinput_cs3"> {{ Param.Candlestick3(class_="Candlestick3", value = 15) }} </div>
+                                            </td>
+                                            <th>{{ Param.ComparisonCandlestick3(class_="ComparisonCandlestick3") }}</th>
+                                            <td>
+                                                <div id="changeinput_cs3"> {{ Param.PercentageCandlestick3(class_="PercentageCandlestick3", value = 0) }} </div>
+                                            </td>
+                                            <td>
+                                                <div class="formatingyesno">
+                                                    <div class="yesno"> {{ Param.booleanCandlestick3() }} </div><div class="yesno"> {{ Param.booleanCandlestick3.label }} </div>
+                                                </div>
+                                            </td>
+                                            <td style="text-align:center; padding:6px;">{{ Param.filterCandlestick3(style="cursor:pointer;") }}</td>
+                                        </tr>
+                                        <!-- Candlestick 4 -->
+                                        <tr>
+                                            <th>{{ Param.Candlestick4.label(class_="LabelHead") }}</th>
+                                            <td>
+                                                <div id="tf_candlestick4">{{ Param.Candlestick4_tf(class_="Candlestick4_tf") }}</div>
+                                            </td>
+                                            <td>
+                                                <div id="nchangeinput_cs4"> {{ Param.Candlestick4(class_="Candlestick4", value = 20) }} </div>
+                                            </td>
+                                            <th>{{ Param.ComparisonCandlestick4(class_="ComparisonCandlestick4") }}</th>
+                                            <td>
+                                                <div id="changeinput_cs4"> {{ Param.PercentageCandlestick4(class_="PercentageCandlestick4", value = 0) }} </div>
+                                            </td>
+                                            <td>
+                                                <div class="formatingyesno">
+                                                    <div class="yesno"> {{ Param.booleanCandlestick4() }} </div><div class="yesno"> {{ Param.booleanCandlestick4.label }} </div>
+                                                </div>
+                                            </td>
+                                            <td style="text-align:center; padding:6px;">{{ Param.filterCandlestick4(style="cursor:pointer;") }}</td>
+                                        </tr>
+                                        <!-- End Additional Indicators -->
                                         <tr>
                                             <th>{{ Param.PrevClose.label(class_="LabelHead") }}</th>
                                             <td>
@@ -901,7 +1082,7 @@
 										</tr>
 										<tr>
 											<th style="padding:10px">Max Headlines</th>
-											<td style="padding:10px" colspan="4">{{ Param.NewsMaxHeadlines(class_="NewsMaxHeadlines", value='5') }}</td>
+											<td style="padding:10px" colspan="4">{{ Param.NewsMaxHeadlines(class_="NewsMaxHeadlines", value='20') }}</td>
 										</tr>
 										<tr>
 											<th style="padding:10px">News Within (0 = any)</th>
@@ -978,6 +1159,13 @@
 										</tr>
 									</thead>
 									<tbody>
+										<tr style="background:#e8f5e9">
+											<td colspan="5" style="padding:10px; font-size:12px; font-weight:bold;"><strong>COLOR SCHEME FOR ALERTS IN RESULTS:</strong> 
+												<span style="display:inline-block; background:#00AA00; color:#fff; padding:4px 8px; margin:0 5px; border-radius:3px;">Green = Price Change Met</span>
+												<span style="display:inline-block; background:#8B4513; color:#fff; padding:4px 8px; margin:0 5px; border-radius:3px;">Brown = RVOL Spike Detected</span>
+												<span style="display:inline-block; background:#FFA500; color:#fff; padding:4px 8px; margin:0 5px; border-radius:3px;">Orange = Key Level Hit</span>
+											</td>
+										</tr>
 										<tr>
 											<th style="padding:10px">Enable % Change Monitoring</th>
 											<td style="padding:10px" colspan="4">{{ Param.EnablePctChangeMonitor(class_="EnablePctChangeMonitor") }}</td>
@@ -985,7 +1173,7 @@
 										<tr>
 											<th style="padding:10px">% Change Threshold</th>
 											<td style="padding:10px" colspan="2">{{ Param.PctChangeThreshold(class_="PctChangeThreshold", value='3.0', style="width:80px") }}%</td>
-											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Alert on price changes above this % (Green)</span></td>
+											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Alert on price changes above this % (displays in <strong style="color:#00AA00;">Green</strong>)</span></td>
 										</tr>
 										<tr>
 											<th style="padding:10px">% Change Lookback Period</th>
@@ -994,7 +1182,7 @@
 										</tr>
 										<tr>
 											<th style="padding:10px">Read Alert on % Change</th>
-											<td style="padding:10px" colspan="4">{{ Param.EnablePctChangeTTS(class_="EnablePctChangeTTS") }}</td>
+											<td style="padding:10px" colspan="4">{{ Param.EnablePctChangeTTS(class_="EnablePctChangeTTS") }} <span style="font-size:11px;color:#888">✓ Check to read stock symbol and price change aloud</span></td>
 										</tr>
 										<tr style="background:#f0f0f0">
 											<th style="padding:10px">Enable RVOL (Relative Volume) Monitoring</th>
@@ -1003,7 +1191,7 @@
 										<tr>
 											<th style="padding:10px">RVOL Lookback Period</th>
 											<td style="padding:10px" colspan="2">{{ Param.RVOLLookbackDays(class_="RVOLLookbackDays", value='5', style="width:80px") }} days</td>
-											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Calculate RVOL based on average volume over past X days (Brown)</span></td>
+											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Calculate RVOL based on average volume over past X days (displays in <strong style="color:#8B4513;">Brown</strong>)</span></td>
 										</tr>
 										<tr>
 											<th style="padding:10px">RVOL Threshold</th>
@@ -1012,7 +1200,7 @@
 										</tr>
 										<tr>
 											<th style="padding:10px">Read Alert on RVOL Spike</th>
-											<td style="padding:10px" colspan="4">{{ Param.EnableRVOLTTS(class_="EnableRVOLTTS") }}</td>
+											<td style="padding:10px" colspan="4">{{ Param.EnableRVOLTTS(class_="EnableRVOLTTS") }} <span style="font-size:11px;color:#888">✓ Check to read stock symbol and RVOL value aloud</span></td>
 										</tr>
 										<tr style="background:#f0f0f0">
 											<th style="padding:10px">Enable Key Level Detection</th>
@@ -1020,16 +1208,16 @@
 										</tr>
 										<tr>
 											<th style="padding:10px">Key Level Type</th>
-											<td style="padding:10px" colspan="4">{{ Param.KeyLevelType(class_="KeyLevelType") }}</td>
+											<td style="padding:10px" colspan="4">{{ Param.KeyLevelType(class_="KeyLevelType") }} <span style="font-size:11px;color:#888">Select: VWAP, Gap Close, Pivot Point, Pivot Point 2, or Pivot Point 3</span></td>
 										</tr>
 										<tr>
 											<th style="padding:10px">Key Level Proximity</th>
 											<td style="padding:10px" colspan="2">{{ Param.KeyLevelProximityPercent(class_="KeyLevelProximityPercent", value='1.0', style="width:80px") }}%</td>
-											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Highlight when within % of selected key level (Yellow)</span></td>
+											<td style="padding:10px" colspan="2"><span style="font-size:11px;color:#888">Highlight when within % of selected key level (displays in <strong style="color:#FFA500;">Orange</strong>)</span></td>
 										</tr>
 										<tr>
 											<th style="padding:10px">Read Alert on Key Level Hit</th>
-											<td style="padding:10px" colspan="4">{{ Param.EnableKeyLevelTTS(class_="EnableKeyLevelTTS") }}</td>
+											<td style="padding:10px" colspan="4">{{ Param.EnableKeyLevelTTS(class_="EnableKeyLevelTTS") }} <span style="font-size:11px;color:#888">✓ Check to read stock symbol and key level name aloud</span></td>
 										</tr>
 									</tbody>
 								</table>
@@ -2259,9 +2447,10 @@ function cleanNewsArticleText(rawText) {
   }
 
   // COLOR SCHEME FOR MONITORING ALERTS (displayed in results with highlighting)
-  // Green - % Price Change threshold met
-  // Brown (#8b7355) - RVOL threshold exceeded
-  // Yellow (#ffffcc) - Key Level hit detected
+  // Green (#00AA00) - % Price Change threshold met
+  // Brown (#8B4513) - RVOL threshold exceeded
+  // Orange (#FFA500) - Key Level hit detected
+  // Priority: RVOL (Brown) > Key Level (Orange) > Price Change (Green) > OBV > sma200Crossover > newsKeyword
 
 
 
@@ -2672,7 +2861,7 @@ function cleanNewsArticleText(rawText) {
   // Toggle mute state
   function toggleTTSMute() {
     _ttsMuted = !_ttsMuted;
-    localStorage.setItem('ttsMuted', _ttsMuted);
+    localStorage.setItem('ttsMuted', _ttsMuted ? 'true' : 'false');
     // Update mute button UI
     const muteBtn = document.getElementById('ttsMuteBtn');
     if (muteBtn) {
@@ -3294,8 +3483,8 @@ function renderResultsFromBackend(response) {
                     const signal = dta.obvAnalysis.signal;
                     
                     if (signal === "strong_bullish") {
-                        // Purple for strong bullish OBV
-                        obvStyle = " style='background:#e6d5f0;color:#000;font-weight:700'";
+                        // Green for strong bullish OBV
+                        obvStyle = " style='background:#28a745;color:#fff;font-weight:800;padding:8px;font-size:14px'";
                         try {
                             const enableTTS = document.querySelector('input[name="EnableOBVTTS"]');
                             if (enableTTS && enableTTS.checked) {
@@ -3305,11 +3494,11 @@ function renderResultsFromBackend(response) {
                             console.warn("OBV bullish TTS alert error:", e);
                         }
                     } else if (signal === "bullish") {
-                        // Light purple for bullish OBV
-                        obvStyle = " style='background:#f0e6ff;color:#000;font-weight:600'";
+                        // Light green for bullish OBV
+                        obvStyle = " style='background:#17a2b8;color:#fff;font-weight:700;padding:6px;font-size:13px'";
                     } else if (signal === "strong_bearish") {
-                        // Light red for strong bearish OBV
-                        obvStyle = " style='background:#ffe6e6;color:#000;font-weight:700'";
+                        // Red for strong bearish OBV
+                        obvStyle = " style='background:#dc3545;color:#fff;font-weight:800;padding:8px;font-size:14px'";
                         try {
                             const enableTTS = document.querySelector('input[name="EnableOBVTTS"]');
                             if (enableTTS && enableTTS.checked) {
@@ -3319,15 +3508,15 @@ function renderResultsFromBackend(response) {
                             console.warn("OBV bearish TTS alert error:", e);
                         }
                     } else if (signal === "bearish") {
-                        // Very light red for bearish OBV
-                        obvStyle = " style='background:#fff0f0;color:#000;font-weight:600'";
+                        // Light red for bearish OBV
+                        obvStyle = " style='background:#fd7e14;color:#fff;font-weight:700;padding:6px;font-size:13px'";
                     }
                 }
                 
                 // Check if near key level and apply yellow highlighting
                 let keyLevelStyle = "";
                 if (dta.variableResults && dta.variableResults["keyLevel"]) {
-                    keyLevelStyle = " style='background:#ffffcc;color:#000;font-weight:600'";  // Yellow
+                    keyLevelStyle = " style='background:#FFA500;color:#fff;font-weight:800;padding:8px;font-size:14px'";  // Orange (brighter than yellow)
                     // Play sound if enabled - commented out per requirements (using TTS instead)
                     try {
                         const enableTTS = document.querySelector('input[name="EnableKeyLevelTTS"]');
@@ -3344,7 +3533,7 @@ function renderResultsFromBackend(response) {
                 // Check if RVOL spike and apply brown highlighting
                 let rvolStyle = "";
                 if (dta.variableResults && dta.variableResults["rvol"]) {
-                    rvolStyle = " style='background:#8b7355;color:#fff;font-weight:600'";  // Brown
+                    rvolStyle = " style='background:#8B4513;color:#fff;font-weight:800;padding:8px;font-size:14px'";  // Saddle brown (darker, more readable)
                     // Read alert if enabled
                     try {
                         const enableTTS = document.querySelector('input[name="EnableRVOLTTS"]');
@@ -3356,8 +3545,10 @@ function renderResultsFromBackend(response) {
                     }
                 }
 
-                // Check Price Change monitoring and announce TTS alert
+                // Check Price Change monitoring and apply green highlighting and announce TTS alert
+                let pctChangeStyle = "";
                 if (dta.variableResults && dta.variableResults["pctChange"]) {
+                    pctChangeStyle = " style='background:#00AA00;color:#fff;font-weight:800;padding:8px;font-size:14px'";  // Green for price change
                     try {
                         const enableTTS = document.querySelector('input[name="EnablePctChangeTTS"]');
                         if (enableTTS && enableTTS.checked) {
@@ -3368,8 +3559,8 @@ function renderResultsFromBackend(response) {
                     }
                 }
 
-                // Apply style in priority: RVOL (Brown) > Key Level (Yellow) > OBV > sma200Crossover > newsKeyword
-                let appliedStyle = rvolStyle || keyLevelStyle || obvStyle || sma200CrossoverStyle || _keywordRowStyle;
+                // Apply style in priority: RVOL (Brown) > Key Level (Yellow) > Price Change (Green) > OBV > sma200Crossover > newsKeyword
+                let appliedStyle = rvolStyle || keyLevelStyle || pctChangeStyle || obvStyle || sma200CrossoverStyle || _keywordRowStyle;
                 txt1 += `<tr class='${rowClass}'${appliedStyle}>`;
 
                 const headerCols = groupHeaderCols || [];
@@ -3413,15 +3604,15 @@ function renderResultsFromBackend(response) {
                     const vrLookup = col.vrKey || col.key;
                     if (vrLookup in vr) {
                         if (vrLookup === "fibGap" && vr[vrLookup]) {
-                            cellStyle = " style='background:#9b59b6;color:#fff;font-weight:700'";
+                            cellStyle = " style='background:#9b59b6;color:#fff;font-weight:700;padding:6px;font-size:13px'";
                         } else {
-                            cellStyle = vr[vrLookup] ? " style='background:#d4edda;color:#000;font-weight:700'" : " style='background:#f8d7da;color:#000;font-weight:700'";
+                            cellStyle = vr[vrLookup] ? " style='background:#28a745;color:#fff;font-weight:800;padding:6px;font-size:13px'" : " style='background:#dc3545;color:#fff;font-weight:800;padding:6px;font-size:13px'";
                         }
                     }
                     
                     // Check for 200 SMA bullish crossover highlighting (orange for smaSlow)
                     if (col.key === "smaSlow" && dta.variableResults && dta.variableResults["sma200Crossover"]) {
-                        cellStyle = " style='background:#ffa500;color:#fff;font-weight:700'";
+                        cellStyle = " style='background:#FFA500;color:#fff;font-weight:800;padding:6px;font-size:13px'";
                     }
                     
                     const stickyClass = (col.key === 'symbol') ? ' sticky-col' : '';
@@ -3440,7 +3631,7 @@ function renderResultsFromBackend(response) {
                 // --- Primary pivots ---
                 let pivotStyle = "";
                 if ("Pivot" in vr) {
-                    pivotStyle = vr["Pivot"] ? " style='background:#d4edda;color:#000;font-weight:700'" : " style='background:#f8d7da;color:#000;font-weight:700'";
+                    pivotStyle = vr["Pivot"] ? " style='background:#28a745;color:#fff;font-weight:800;padding:6px;font-size:13px'" : " style='background:#dc3545;color:#fff;font-weight:800;padding:6px;font-size:13px'";
                 }
                 for (const pp of pivotPrimary) {
                     const pKey = 'pivot_' + pp;
@@ -3477,12 +3668,12 @@ function renderResultsFromBackend(response) {
                 {
                     let newsStyle = "";
                     if (_newsKeywordMatch) {
-                        // Keyword match — yellow highlight
-                        newsStyle = " style='background:#f1c40f;color:#000;font-weight:700;cursor:pointer'";
+                        // Keyword match — orange highlight
+                        newsStyle = " style='background:#FFA500;color:#fff;font-weight:800;cursor:pointer;padding:6px;font-size:13px'";
                     } else if (newsItems.length > 0) {
                         const vr2 = dta.variableResults || {};
                         if ("news" in vr2) {
-                            newsStyle = vr2["news"] ? " style='background:#d4edda;color:#000;font-weight:700;cursor:pointer'" : " style='background:#f8d7da;color:#000;font-weight:700;cursor:pointer'";
+                            newsStyle = vr2["news"] ? " style='background:#28a745;color:#fff;font-weight:800;cursor:pointer;padding:6px;font-size:13px'" : " style='background:#dc3545;color:#fff;font-weight:800;cursor:pointer;padding:6px;font-size:13px'";
                         } else {
                             newsStyle = " style='cursor:pointer'";
                         }
@@ -4203,11 +4394,12 @@ function _initDragReorder(tableId) {
 window._tablesSortState = {};
 
 function _initTableSorting(tableId, groupData) {
-    // Store original data for this table
+    // Store original data and row order for this table
     window._tablesSortState[tableId] = {
         originalData: JSON.parse(JSON.stringify(groupData)),
+        originalRowOrder: null, // Will be captured on first access
         sortColumn: null,
-        sortAscending: true
+        sortState: 'default' // 'default' (news-sorted), 'ascending', or 'descending'
     };
 
     // Add click handlers to all headers
@@ -4219,17 +4411,54 @@ function _initTableSorting(tableId, groupData) {
         const th = ths[i];
         const colKey = th.getAttribute('data-col');
         
-        // Skip non-sortable columns
-        if (colKey === '_placeOrder' || colKey === '_news' || colKey === 'netPosition') continue;
+        // Skip non-sortable columns (place order, news, position, and ticker/cusip columns)
+        if (colKey === '_placeOrder' || colKey === '_news' || colKey === 'netPosition' || 
+            colKey === 'symbol' || colKey === 'cusip') continue;
         
         // Add pointer cursor to indicate it's clickable
         th.style.cursor = 'pointer';
-        th.title = `Click to sort by ${th.textContent}`;
+        th.title = `Click to sort by ${th.textContent} (click 3x to reset)`;
         
         // Add click handler
         th.addEventListener('click', function(e) {
             e.stopPropagation();
             _sortTable(tableId, colKey);
+        });
+    }
+
+    // Make ticker/cusip columns show news instead of sorting
+    const tickerTh = thead.querySelector('th[data-col="symbol"]');
+    const cusipTh = thead.querySelector('th[data-col="cusip"]');
+    
+    if (tickerTh) {
+        tickerTh.style.cursor = 'pointer';
+        tickerTh.title = 'Click to show news';
+        tickerTh.addEventListener('click', function(e) {
+            e.stopPropagation();
+            // Show first news row by clicking on the news toggle
+            const tbody = document.querySelector(`#responsive-data-table-${tableId} tbody`);
+            if (tbody) {
+                const firstNewsToggle = tbody.querySelector('.news-arrow-sym');
+                if (firstNewsToggle) {
+                    firstNewsToggle.click();
+                }
+            }
+        });
+    }
+    
+    if (cusipTh) {
+        cusipTh.style.cursor = 'pointer';
+        cusipTh.title = 'Click to show news';
+        cusipTh.addEventListener('click', function(e) {
+            e.stopPropagation();
+            // Show first news row by clicking on the news toggle
+            const tbody = document.querySelector(`#responsive-data-table-${tableId} tbody`);
+            if (tbody) {
+                const firstNewsToggle = tbody.querySelector('.news-arrow-sym');
+                if (firstNewsToggle) {
+                    firstNewsToggle.click();
+                }
+            }
         });
     }
 }
@@ -4238,87 +4467,98 @@ function _sortTable(tableId, sortColumn) {
     const state = window._tablesSortState[tableId];
     if (!state) return;
 
-    // Toggle ascending/descending if clicking same column
-    if (state.sortColumn === sortColumn) {
-        state.sortAscending = !state.sortAscending;
-    } else {
-        state.sortColumn = sortColumn;
-        state.sortAscending = true;
-    }
-
-    // Get all rows from the table body
+    // Get the table and rows
     const table = document.querySelector(`#responsive-data-table-${tableId}`);
     const tbody = table.querySelector('tbody');
-    const rows = Array.from(tbody.querySelectorAll('tr:not(.news-row)'));
+    const rows = Array.from(tbody.querySelectorAll('tr:not([id*="newsRow"])'));
 
-    // Extract data and sort
-    const rowsData = [];
-    for (let row of rows) {
-        // Get symbol from first cell for matching original data
-        const symbolCell = row.querySelector('td:first-child');
-        const symbol = symbolCell ? symbolCell.textContent.trim().split(/\s+/)[0] : '';
-        rowsData.push({ element: row, symbol: symbol });
+    // Capture original row order if not done yet
+    if (!state.originalRowOrder) {
+        state.originalRowOrder = rows.map(row => row.cloneNode(true));
     }
 
-    // Sort by priority:
-    // 1. Rows meeting all criteria (signal === "yes")
-    // 2. Most recent news
-    // 3. Selected column value
-    rowsData.sort((a, b) => {
-        const origData = state.originalData;
-        let aData = null, bData = null;
+    // Handle three-state cycle: default → ascending → descending → back to default
+    if (state.sortColumn === sortColumn) {
+        // Clicking the same column cycles through states
+        if (state.sortState === 'default') {
+            state.sortState = 'ascending';
+        } else if (state.sortState === 'ascending') {
+            state.sortState = 'descending';
+        } else {
+            state.sortState = 'default';
+        }
+    } else {
+        // Clicking a different column starts with ascending
+        state.sortColumn = sortColumn;
+        state.sortState = 'ascending';
+    }
 
-        // Find original data for each row
-        for (const groupKey in origData) {
-            const group = origData[groupKey];
-            if (Array.isArray(group)) {
-                aData = aData || group.find(d => d.symbol === a.symbol);
-                bData = bData || group.find(d => d.symbol === b.symbol);
-            } else {
-                for (const key in group) {
-                    if (Array.isArray(group[key])) {
-                        aData = aData || group[key].find(d => d.symbol === a.symbol);
-                        bData = bData || group[key].find(d => d.symbol === b.symbol);
+    // Reset to original order if in default state
+    if (state.sortState === 'default') {
+        const newTbody = tbody.cloneNode(false);
+        for (let origRow of state.originalRowOrder) {
+            newTbody.appendChild(origRow.cloneNode(true));
+        }
+        while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+        for (let row of newTbody.childNodes) tbody.appendChild(row.cloneNode(true));
+    } else {
+        // Sort rows based on current sort state
+        const rowsData = [];
+        for (let row of rows) {
+            // Get symbol from first cell for matching original data
+            const symbolCell = row.querySelector('td:first-child');
+            const symbol = symbolCell ? symbolCell.textContent.trim().split(/\s+/)[0] : '';
+            rowsData.push({ element: row, symbol: symbol });
+        }
+
+        // Sort by the selected column value only (no priorities)
+        rowsData.sort((a, b) => {
+            const origData = state.originalData;
+            let aData = null, bData = null;
+
+            // Find original data for each row
+            for (const groupKey in origData) {
+                const group = origData[groupKey];
+                if (Array.isArray(group)) {
+                    aData = aData || group.find(d => d.symbol === a.symbol);
+                    bData = bData || group.find(d => d.symbol === b.symbol);
+                } else {
+                    for (const key in group) {
+                        if (Array.isArray(group[key])) {
+                            aData = aData || group[key].find(d => d.symbol === a.symbol);
+                            bData = bData || group[key].find(d => d.symbol === b.symbol);
+                        }
                     }
                 }
             }
+
+            // Get values from the sort column
+            let aVal = aData ? aData[sortColumn] : "";
+            let bVal = bData ? bData[sortColumn] : "";
+
+            // Handle null/undefined
+            if (aVal == null) aVal = "";
+            if (bVal == null) bVal = "";
+
+            // Try numeric comparison first
+            const aNum = parseFloat(aVal);
+            const bNum = parseFloat(bVal);
+            if (!isNaN(aNum) && !isNaN(bNum)) {
+                return state.sortState === 'ascending' ? (aNum - bNum) : (bNum - aNum);
+            }
+
+            // String comparison
+            const aStr = String(aVal).toLowerCase();
+            const bStr = String(bVal).toLowerCase();
+            const cmp = aStr.localeCompare(bStr);
+            return state.sortState === 'ascending' ? cmp : -cmp;
+        });
+
+        // Re-insert sorted rows in tbody
+        for (let item of rowsData) {
+            tbody.appendChild(item.element);
         }
-
-        // Priority 1: Rows meeting all criteria (signal === "yes") come first
-        const aSignal = aData ? (aData.signal === "yes" ? 1 : 0) : 0;
-        const bSignal = bData ? (bData.signal === "yes" ? 1 : 0) : 0;
-        if (aSignal !== bSignal) return bSignal - aSignal;
-
-        // Priority 2: Most recent news
-        const aTime = aData?.latestNewsTime || "";
-        const bTime = bData?.latestNewsTime || "";
-        if (aTime && bTime && aTime !== bTime) {
-            const cmp = bTime.localeCompare(aTime);
-            if (cmp !== 0) return cmp;
-        } else if (aTime && !bTime) return -1;
-        else if (!aTime && bTime) return 1;
-
-        // Priority 3: Sort by clicked column
-        let aVal = aData ? aData[sortColumn] : "";
-        let bVal = bData ? bData[sortColumn] : "";
-
-        // Handle null/undefined
-        if (aVal == null) aVal = "";
-        if (bVal == null) bVal = "";
-
-        // Try numeric comparison first
-        const aNum = parseFloat(aVal);
-        const bNum = parseFloat(bVal);
-        if (!isNaN(aNum) && !isNaN(bNum)) {
-            return state.sortAscending ? (aNum - bNum) : (bNum - aNum);
-        }
-
-        // String comparison
-        const aStr = String(aVal).toLowerCase();
-        const bStr = String(bVal).toLowerCase();
-        const cmp = aStr.localeCompare(bStr);
-        return state.sortAscending ? cmp : -cmp;
-    });
+    }
 
     // Update visual indicators on headers
     const thead = table.querySelector('thead');
@@ -4327,24 +4567,24 @@ function _sortTable(tableId, sortColumn) {
         const indicator = th.querySelector('.sort-indicator');
         if (indicator) indicator.remove();
         th.style.fontWeight = 'normal';
+        th.style.color = 'inherit';
     });
 
-    // Add indicator to active column
-    const activeTh = thead.querySelector(`th[data-col="${sortColumn}"]`);
-    if (activeTh) {
-        activeTh.style.fontWeight = 'bold';
-        const arrow = state.sortAscending ? '▲' : '▼';
-        const span = document.createElement('span');
-        span.className = 'sort-indicator';
-        span.textContent = ' ' + arrow;
-        span.style.fontSize = '0.8em';
-        span.style.color = '#0969da';
-        activeTh.appendChild(span);
-    }
-
-    // Re-insert sorted rows
-    for (let item of rowsData) {
-        tbody.appendChild(item.element);
+    // Add indicator to active column (only if not in default state)
+    if (state.sortState !== 'default') {
+        const activeTh = thead.querySelector(`th[data-col="${sortColumn}"]`);
+        if (activeTh) {
+            activeTh.style.fontWeight = 'bold';
+            activeTh.style.color = '#0969da';
+            const arrow = state.sortState === 'ascending' ? '▲ HIGH→LOW' : '▼ LOW→HIGH';
+            const span = document.createElement('span');
+            span.className = 'sort-indicator';
+            span.textContent = ' ' + arrow;
+            span.style.fontSize = '0.75em';
+            span.style.color = '#0969da';
+            span.style.fontWeight = 'bold';
+            activeTh.appendChild(span);
+        }
     }
 }
 

@@ -64,7 +64,15 @@ class PriceReference:
         if self.type == 'custom':
             return round(self.custom_price, 2)
         
-        # Apply offset percentage
+        if self.type == 'percent_target':
+            # For percent targets, the offset_pct is the % gain above the base price
+            # e.g., offset_pct=5 means 5% above prev_close
+            offset_multiplier = 1 + (self.offset_pct / 100.0)
+            final_price = indicator_value * offset_multiplier
+            return round(final_price, 2)
+        
+        # For all other indicators, apply offset percentage
+        # offset_pct positive = move up, negative = move down
         offset_multiplier = 1 + (self.offset_pct / 100.0)
         final_price = indicator_value * offset_multiplier
         return round(final_price, 2)
@@ -112,8 +120,6 @@ class SellTarget:
             notes=data.get('notes', ''),
         )
 
-
-@dataclass
 
 @dataclass
 class OrderLevel:
@@ -400,7 +406,15 @@ class PriceReferenceResolver:
             Resolved price or None if resolution fails
         """
         if price_ref.type == 'custom':
-            return price_ref.resolve_price(price_ref.custom_price)
+            return round(price_ref.custom_price, 2) if price_ref.custom_price else None
+        
+        if price_ref.type == 'percent_target':
+            # For percent targets, directly apply offset to prev_close
+            base_value = self.indicator_values.get('prev_close')
+            if base_value is None:
+                logger.warning("Could not resolve percent_target: prev_close not available")
+                return None
+            return price_ref.resolve_price(base_value)
         
         # Get the base indicator value
         base_value = self._get_indicator_value(price_ref.type)
@@ -437,6 +451,7 @@ class PriceReferenceResolver:
             'high_of_day': 'day_high',
             'day_low': 'day_low',
             'low_of_day': 'day_low',
+            'gap_close': 'prev_close',  # Gap close = previous close
         }
         
         # Support/Resistance (based on simple day high/low)
@@ -459,10 +474,6 @@ class PriceReferenceResolver:
                 return round((high + low + close) / 3, 2)
             return None
         
-        # Percent target from previous close
-        if ref_type == 'percent_target':
-            return self.indicator_values.get('prev_close')
-        
         # Fibonacci levels are calculated from swing high/low
         if ref_type.startswith('fibonacci_'):
             return self._calculate_fibonacci(ref_type)
@@ -475,51 +486,56 @@ class PriceReferenceResolver:
         Calculate Fibonacci level using FibonacciCalculator.
         
         Args:
-            fib_type: Format 'fibonacci_XX.X' (e.g., 'fibonacci_38.2')
+            fib_type: Format 'fibonacci_XX.X' (e.g., 'fibonacci_38.2' or 'fibonacci_61.8')
         
         Returns:
             Fibonacci level price or None
         """
         if not FibonacciCalculator:
-            logger.warning("FibonacciCalculator not available")
+            logger.warning("FibonacciCalculator not available for Fibonacci calculations")
             return None
         
         try:
-            # Extract percentage from type (e.g., 0.382 from 'fibonacci_38.2')
-            pct_str = fib_type.replace('fibonacci_', '').replace('.', '')
-            # Convert "382" to 0.382
-            if len(pct_str) == 3:
-                pct = float(pct_str[0] + '.' + pct_str[1:]) / 100.0
-            else:
-                pct = float(pct_str.replace(',', '.')) / 100.0
+            # Extract percentage from type (e.g., 38.2 from 'fibonacci_38.2')
+            pct_str = fib_type.replace('fibonacci_', '')
+            pct = float(pct_str)  # This will be 23.6, 38.2, 50.0, 61.8, or 78.6
             
             # Check cache first
             cache_key = f"{pct:.3f}"
             if cache_key in self._fibonacci_cache:
                 return self._fibonacci_cache[cache_key]
             
-            # Get swing high and low
-            prev_close = self.indicator_values.get('prev_close')
-            day_high = self.indicator_values.get('day_high')
+            # Get swing high and low from previous day's data
+            prev_close = self.indicator_values.get('prev_close', 0)
+            day_high = self.indicator_values.get('day_high', 0)
+            day_low = self.indicator_values.get('day_low', prev_close)
             
             if prev_close is None or day_high is None:
+                logger.warning(f"Cannot calculate Fibonacci: missing prev_close or day_high")
                 return None
             
-            # Calculate using FibonacciCalculator
-            calc = FibonacciCalculator(prev_close=prev_close, high_of_day=day_high)
-            levels = calc.calculate_levels()
+            # Calculate Fibonacci levels using standard formula
+            # For uptrend: Low + (High - Low) * percentage
+            # For downtrend: High - (High - Low) * percentage
+            swing_range = day_high - day_low
+            if swing_range <= 0:
+                swing_range = day_high - prev_close if day_high > prev_close else prev_close - day_low
             
-            # Find the matching level
-            for key, level_data in levels.items():
-                if abs(level_data['level'] - pct) < 0.001:
-                    result = level_data['entry']
-                    self._fibonacci_cache[cache_key] = result
-                    return round(result, 2)
+            if swing_range <= 0:
+                logger.warning("Cannot calculate Fibonacci: no price swing data")
+                return None
             
-            logger.warning(f"Could not calculate Fibonacci level: {fib_type}")
-            return None
+            # Calculate level at percentage
+            pct_decimal = pct / 100.0
+            fib_level = day_low + (swing_range * pct_decimal)
+            
+            result = round(fib_level, 2)
+            self._fibonacci_cache[cache_key] = result
+            
+            logger.debug(f"Calculated Fibonacci {pct}% level: {result} (range: {day_low}-{day_high})")
+            return result
         
-        except (ValueError, KeyError) as e:
+        except (ValueError, KeyError, TypeError) as e:
             logger.warning(f"Error calculating Fibonacci level {fib_type}: {e}")
             return None
 

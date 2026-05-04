@@ -418,3 +418,295 @@ class ConditionChecker:
         
         reason = " | ".join(reasons)
         return all_met, reason
+
+
+# ============================================================================
+# HELD ORDER LIMIT PRICE CALCULATOR
+# ============================================================================
+
+class HeldOrderLimitPriceCalculator:
+    """
+    Calculates dynamic limit prices for held orders based on entry/exit criteria.
+    
+    Supports calculating limit prices from:
+    - Candlestick patterns (high/low with lookback)
+    - Moving averages (SMA, EMA)
+    - Volatility measures (ATR)
+    - Support/resistance levels
+    
+    Prices update dynamically as new market data arrives and candles update.
+    """
+    
+    @staticmethod
+    def calculate_entry_limit_price(symbol: str, side: str, market_data: Dict,
+                                   entry_config: Dict, offset_pct: float = 0) -> Optional[float]:
+        """
+        Calculate entry limit price from entry criteria data.
+        
+        Args:
+            symbol: Stock symbol
+            side: 'long' or 'short'
+            market_data: Current market data dict with indicators:
+                - 'candlestick_high_{lookback}_{timeframe}': Recent high
+                - 'candlestick_low_{lookback}_{timeframe}': Recent low
+                - 'sma_{period}_{timeframe}': SMA value
+                - 'ema_{period}_{timeframe}': EMA value
+                - 'atr_{period}_{timeframe}': ATR value
+                - 'close': Current close price
+            entry_config: Dict with keys like:
+                - 'type': 'candlestick_high', 'candlestick_low', 'sma', 'ema', 'atr', etc.
+                - 'lookback_bars': For candlestick patterns
+                - 'period': For moving averages/ATR
+                - 'timeframe': '5min', '15min', '1h', 'daily', etc.
+            offset_pct: Additional % offset from calculated level (for limit order slippage buffer)
+        
+        Returns:
+            Calculated limit price, or None if calculation fails
+        """
+        if not market_data or not entry_config:
+            return None
+        
+        try:
+            config_type = entry_config.get('type', '').lower()
+            timeframe = entry_config.get('timeframe', '1min')
+            
+            # Candlestick breakout entry (long: above recent high, short: below recent low)
+            if config_type.startswith('candlestick'):
+                lookback = entry_config.get('lookback_bars', 5)
+                
+                if side == 'long':
+                    # Long entry: above recent high
+                    data_key = f'candlestick_high_{lookback}_{timeframe}'
+                    if data_key in market_data:
+                        base_price = float(market_data[data_key])
+                        # For limit orders on long breakout, set slightly above the high
+                        limit_offset = entry_config.get('entry_offset_pct', 0.1)
+                        final_price = base_price * (1 + (limit_offset + offset_pct) / 100.0)
+                        return round(final_price, 2)
+                
+                else:  # short
+                    # Short entry: below recent low
+                    data_key = f'candlestick_low_{lookback}_{timeframe}'
+                    if data_key in market_data:
+                        base_price = float(market_data[data_key])
+                        # For limit orders on short breakout, set slightly below the low
+                        limit_offset = entry_config.get('entry_offset_pct', 0.1)
+                        final_price = base_price * (1 - (limit_offset + offset_pct) / 100.0)
+                        return round(final_price, 2)
+            
+            # SMA-based entry
+            elif config_type == 'sma':
+                period = entry_config.get('period', 20)
+                data_key = f'sma_{period}_{timeframe}'
+                
+                if data_key in market_data:
+                    base_price = float(market_data[data_key])
+                    # Apply offset percentage
+                    if side == 'long':
+                        # Long entry: above SMA
+                        limit_offset = entry_config.get('entry_offset_pct', 0)
+                        final_price = base_price * (1 + (limit_offset + offset_pct) / 100.0)
+                    else:
+                        # Short entry: below SMA
+                        limit_offset = entry_config.get('entry_offset_pct', 0)
+                        final_price = base_price * (1 - (limit_offset + offset_pct) / 100.0)
+                    return round(final_price, 2)
+            
+            # EMA-based entry
+            elif config_type == 'ema':
+                period = entry_config.get('period', 20)
+                data_key = f'ema_{period}_{timeframe}'
+                
+                if data_key in market_data:
+                    base_price = float(market_data[data_key])
+                    if side == 'long':
+                        limit_offset = entry_config.get('entry_offset_pct', 0)
+                        final_price = base_price * (1 + (limit_offset + offset_pct) / 100.0)
+                    else:
+                        limit_offset = entry_config.get('entry_offset_pct', 0)
+                        final_price = base_price * (1 - (limit_offset + offset_pct) / 100.0)
+                    return round(final_price, 2)
+            
+            # ATR-based entry (volatility-adjusted)
+            elif config_type == 'atr':
+                period = entry_config.get('period', 14)
+                data_key = f'atr_{period}_{timeframe}'
+                close_key = 'close'
+                
+                if data_key in market_data and close_key in market_data:
+                    atr_value = float(market_data[data_key])
+                    current_close = float(market_data[close_key])
+                    atr_multiplier = entry_config.get('atr_multiplier', 1.0)
+                    
+                    if side == 'long':
+                        # Long entry: close + (ATR * multiplier)
+                        final_price = current_close + (atr_value * atr_multiplier)
+                    else:
+                        # Short entry: close - (ATR * multiplier)
+                        final_price = current_close - (atr_value * atr_multiplier)
+                    return round(final_price, 2)
+        
+        except (ValueError, KeyError, TypeError) as e:
+            logger.warning(f"Error calculating entry limit price for {symbol}: {e}")
+        
+        return None
+    
+    @staticmethod
+    def calculate_exit_limit_price(symbol: str, side: str, market_data: Dict,
+                                  exit_config: Dict, profit_target_pct: float = 0) -> Optional[float]:
+        """
+        Calculate exit/sell limit price from sell criteria data.
+        
+        Args:
+            symbol: Stock symbol
+            side: 'long' or 'short'
+            market_data: Current market data dict with indicators
+            exit_config: Dict with sell criteria like:
+                - 'type': 'candlestick_high', 'sma', 'ema', 'atr', 'fixed_percent', etc.
+                - 'lookback_bars': For candlestick patterns
+                - 'period': For moving averages
+                - 'timeframe': Timeframe for the data
+            profit_target_pct: % profit target above/below entry price
+        
+        Returns:
+            Calculated sell limit price, or None if calculation fails
+        """
+        if not market_data or not exit_config:
+            return None
+        
+        try:
+            config_type = exit_config.get('type', '').lower()
+            timeframe = exit_config.get('timeframe', '1min')
+            
+            # Candlestick resistance/support levels for exit
+            if config_type.startswith('candlestick'):
+                lookback = exit_config.get('lookback_bars', 5)
+                
+                if side == 'long':
+                    # Long exit: recent high (resistance)
+                    data_key = f'candlestick_high_{lookback}_{timeframe}'
+                    if data_key in market_data:
+                        base_price = float(market_data[data_key])
+                        exit_offset = exit_config.get('exit_offset_pct', 0)
+                        final_price = base_price * (1 + (exit_offset - profit_target_pct) / 100.0)
+                        return round(final_price, 2)
+                
+                else:  # short
+                    # Short exit: recent low (support)
+                    data_key = f'candlestick_low_{lookback}_{timeframe}'
+                    if data_key in market_data:
+                        base_price = float(market_data[data_key])
+                        exit_offset = exit_config.get('exit_offset_pct', 0)
+                        final_price = base_price * (1 - (exit_offset + profit_target_pct) / 100.0)
+                        return round(final_price, 2)
+            
+            # SMA-based exit
+            elif config_type == 'sma':
+                period = exit_config.get('period', 20)
+                data_key = f'sma_{period}_{timeframe}'
+                
+                if data_key in market_data:
+                    base_price = float(market_data[data_key])
+                    exit_offset = exit_config.get('exit_offset_pct', 0)
+                    
+                    if side == 'long':
+                        final_price = base_price * (1 + (exit_offset + profit_target_pct) / 100.0)
+                    else:
+                        final_price = base_price * (1 - (exit_offset + profit_target_pct) / 100.0)
+                    return round(final_price, 2)
+            
+            # EMA-based exit
+            elif config_type == 'ema':
+                period = exit_config.get('period', 20)
+                data_key = f'ema_{period}_{timeframe}'
+                
+                if data_key in market_data:
+                    base_price = float(market_data[data_key])
+                    exit_offset = exit_config.get('exit_offset_pct', 0)
+                    
+                    if side == 'long':
+                        final_price = base_price * (1 + (exit_offset + profit_target_pct) / 100.0)
+                    else:
+                        final_price = base_price * (1 - (exit_offset + profit_target_pct) / 100.0)
+                    return round(final_price, 2)
+            
+            # ATR-based exit (trailing)
+            elif config_type == 'atr':
+                period = exit_config.get('period', 14)
+                data_key = f'atr_{period}_{timeframe}'
+                close_key = 'close'
+                
+                if data_key in market_data and close_key in market_data:
+                    atr_value = float(market_data[data_key])
+                    current_close = float(market_data[close_key])
+                    atr_multiplier = exit_config.get('atr_multiplier', 2.0)
+                    
+                    if side == 'long':
+                        # Long exit: close + (ATR * multiplier for profit target)
+                        final_price = current_close + (atr_value * atr_multiplier)
+                    else:
+                        # Short exit: close - (ATR * multiplier for profit target)
+                        final_price = current_close - (atr_value * atr_multiplier)
+                    return round(final_price, 2)
+            
+            # Fixed percentage profit target
+            elif config_type == 'fixed_percent':
+                if 'entry_price' in market_data:
+                    entry_price = float(market_data['entry_price'])
+                    target_pct = exit_config.get('target_percent', 2.0)
+                    
+                    if side == 'long':
+                        final_price = entry_price * (1 + target_pct / 100.0)
+                    else:
+                        final_price = entry_price * (1 - target_pct / 100.0)
+                    return round(final_price, 2)
+        
+        except (ValueError, KeyError, TypeError) as e:
+            logger.warning(f"Error calculating exit limit price for {symbol}: {e}")
+        
+        return None
+    
+    @staticmethod
+    def update_held_order_limit_prices(held_order: HeldOrder, market_data: Dict) -> bool:
+        """
+        Update a held order's limit price based on current market data.
+        
+        This is called periodically (e.g., on each new candle) to recalculate
+        the limit price based on updated market data.
+        
+        Args:
+            held_order: HeldOrder object to update
+            market_data: Current market data with all indicators
+        
+        Returns:
+            True if limit price was updated, False otherwise
+        """
+        if not held_order or not market_data:
+            return False
+        
+        try:
+            # Get entry conditions to calculate entry limit
+            if held_order.entry_conditions:
+                entry_condition = held_order.entry_conditions[0]
+                if hasattr(entry_condition, 'config') and entry_condition.config:
+                    new_entry_limit = HeldOrderLimitPriceCalculator.calculate_entry_limit_price(
+                        held_order.symbol,
+                        held_order.side,
+                        market_data,
+                        entry_condition.config
+                    )
+                    
+                    if new_entry_limit and new_entry_limit != held_order.limit_price:
+                        old_price = held_order.limit_price
+                        held_order.limit_price = new_entry_limit
+                        held_order.modified_at = datetime.utcnow().isoformat()
+                        logger.info(
+                            f"Updated {held_order.symbol} {held_order.side} limit price: "
+                            f"{old_price} -> {new_entry_limit}"
+                        )
+                        return True
+        
+        except Exception as e:
+            logger.error(f"Error updating limit price for order {held_order.order_id}: {e}")
+        
+        return False

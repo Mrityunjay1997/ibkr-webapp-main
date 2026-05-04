@@ -330,6 +330,107 @@ def _safe_to_float(value) -> Optional[float]:
         return None
 
 
+def generate_tts_message(symbol: str, signal: str, description: str) -> str:
+    """
+    Generate a text-to-speech message for OBV analysis alerts.
+    
+    Args:
+        symbol: Stock symbol (e.g., "AAPL")
+        signal: Signal type (e.g., "strong_bullish", "strong_bearish")
+        description: Natural language description from analyze_multi_obv
+    
+    Returns:
+        str: Formatted message ready for TTS
+    """
+    if signal == "strong_bullish":
+        return f"{symbol}. Strong bullish O B V signal detected. {description}"
+    elif signal == "bullish":
+        return f"{symbol}. Bullish O B V signal detected. {description}"
+    elif signal == "strong_bearish":
+        return f"{symbol}. Strong bearish O B V signal detected. {description}"
+    elif signal == "bearish":
+        return f"{symbol}. Bearish O B V signal detected. {description}"
+    else:  # neutral or unknown
+        return f"{symbol}. Neutral O B V signal. Monitor for clearer direction."
+
+
+def prepare_obv_audio_alert(signal: str) -> dict:
+    """
+    Prepare audio alert configuration for Multi-OBV signals.
+    
+    Supports bullish (triumphant arpeggio) and bearish (descending) audio cues.
+    
+    Args:
+        signal: Signal type from analyze_multi_obv result
+    
+    Returns:
+        dict with audio configuration:
+        {
+            "type": "arpeggio" | "descending" | "neutral",
+            "intensity": "high" | "medium" | "low",
+            "notes": list of note frequencies or MIDI codes
+        }
+    """
+    if signal in ["strong_bullish", "bullish"]:
+        # Triumphant arpeggio: ascending notes
+        return {
+            "type": "arpeggio",
+            "intensity": "high" if signal == "strong_bullish" else "medium",
+            "direction": "ascending",
+            "notes": [261.63, 329.63, 392.00, 523.25],  # C, E, G, C (arpeggio)
+            "description": "Bullish momentum detected"
+        }
+    elif signal in ["strong_bearish", "bearish"]:
+        # Descending notes: bearish indication
+        return {
+            "type": "descending",
+            "intensity": "high" if signal == "strong_bearish" else "medium",
+            "direction": "descending",
+            "notes": [523.25, 392.00, 329.63, 261.63],  # C, G, E, C (descending)
+            "description": "Bearish momentum detected"
+        }
+    else:
+        # Neutral sound
+        return {
+            "type": "neutral",
+            "intensity": "low",
+            "notes": [349.23],  # F middle tone
+            "description": "Neutral OBV signal"
+        }
+
+
+def format_obv_equation(fast_obv: float, medium_obv: float, slow_obv: float,
+                        fast_pct_change: float, medium_pct_change: float, 
+                        fast_slow_pct_change: float) -> str:
+    """
+    Format OBV comparison equation for display.
+    
+    Shows the visual relationship between three OBV values with direction indicators
+    and percentage changes.
+    
+    Args:
+        fast_obv: Fast OBV value (5-bar MA)
+        medium_obv: Medium OBV value (10-bar MA)
+        slow_obv: Slow OBV value (20-bar MA)
+        fast_pct_change: % change from Fast to Medium OBV
+        medium_pct_change: % change from Medium to Slow OBV
+        fast_slow_pct_change: % change from Fast to Slow OBV
+    
+    Returns:
+        str: Formatted equation string
+    """
+    fast_dir = '↑' if fast_obv > 0 else '↓'
+    medium_dir = '↑' if medium_obv > 0 else '↓'
+    slow_dir = '↑' if slow_obv > 0 else '↓'
+    
+    return (
+        f"Fast OBV: {fast_obv:,.0f}{fast_dir} | "
+        f"Medium OBV: {medium_obv:,.0f}{medium_dir} | "
+        f"Slow OBV: {slow_obv:,.0f}{slow_dir} | "
+        f"% Changes: F→M {fast_pct_change:+.1f}% | M→S {medium_pct_change:+.1f}% | F→S {fast_slow_pct_change:+.1f}%"
+    )
+
+
 def apply_result_filters(stock_data: dict, form: dict) -> bool:
     """
     Check if a stock result meets all enabled filter criteria.
@@ -435,6 +536,7 @@ def apply_result_filters(stock_data: dict, form: dict) -> bool:
         
         # Price-based indicators
         ("filterPrevClose", "prevClose", "ComparisonPrevClose", "PrevClose", "PercentagePrevClose"),
+        ("filterPctChange", "pctChange", "ComparisonPctChange", "PctChange", "PercentagePctChange"),
         ("filterLowOfDay", "lowOfDay", "ComparisonLowOfDay", "LowOfDay", "PercentageLowOfDay"),
         ("filterHighOfDay", "highOfDay", "ComparisonHighOfDay", "HighOfDay", "PercentageHighOfDay"),
         ("filterBreakHigh", "breakHigh", "ComparisonBreakHigh", "BreakHigh", "PercentageBreakHigh"),
@@ -2805,6 +2907,19 @@ class IBapi(EWrapper, EClient):
                 indicators["prevClose1"] = prev_close
         except Exception:
             indicators["prevClose"] = None
+
+        # --- Percentage Change from Previous Close (% CHG) ---
+        try:
+            current_close = indicators.get("close")
+            prev_close = indicators.get("prevClose")
+            
+            if current_close is not None and prev_close is not None and prev_close != 0:
+                pct_change = ((current_close - prev_close) / prev_close) * 100.0
+                indicators["pctChange"] = float(pct_change)
+            else:
+                indicators["pctChange"] = None
+        except Exception:
+            indicators["pctChange"] = None
 
         # --- LowOfDay / HighOfDay (session-only) ---
         if form.get("ComparisonLowOfDay", "Not used") != "Not used":
@@ -5396,7 +5511,7 @@ class IBapi(EWrapper, EClient):
                     data["pctChange"] = 0.0
             except Exception as e:
                 logger.warning(f"% Change monitoring failed: {e}")
-        pct_change_condition = False
+                pct_change_condition = False
         
         if pct_change_condition is not None:
             variable_results["pctChange"] = bool(pct_change_condition)
@@ -5542,6 +5657,104 @@ class IBapi(EWrapper, EClient):
             # Variable 2: OBV Above MA (strong relative volume)
             variable_results["obvAboveMovingAverage"] = obv_analysis["above_ma"]
 
+        # -------------------------
+        # MULTI-OBV ANALYSIS (Fast, Medium, Slow comparison)
+        # -------------------------
+        multi_obv_analysis = None
+        obv_tts_alert = None
+        if form.get("EnableMultiOBVAnalysis"):
+            try:
+                # Get current OBV values from indicators
+                fast_obv = indicators.get("fast_obv")
+                medium_obv = indicators.get("medium_obv")
+                slow_obv = indicators.get("slow_obv")
+                
+                # Get previous OBV values from historical data
+                prev_fast = None
+                prev_medium = None
+                prev_slow = None
+                
+                symbol = data.get("symbol")
+                if symbol and symbol in self.HistoricalDt:
+                    hist_df = self.HistoricalDt[symbol]
+                    if isinstance(hist_df, pd.DataFrame) and len(hist_df) >= 2:
+                        try:
+                            # Get previous bar's OBV values
+                            prev_close = hist_df.iloc[-2]['close'] if len(hist_df) >= 2 else hist_df.iloc[-1]['close']
+                            prev_volume = hist_df.iloc[-2]['volume'] if len(hist_df) >= 2 else hist_df.iloc[-1]['volume']
+                            
+                            # Calculate previous OBV values using the indicator classes
+                            if len(hist_df) >= 6:  # Fast OBV needs 5-bar window
+                                fast_obv_ind = FastOBVIndicator(close=hist_df['close'], volume=hist_df['volume'], window=5)
+                                prev_fast = last_value(fast_obv_ind.fast_obv().iloc[:-1])
+                            
+                            if len(hist_df) >= 11:  # Medium OBV needs 10-bar window
+                                medium_obv_ind = MediumOBVIndicator(close=hist_df['close'], volume=hist_df['volume'], window=10)
+                                prev_medium = last_value(medium_obv_ind.medium_obv().iloc[:-1])
+                            
+                            if len(hist_df) >= 21:  # Slow OBV needs 20-bar window
+                                slow_obv_ind = SlowOBVIndicator(close=hist_df['close'], volume=hist_df['volume'], window=20)
+                                prev_slow = last_value(slow_obv_ind.slow_obv().iloc[:-1])
+                        except Exception as e:
+                            logger.debug(f"Could not calculate previous OBV values: {e}")
+                            prev_fast = fast_obv
+                            prev_medium = medium_obv
+                            prev_slow = slow_obv
+                
+                # Perform multi-OBV analysis
+                change_threshold = float(form.get("MultiOBVChangeThreshold", 5.0))
+                multi_obv_analysis = analyze_multi_obv(
+                    fast_obv=fast_obv,
+                    medium_obv=medium_obv,
+                    slow_obv=slow_obv,
+                    prev_fast=prev_fast if prev_fast is not None else fast_obv,
+                    prev_medium=prev_medium if prev_medium is not None else medium_obv,
+                    prev_slow=prev_slow if prev_slow is not None else slow_obv,
+                    change_threshold=change_threshold
+                )
+                
+                # Store Multi-OBV analysis results
+                data["multiOBVAnalysis"] = multi_obv_analysis
+                data["multiOBVSignal"] = multi_obv_analysis["signal"]
+                data["multiOBVAlignment"] = multi_obv_analysis["alignment"]
+                data["multiOBVStrength"] = multi_obv_analysis["strength"]
+                data["multiOBVDivergence"] = multi_obv_analysis["divergence"]
+                data["multiOBVEquation"] = multi_obv_analysis["equation"]
+                
+                # Store individual OBV values and changes for display
+                data["fastOBVValue"] = fast_obv
+                data["mediumOBVValue"] = medium_obv
+                data["slowOBVValue"] = slow_obv
+                data["fastMediumPctChange"] = multi_obv_analysis["fast_medium_pct_change"]
+                data["mediumSlowPctChange"] = multi_obv_analysis["medium_slow_pct_change"]
+                data["fastSlowPctChange"] = multi_obv_analysis["fast_slow_pct_change"]
+                
+                # Add to variable results for conditional filtering
+                is_strong_bullish = multi_obv_analysis["signal"] in ["strong_bullish", "bullish"]
+                variable_results["multiOBVBullish"] = is_strong_bullish
+                variable_results["multiOBVAlignment"] = multi_obv_analysis["alignment"] != "misaligned"
+                
+                # Text-to-Speech alert if enabled
+                if form.get("EnableMultiOBVTTS"):
+                    symbol = data.get("symbol", "unknown")
+                    # Create TTS alert message
+                    if multi_obv_analysis["signal"] in ["strong_bullish", "strong_bearish"]:
+                        obv_tts_alert = {
+                            "symbol": symbol,
+                            "signal": multi_obv_analysis["signal"],
+                            "description": multi_obv_analysis["description"],
+                            "equation": multi_obv_analysis["equation"]
+                        }
+                        data["obvTTSAlert"] = obv_tts_alert
+                        
+                        # Log for debugging
+                        logger.info(f"Multi-OBV TTS Alert for {symbol}: {multi_obv_analysis['signal']}")
+                
+            except Exception as e:
+                logger.warning(f"Multi-OBV analysis failed: {e}")
+                logger.debug(f"Multi-OBV error traceback: {traceback.format_exc()}")
+                multi_obv_analysis = None
+
         if self.config.scale_volume_metrics:
             # create copy for Flask so internal logic stays untouched
             flask_data = data.copy()
@@ -5577,13 +5790,13 @@ class IBapi(EWrapper, EClient):
         """
         from datetime import datetime, timezone, timedelta
 
-        max_headlines = 5
+        max_headlines = 20
         try:
-            max_headlines = int(form.get("NewsMaxHeadlines", 5))
+            max_headlines = int(form.get("NewsMaxHeadlines", 20))
         except Exception:
             pass
         if max_headlines < 1:
-            max_headlines = 5
+            max_headlines = 20
 
         # Parse excluded publishers from comma-separated string
         exclude_raw = form.get("NewsExcludePublishers", "")
@@ -5643,10 +5856,10 @@ class IBapi(EWrapper, EClient):
         end_dt = ""  # now
         start_dt = ""  # open-ended (let maxResults limit it)
 
-        # Over-request articles to improve provider diversity
-        # Request 3x more headlines than needed to ensure variety across different providers
-        # This helps overcome DJ-N dominance and get more diverse news sources
-        total_to_request = (max_headlines + 20) * 3  # tripled for better diversity
+        # Over-request articles to improve availability and provider diversity
+        # Request significantly more headlines than needed to ensure we can filter by diversity
+        # while still returning the requested max_headlines to the user
+        total_to_request = max(150, max_headlines * 8)  # request significantly more for diversity and availability
 
         logger.info(
             "reqHistoricalNews reqId=%s conId=%s providers=%s totalResults=%s",
@@ -5721,25 +5934,34 @@ class IBapi(EWrapper, EClient):
             deduped.append(h)
 
         # -------------------------
-        # Provider diversity filter: avoid DJ-N dominance
+        # Provider diversity filter: maintain variety while respecting max_headlines
         # -------------------------
-        # Count providers to ensure variety
-        dj_providers = {"dj-n", "dj-rt", "djnl"}  # Dow Jones variants
-        dj_items = []
-        non_dj_items = []
+        # Only apply diversity filtering if we have significantly more headlines than requested
+        # This prevents accidentally truncating results when user wants many headlines
+        if len(deduped) > max_headlines * 1.5:  # Only if we have excess
+            dj_providers = {"dj-n", "dj-rt", "djnl"}  # Dow Jones variants
+            dj_items = []
+            non_dj_items = []
+            
+            for h in deduped:
+                provider = (h.get("provider") or "").strip().lower()
+                if provider in dj_providers:
+                    dj_items.append(h)
+                else:
+                    non_dj_items.append(h)
+            
+            # Strategy: Mix DJ and non-DJ for diversity when we have excess
+            # Prioritize non-DJ, but include DJ headlines to reach max_headlines target
+            if non_dj_items and dj_items:
+                # Balance providers: allow up to 60% DJ if that's what we have
+                max_dj_allowed = max(int(max_headlines * 0.60), 1)
+                max_non_dj_allowed = max_headlines - max_dj_allowed
+                mixed = []
+                mixed.extend(non_dj_items[:max_non_dj_allowed])
+                mixed.extend(dj_items[:max_dj_allowed])
+                deduped = mixed
         
-        for h in deduped:
-            provider = (h.get("provider") or "").strip().lower()
-            if provider in dj_providers:
-                dj_items.append(h)
-            else:
-                non_dj_items.append(h)
-        
-        # Reorder: non-DJ first, then DJ (limits DJ to max 30% of final results)
-        max_dj_allowed = max(1, int(max_headlines * 0.30))
-        deduped = non_dj_items + dj_items[:max_dj_allowed]
-
-        # Limit to max requested
+        # Limit to max requested (show all if fewer available)
         deduped = deduped[:max_headlines]
 
         # -------------------------
@@ -6308,10 +6530,15 @@ class IBapi(EWrapper, EClient):
                 indic["cusip"] = resolved_cusip
 
                 # -------------------------
-                # Always fetch news headlines for all returned stocks
+                # Fetch news headlines only if news is ENABLED or keyword filtering is enabled
                 # -------------------------
+                should_fetch_news = (
+                    form.get("ComparisonNews", "Not used") != "Not used" or 
+                    bool(form.get("NewsKeywords", "").strip())
+                )
+                
                 con_id = getattr(contract, "conId", None)
-                if con_id:
+                if con_id and should_fetch_news:
                     try:
                         with self.Locking:
                             self.idInc += 1
@@ -6661,6 +6888,167 @@ class IBapi(EWrapper, EClient):
         # Set the last order to transmit=True to trigger batch submission
         if all_orders:
             all_orders[-1].transmit = True
+        
+        return all_orders
+
+    def multiLevelOrderAdvanced(self, multi_level_order_dict: dict) -> list:
+        """
+        Create multiple bracket orders with ADVANCED FEATURES:
+        - Multiple exit targets per entry level (not just one)
+        - Flexible stop loss configuration per level
+        - Percentage allocation for partial exits
+        
+        Args:
+            multi_level_order_dict: Dictionary containing levels configuration
+                {
+                    'action': 'BUY' | 'SELL',
+                    'tif': 'DAY' | 'GTC',
+                    'outside_rth': bool,
+                    'start_order_id': int,
+                    'levels': [
+                        {
+                            'quantity': int,
+                            'entry_price': float,
+                            'entry_type': 'LMT' | 'MKT',
+                            'exit_prices': [
+                                {
+                                    'price': float,
+                                    'percent_of_position': float,  # 100 = full qty
+                                    'order_type': 'limit' | 'market' | 'trail',
+                                    'trailing_amount': float | None,
+                                    'trailing_type': 'amount' | 'percent',
+                                },
+                                ...
+                            ],
+                            'stop_price': float | None,
+                        },
+                        ...
+                    ]
+                }
+        
+        Returns:
+            List of all Order objects for all levels
+        """
+        all_orders = []
+        action = multi_level_order_dict.get('action', 'BUY')
+        tif = multi_level_order_dict.get('tif', 'DAY')
+        outside_rth = multi_level_order_dict.get('outside_rth', False)
+        start_order_id = multi_level_order_dict.get('start_order_id', int(time.time()))
+        levels = multi_level_order_dict.get('levels', [])
+        
+        current_order_id = start_order_id
+        
+        for level_idx, level in enumerate(levels):
+            quantity = level.get('quantity')
+            entry_price = level.get('entry_price')
+            entry_type = level.get('entry_type', 'LMT')
+            stop_price = level.get('stop_price')
+            exit_prices_config = level.get('exit_prices', [])
+            
+            logger.info(f"Processing level {level_idx + 1}: "
+                       f"Entry {quantity} @ {entry_price} ({entry_type}), "
+                       f"{len(exit_prices_config)} exit targets")
+            
+            # Create parent entry order
+            parent = Order()
+            parent.eTradeOnly = False
+            parent.firmQuoteOnly = False
+            parent.orderId = current_order_id
+            parent.action = action
+            parent.orderType = entry_type
+            parent.totalQuantity = quantity
+            parent.tif = tif
+            parent.outsideRth = outside_rth
+            parent.transmit = False
+            
+            if entry_type == "LMT" and entry_price:
+                parent.lmtPrice = round(entry_price, 2)
+            
+            all_orders.append(parent)
+            logger.debug(f"Created parent entry order {current_order_id}: {action} {quantity} @ {entry_price}")
+            current_order_id += 1
+            
+            # Create exit orders for each target
+            for exit_idx, exit_config in enumerate(exit_prices_config):
+                exit_price = exit_config.get('price')
+                percent_of_position = exit_config.get('percent_of_position', 100.0)
+                exit_order_type = exit_config.get('order_type', 'limit').upper()
+                
+                # Calculate quantity for this exit
+                exit_quantity = max(1, int(quantity * (percent_of_position / 100.0)))
+                
+                # Normalize order type
+                if exit_order_type in ('LIMIT', 'LMT'):
+                    exit_order_type = 'LMT'
+                elif exit_order_type in ('MARKET', 'MKT'):
+                    exit_order_type = 'MKT'
+                elif exit_order_type in ('TRAIL', 'TRAIL_PERCENT', 'TRAIL_CANDLE'):
+                    exit_order_type = 'TRAIL'
+                elif exit_order_type in ('STOP', 'STP'):
+                    exit_order_type = 'STP'
+                else:
+                    exit_order_type = 'LMT'  # Default to limit
+                
+                # Create exit order
+                exit_order = Order()
+                exit_order.eTradeOnly = False
+                exit_order.firmQuoteOnly = False
+                exit_order.orderId = current_order_id
+                exit_order.action = "SELL" if action == "BUY" else "BUY"
+                exit_order.totalQuantity = exit_quantity
+                exit_order.parentId = parent.orderId
+                exit_order.tif = tif
+                exit_order.outsideRth = outside_rth
+                exit_order.transmit = False
+                
+                if exit_order_type == "LMT" and exit_price:
+                    exit_order.orderType = "LMT"
+                    exit_order.lmtPrice = round(exit_price, 2)
+                elif exit_order_type == "MKT":
+                    exit_order.orderType = "MKT"
+                elif exit_order_type == "TRAIL":
+                    exit_order.orderType = "TRAIL"
+                    trailing_amount = exit_config.get('trailing_amount')
+                    trailing_type = exit_config.get('trailing_type', 'amount')
+                    if trailing_type == 'percent':
+                        exit_order.trailingPercent = trailing_amount
+                    else:
+                        exit_order.auxPrice = round(trailing_amount, 2)
+                else:
+                    exit_order.orderType = "LMT"
+                    exit_order.lmtPrice = round(exit_price, 2)
+                
+                all_orders.append(exit_order)
+                logger.debug(f"Created exit order {current_order_id}: "
+                            f"{exit_order.action} {exit_quantity} @ {exit_price} "
+                            f"({percent_of_position:.1f}% of position)")
+                current_order_id += 1
+            
+            # Create stop-loss order if specified
+            if stop_price is not None and stop_price > 0:
+                stop_order = Order()
+                stop_order.eTradeOnly = False
+                stop_order.firmQuoteOnly = False
+                stop_order.orderId = current_order_id
+                stop_order.action = "SELL" if action == "BUY" else "BUY"
+                stop_order.orderType = "STP"
+                stop_order.totalQuantity = quantity
+                stop_order.auxPrice = round(stop_price, 2)
+                stop_order.parentId = parent.orderId
+                stop_order.tif = tif
+                stop_order.outsideRth = outside_rth
+                stop_order.transmit = False
+                
+                all_orders.append(stop_order)
+                logger.debug(f"Created stop-loss order {current_order_id}: "
+                            f"{stop_order.action} {quantity} @ {stop_price}")
+                current_order_id += 1
+        
+        # Set the last order to transmit=True to trigger batch submission
+        if all_orders:
+            all_orders[-1].transmit = True
+            logger.info(f"Multi-level order ready: {len(all_orders)} total orders "
+                       f"({len(levels)} levels with multiple exits)")
         
         return all_orders
 
