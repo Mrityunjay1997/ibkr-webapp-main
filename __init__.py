@@ -131,9 +131,15 @@ def create_app(config_object=Config) -> Flask:
 
 app = create_app()
 
+# Register held orders API routes
+try:
+    from held_orders_api import register_held_orders_routes
+    register_held_orders_routes(app)
+    logger.info("Held orders API routes registered")
+except Exception as e:
+    logger.warning(f"Failed to register held orders routes: {e}")
 
-# -----------------------------------------------------------------------------
-# Small helpers
+
 # -----------------------------------------------------------------------------
 def safe_last_two_dates(folder: str):
     """
@@ -174,7 +180,7 @@ def apply_result_filters(results_list: list, form: dict) -> list:
     # Check if any filter is enabled
     filter_keys = [
         'filterVWAP', 'filterFastSMA', 'filterMediumSMA', 'filterSlowSMA',
-        'filterRSI', 'filterFastEMA', 'filterSlowEMA', 'filterOBV', 'filterATR',
+        'filterRSI', 'filterFastEMA', 'filterSlowEMA', 'filterOBV', 'filterFastOBV', 'filterMediumOBV', 'filterSlowOBV', 'filterATR',
         'filterAverageVolume', 'filterRelativeVolume', 'filterPrevClose',
         'filterLowOfDay', 'filterHighOfDay', 'filterCross50SMA', 'filterCross200SMA',
         'filterBreakHigh', 'filterPullbackPct', 'filterPullbackPct2',
@@ -231,7 +237,6 @@ def micelania():
 def exclude_stocks_page():
     """Render the exclude stocks management page."""
     return render_template("exclude_stocks.html")
-
 
 @app.route("/updatepdf", methods=["GET", "POST"])
 def updatepdf():
@@ -935,6 +940,159 @@ def delete_order_preset(filename):
     except Exception as e:
         logger.exception("Error deleting order preset")
         return {"status": "error", "message": str(e)}, 500
+
+
+# =============================================================================
+# Auto-Order Preset Management Routes
+# =============================================================================
+
+@app.route("/auto-order-presets/save", methods=["POST"])
+def save_auto_order_preset():
+    """Save an auto-order preset with its settings."""
+    try:
+        data = request.get_json()
+        
+        if not data or 'name' not in data or 'settings' not in data:
+            return {"ok": False, "message": "Missing required fields (name, settings)"}, 400
+        
+        name = data['name']
+        settings = data['settings']
+        is_default = data.get('isDefault', False)
+        overwrite = data.get('overwrite', False)
+        
+        # Ensure 'ao_' prefix for namespace
+        if not name.startswith('ao_'):
+            name = 'ao_' + name
+        
+        # Create presets directory if needed
+        cfg.order_presets_dir.mkdir(exist_ok=True)
+        
+        preset_file = cfg.order_presets_dir / (name + '.json')
+        
+        # Check if file exists and overwrite not allowed
+        if preset_file.exists() and not overwrite:
+            return {"ok": False, "message": "Preset already exists"}, 409
+        
+        # Prepare the full preset document
+        preset_doc = {
+            "meta": {
+                "name": name,
+                "isDefault": is_default,
+                "created_at": datetime.now(UTC).isoformat(),
+                "updated_at": datetime.now(UTC).isoformat(),
+            },
+            "settings": settings
+        }
+        
+        # Write to file
+        with open(preset_file, 'w', encoding='utf-8') as f:
+            json.dump(preset_doc, f, indent=2)
+        
+        logger.info(f"Auto-order preset saved: {preset_file}")
+        
+        return {"ok": True, "message": f"Preset saved: {name}", "name": name}
+    
+    except Exception as e:
+        logger.exception("Error saving auto-order preset")
+        return {"ok": False, "message": str(e)}, 500
+
+
+@app.route("/auto-order-presets/load", methods=["POST"])
+def load_auto_order_preset():
+    """Load an auto-order preset by name."""
+    try:
+        data = request.get_json()
+        
+        if not data or 'name' not in data:
+            return {"ok": False, "message": "Missing preset name"}, 400
+        
+        name = data['name']
+        
+        # Ensure 'ao_' prefix
+        if not name.startswith('ao_'):
+            name = 'ao_' + name
+        
+        preset_file = cfg.order_presets_dir / (name + '.json')
+        
+        if not preset_file.exists():
+            return {"ok": False, "message": "Preset not found"}, 404
+        
+        # Read the file
+        with open(preset_file, 'r', encoding='utf-8') as f:
+            preset_doc = json.load(f)
+        
+        logger.info(f"Auto-order preset loaded: {preset_file}")
+        
+        return preset_doc
+    
+    except Exception as e:
+        logger.exception("Error loading auto-order preset")
+        return {"ok": False, "message": str(e)}, 500
+
+
+@app.route("/auto-order-presets/delete", methods=["POST"])
+def delete_auto_order_preset():
+    """Delete an auto-order preset by name."""
+    try:
+        data = request.get_json()
+        
+        if not data or 'name' not in data:
+            return {"ok": False, "message": "Missing preset name"}, 400
+        
+        name = data['name']
+        
+        # Ensure 'ao_' prefix
+        if not name.startswith('ao_'):
+            name = 'ao_' + name
+        
+        preset_file = cfg.order_presets_dir / (name + '.json')
+        
+        if not preset_file.exists():
+            return {"ok": False, "message": "Preset not found"}, 404
+        
+        # Delete the file
+        preset_file.unlink()
+        
+        logger.info(f"Auto-order preset deleted: {preset_file}")
+        
+        return {"ok": True, "message": f"Preset deleted: {name}"}
+    
+    except Exception as e:
+        logger.exception("Error deleting auto-order preset")
+        return {"ok": False, "message": str(e)}, 500
+
+
+@app.route("/auto-order-presets/list", methods=["GET"])
+def list_auto_order_presets():
+    """List all available auto-order presets."""
+    try:
+        cfg.order_presets_dir.mkdir(exist_ok=True)
+        
+        presets = []
+        for preset_file in cfg.order_presets_dir.glob('ao_*.json'):
+            try:
+                with open(preset_file, 'r', encoding='utf-8') as f:
+                    preset_doc = json.load(f)
+                
+                meta = preset_doc.get('meta', {})
+                presets.append({
+                    'name': meta.get('name', preset_file.stem),
+                    'filename': preset_file.name,
+                    'isDefault': meta.get('isDefault', False),
+                    'created_at': meta.get('created_at'),
+                    'updated_at': meta.get('updated_at'),
+                })
+            except Exception as e:
+                logger.warning(f"Error reading preset file {preset_file}: {e}")
+                continue
+        
+        logger.info(f"Listed {len(presets)} auto-order presets")
+        
+        return {"ok": True, "presets": presets, "count": len(presets)}
+    
+    except Exception as e:
+        logger.exception("Error listing auto-order presets")
+        return {"ok": False, "message": str(e)}, 500
 
 
 @app.route("/upload-csv", methods=["POST"])
@@ -1745,18 +1903,33 @@ def order_presets_delete():
 
 @app.route("/positions/list", methods=["GET"])
 def positions_list():
-    """Get all open positions and summary"""
+    """Get all open positions, summary, and account data"""
     try:
         from ibkr_signal_engine import IBapi
-        # Create temporary IBAPI instance to access position manager
+        # Create temporary IBAPI instance to access position manager and account data
         api = IBapi()
         summary = api.position_manager.get_all_positions()
+        account_data = api.get_account_data()
         return jsonify({
             "positions": [p.to_dict() for p in summary],
-            "summary": api.position_manager.get_positions_summary()
+            "summary": api.position_manager.get_positions_summary(),
+            "account": account_data
         }), 200
     except Exception as e:
         logger.exception("Failed to list positions: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/account/summary", methods=["GET"])
+def account_summary():
+    """Get current account summary data"""
+    try:
+        from ibkr_signal_engine import IBapi
+        api = IBapi()
+        account_data = api.get_account_data()
+        return jsonify(account_data), 200
+    except Exception as e:
+        logger.exception("Failed to get account summary: %s", e)
         return jsonify({"error": str(e)}), 500
 
 
@@ -2510,18 +2683,60 @@ class BackgroundScanner:
             }
 
 
-# one global scanner instance
-_background_scanner = BackgroundScanner()
-_background_tab_unique_id = None
+# Per-tab scanner instances - supports multiple concurrent scanners
+_background_scanners = {}  # dict mapping tab_unique_id -> BackgroundScanner instance
+_background_scanners_lock = threading.Lock()  # Thread-safe access to _background_scanners
+
+
+def _get_or_create_background_scanner(tab_unique_id):
+    """
+    Get or create a BackgroundScanner instance for the given tab.
+    Returns the scanner instance for this tab.
+    """
+    if not tab_unique_id:
+        raise ValueError("tab_unique_id is required")
+    
+    with _background_scanners_lock:
+        if tab_unique_id not in _background_scanners:
+            _background_scanners[tab_unique_id] = BackgroundScanner()
+            logger.info("Created new background scanner for tab: %s", tab_unique_id)
+        return _background_scanners[tab_unique_id]
+
+
+def _get_background_scanner(tab_unique_id):
+    """
+    Get the BackgroundScanner instance for the given tab, or None if not found.
+    """
+    if not tab_unique_id:
+        return None
+    
+    with _background_scanners_lock:
+        return _background_scanners.get(tab_unique_id)
+
+
+def _remove_background_scanner(tab_unique_id):
+    """
+    Remove the BackgroundScanner instance for the given tab after stopping it.
+    """
+    if not tab_unique_id:
+        return False
+    
+    with _background_scanners_lock:
+        if tab_unique_id in _background_scanners:
+            del _background_scanners[tab_unique_id]
+            logger.info("Removed background scanner for tab: %s", tab_unique_id)
+            return True
+    return False
 
 
 @app.route("/background/start", methods=["POST"])
 def background_start():
     """
-    Start the background scanner.
+    Start the background scanner for a specific tab.
 
     Expected JSON payload:
     {
+        "tab_unique_id": "unique-tab-id",  # REQUIRED - identifies the tab
         "value": 5,
         "unit": "seconds" | "minutes" | "hours",
         "form": { ... },            # same shape used by getFinalResult
@@ -2529,19 +2744,32 @@ def background_start():
     }
 
     Returns 200 on success or 4xx on bad input.
+    Multiple tabs can run scanners concurrently with their own configurations.
     """
     payload = request.get_json(silent=True)
     if not payload:
         return jsonify({"error": "JSON payload required"}), 400
 
+    tab_unique_id = payload.get("tab_unique_id")
+    if not tab_unique_id:
+        return jsonify({"error": "tab_unique_id is required"}), 400
+
     value = payload.get("value")
     unit = payload.get("unit", "seconds")
     form = payload.get("form")
     securities = payload.get("securities")
-    global _background_tab_unique_id
-    _background_tab_unique_id = payload.get("tab_unique_id")
 
-    seconds = _background_scanner.parse_interval(value, unit)
+    # Get or create scanner for this tab
+    try:
+        scanner = _get_or_create_background_scanner(tab_unique_id)
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        logger.exception("Failed to get/create background scanner: %s", e)
+        return jsonify({"error": "failed to get/create scanner"}), 500
+
+    # Parse interval
+    seconds = scanner.parse_interval(value, unit)
     if seconds is None:
         return jsonify({"error": "Invalid interval value/unit"}), 400
 
@@ -2551,34 +2779,45 @@ def background_start():
 
     # start scanner (guarded)
     try:
-        _background_scanner.start(seconds, form, securities)
+        scanner.start(seconds, form, securities)
     except RuntimeError as rte:
-        # already running
+        # already running for this tab
         return jsonify({"error": str(rte)}), 409
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 400
     except Exception as e:
-        logger.exception("Failed to start background scanner: %s", e)
+        logger.exception("Failed to start background scanner for tab %s: %s", tab_unique_id, e)
         return jsonify({"error": "failed to start scanner"}), 500
 
-    return jsonify({"status": "started", "interval_seconds": seconds}), 200
+    return jsonify({"status": "started", "interval_seconds": seconds, "tab_id": tab_unique_id}), 200
 
 
 @app.route("/background/stop", methods=["POST"])
 def background_stop():
     """
-    Stop the background scanner.
+    Stop the background scanner for a specific tab.
+    
+    Expected JSON payload:
+    {
+        "tab_unique_id": "unique-tab-id"  # REQUIRED
+    }
     """
     try:
-        # ONLY apply check if beacon sent data
         data = request.get_json(silent=True)
+        
+        if not data or "tab_unique_id" not in data:
+            return jsonify({"error": "tab_unique_id is required"}), 400
 
-        global _background_tab_unique_id
-        if data and "tab_unique_id" in data:
-            if data["tab_unique_id"] != _background_tab_unique_id:
-                return jsonify({"status": "ignored"}), 200
-        _background_tab_unique_id = None
-        stopped = _background_scanner.stop()
+        tab_unique_id = data.get("tab_unique_id")
+        scanner = _get_background_scanner(tab_unique_id)
+        
+        if scanner is None:
+            return jsonify({"status": "not_running"}), 200
+
+        stopped = scanner.stop()
+        
+        # Clean up the scanner instance after stopping
+        _remove_background_scanner(tab_unique_id)
 
     except Exception as e:
         logger.exception("Failed to stop background scanner: %s", e)
@@ -2586,16 +2825,26 @@ def background_stop():
 
     if not stopped:
         return jsonify({"status": "not_running"}), 200
-    return jsonify({"status": "stopped"}), 200
+    return jsonify({"status": "stopped", "tab_id": tab_unique_id}), 200
 
 
 @app.route("/background/status", methods=["GET"])
 def background_status():
     """
-    Return current status of the background scanner.
+    Return current status of the background scanner for a specific tab.
+    Query parameter: tab_unique_id (required)
     """
     try:
-        status = _background_scanner.status()
+        tab_unique_id = request.args.get("tab_unique_id")
+        if not tab_unique_id:
+            return jsonify({"error": "tab_unique_id query parameter is required"}), 400
+
+        scanner = _get_background_scanner(tab_unique_id)
+        if scanner is None:
+            return jsonify({"enabled": False, "error": "no scanner for this tab"}), 200
+
+        status = scanner.status()
+        status["tab_id"] = tab_unique_id
         return jsonify(status), 200
     except Exception as e:
         logger.exception("Failed to get background status: %s", e)
@@ -2605,10 +2854,20 @@ def background_status():
 @app.route("/background/results", methods=["GET"])
 def background_results():
     """
-    Return the last scan results and a 'beep' boolean the frontend can use to trigger sound.
+    Return the last scan results for a specific tab.
+    Query parameter: tab_unique_id (required)
     """
     try:
-        res = _background_scanner.results()
+        tab_unique_id = request.args.get("tab_unique_id")
+        if not tab_unique_id:
+            return jsonify({"error": "tab_unique_id query parameter is required"}), 400
+
+        scanner = _get_background_scanner(tab_unique_id)
+        if scanner is None:
+            return jsonify({"results": {}, "beep": False, "warning": {}, "error": "no scanner for this tab"}), 200
+
+        res = scanner.results()
+        res["tab_id"] = tab_unique_id
         return jsonify(res), 200
     except Exception as e:
         logger.exception("Failed to get background results: %s", e)
@@ -3043,24 +3302,89 @@ class BackgroundTop50Scanner:
             }
 
 
-# one global top50 scanner instance
-_bg_top50_scanner = BackgroundTop50Scanner()
-_bg_top50_tab_unique_id = None
+# Per-tab Top 50 scanner instances - supports multiple concurrent scanners
+_bg_top50_scanners = {}  # dict mapping tab_unique_id -> BackgroundTop50Scanner instance
+_bg_top50_scanners_lock = threading.Lock()  # Thread-safe access to _bg_top50_scanners
+
+
+def _get_or_create_top50_scanner(tab_unique_id):
+    """
+    Get or create a BackgroundTop50Scanner instance for the given tab.
+    Returns the scanner instance for this tab.
+    """
+    if not tab_unique_id:
+        raise ValueError("tab_unique_id is required")
+    
+    with _bg_top50_scanners_lock:
+        if tab_unique_id not in _bg_top50_scanners:
+            _bg_top50_scanners[tab_unique_id] = BackgroundTop50Scanner()
+            logger.info("Created new Top50 scanner for tab: %s", tab_unique_id)
+        return _bg_top50_scanners[tab_unique_id]
+
+
+def _get_top50_scanner(tab_unique_id):
+    """
+    Get the BackgroundTop50Scanner instance for the given tab, or None if not found.
+    """
+    if not tab_unique_id:
+        return None
+    
+    with _bg_top50_scanners_lock:
+        return _bg_top50_scanners.get(tab_unique_id)
+
+
+def _remove_top50_scanner(tab_unique_id):
+    """
+    Remove the BackgroundTop50Scanner instance for the given tab after stopping it.
+    """
+    if not tab_unique_id:
+        return False
+    
+    with _bg_top50_scanners_lock:
+        if tab_unique_id in _bg_top50_scanners:
+            del _bg_top50_scanners[tab_unique_id]
+            logger.info("Removed Top50 scanner for tab: %s", tab_unique_id)
+            return True
+    return False
 
 
 @app.route("/scanner-loop/start", methods=["POST"])
 def scanner_loop_start():
+    """
+    Start the Top 50 scanner for a specific tab.
+    
+    Expected JSON payload:
+    {
+        "tab_unique_id": "unique-tab-id",  # REQUIRED - identifies the tab
+        "value": 5,
+        "unit": "seconds" | "minutes" | "hours",
+        "form": { ... },            # same shape used by getFinalResult
+        "scanner_params": { ... }   # optional scanner parameters
+    }
+    
+    Multiple tabs can run Top 50 scanners concurrently with their own configurations.
+    """
     payload = request.get_json(silent=True)
     if not payload:
         return jsonify({"error": "JSON payload required"}), 400
+
+    tab_unique_id = payload.get("tab_unique_id")
+    if not tab_unique_id:
+        return jsonify({"error": "tab_unique_id is required"}), 400
 
     value = payload.get("value")
     unit = payload.get("unit", "seconds")
     form = payload.get("form")
     scanner_params = payload.get("scanner_params", {})
 
-    global _bg_top50_tab_unique_id
-    _bg_top50_tab_unique_id = payload.get("tab_unique_id")
+    # Get or create scanner for this tab
+    try:
+        scanner = _get_or_create_top50_scanner(tab_unique_id)
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        logger.exception("Failed to get/create Top50 scanner: %s", e)
+        return jsonify({"error": "failed to get/create scanner"}), 500
 
     seconds = BackgroundTop50Scanner.parse_interval(value, unit)
     if seconds is None:
@@ -3073,41 +3397,71 @@ def scanner_loop_start():
         scanner_params = {}
 
     try:
-        _bg_top50_scanner.start(seconds, form, scanner_params)
+        scanner.start(seconds, form, scanner_params)
     except RuntimeError as rte:
         return jsonify({"error": str(rte)}), 409
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 400
     except Exception as e:
-        logger.exception("Failed to start top50 scanner loop: %s", e)
+        logger.exception("Failed to start top50 scanner loop for tab %s: %s", tab_unique_id, e)
         return jsonify({"error": "failed to start scanner loop"}), 500
 
-    return jsonify({"status": "started", "interval_seconds": seconds}), 200
+    return jsonify({"status": "started", "interval_seconds": seconds, "tab_id": tab_unique_id}), 200
 
 
 @app.route("/scanner-loop/stop", methods=["POST"])
 def scanner_loop_stop():
+    """
+    Stop the Top 50 scanner for a specific tab.
+    
+    Expected JSON payload:
+    {
+        "tab_unique_id": "unique-tab-id"  # REQUIRED
+    }
+    """
     try:
         data = request.get_json(silent=True)
-        global _bg_top50_tab_unique_id
-        if data and "tab_unique_id" in data:
-            if data["tab_unique_id"] != _bg_top50_tab_unique_id:
-                return jsonify({"status": "ignored"}), 200
-        _bg_top50_tab_unique_id = None
-        stopped = _bg_top50_scanner.stop()
+        
+        if not data or "tab_unique_id" not in data:
+            return jsonify({"error": "tab_unique_id is required"}), 400
+
+        tab_unique_id = data.get("tab_unique_id")
+        scanner = _get_top50_scanner(tab_unique_id)
+        
+        if scanner is None:
+            return jsonify({"status": "not_running"}), 200
+
+        stopped = scanner.stop()
+        
+        # Clean up the scanner instance after stopping
+        _remove_top50_scanner(tab_unique_id)
+        
     except Exception as e:
         logger.exception("Failed to stop top50 scanner loop: %s", e)
         return jsonify({"error": "failed to stop scanner loop"}), 500
 
     if not stopped:
         return jsonify({"status": "not_running"}), 200
-    return jsonify({"status": "stopped"}), 200
+    return jsonify({"status": "stopped", "tab_id": tab_unique_id}), 200
 
 
 @app.route("/scanner-loop/status", methods=["GET"])
 def scanner_loop_status():
+    """
+    Return current status of the Top 50 scanner for a specific tab.
+    Query parameter: tab_unique_id (required)
+    """
     try:
-        status = _bg_top50_scanner.status()
+        tab_unique_id = request.args.get("tab_unique_id")
+        if not tab_unique_id:
+            return jsonify({"error": "tab_unique_id query parameter is required"}), 400
+
+        scanner = _get_top50_scanner(tab_unique_id)
+        if scanner is None:
+            return jsonify({"enabled": False, "error": "no scanner for this tab"}), 200
+
+        status = scanner.status()
+        status["tab_id"] = tab_unique_id
         return jsonify(status), 200
     except Exception as e:
         logger.exception("Failed to get scanner loop status: %s", e)
@@ -3116,8 +3470,21 @@ def scanner_loop_status():
 
 @app.route("/scanner-loop/results", methods=["GET"])
 def scanner_loop_results():
+    """
+    Return the last scan results for a specific tab.
+    Query parameter: tab_unique_id (required)
+    """
     try:
-        res = _bg_top50_scanner.results()
+        tab_unique_id = request.args.get("tab_unique_id")
+        if not tab_unique_id:
+            return jsonify({"error": "tab_unique_id query parameter is required"}), 400
+
+        scanner = _get_top50_scanner(tab_unique_id)
+        if scanner is None:
+            return jsonify({"results": {}, "beep": False, "warning": {}, "error": "no scanner for this tab"}), 200
+
+        res = scanner.results()
+        res["tab_id"] = tab_unique_id
         return jsonify(res), 200
     except Exception as e:
         logger.exception("Failed to get scanner loop results: %s", e)

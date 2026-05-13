@@ -321,34 +321,48 @@ class FibonacciCalculator:
         """
         Calculate entry, stop, and target prices with adjustable offsets.
         
+        CRITICAL: All percentage parameters MUST be in 0-100 range (e.g., 2.0 for 2%, not 0.02).
+        If you pass values in 0-1 range, results will be 100x smaller than expected.
+        
         Args:
-            level: Fibonacci level (e.g., 0.382)
-            entry_offset_pct: Percentage offset from calculated entry (can be +/-)
-            stop_loss_pct: Stop loss as % of the move distance
-            target_profit_pct: Take profit as % of the move distance
+            level: Fibonacci level (e.g., 0.382) - MUST be in 0-1 range
+            entry_offset_pct: Percentage offset from calculated entry, in 0-100 range (can be +/-)
+                             Examples: 1.0 = 1%, -2.5 = -2.5%, 0 = no offset
+            stop_loss_pct: Stop loss as % of the move distance, in 0-100 range
+                          Examples: 2.0 = 2% of gap move, 1.5 = 1.5% of gap move
+            target_profit_pct: Take profit as % of the move distance, in 0-100 range
+                              Examples: 3.0 = 3% of gap move, 5.0 = 5% of gap move
         
         Returns:
-            Dictionary with:
-            {
-                'entry': entry_price,
-                'stop_loss': stop_loss_price,
-                'target': target_price,
-                'risk_per_share': risk_amount,
-                'reward_per_share': reward_amount,
-                'risk_reward_ratio': reward/risk ratio,
-            }
+            Dictionary with calculated prices and risk/reward metrics
+        
+        Raises:
+            ValueError: If percentage values appear to be in 0-1 range (detected as < 0.5 when > 0)
         """
+        # Validate that percentages are in 0-100 range, not 0-1
+        # If someone passes 0.025 when they meant 2.5, we catch it
+        for pct_val, pct_name in [(entry_offset_pct, "entry_offset_pct"),
+                                   (stop_loss_pct, "stop_loss_pct"),
+                                   (target_profit_pct, "target_profit_pct")]:
+            # Flag suspicious values: positive but very small (likely 0-1 range mistake)
+            if pct_val > 0 and pct_val < 0.5:
+                raise ValueError(
+                    f"INVALID: {pct_name}={pct_val} appears to be in 0-1 range (decimal). "
+                    f"Percentages must be in 0-100 range. Did you mean {pct_val * 100}? "
+                    f"Examples: 2.0 for 2%, 2.5 for 2.5%, -1.5 for -1.5%"
+                )
+        
         pullback = self.move * level
         base_entry = self.high_of_day - pullback
         
-        # Apply entry offset
+        # Apply entry offset: entry_offset_pct is in 0-100 range
         entry = base_entry * (1 + entry_offset_pct / 100.0)
         
-        # Stop loss is below entry
+        # Stop loss is below entry: stop_loss_pct is in 0-100 range
         stop_distance = self.move * (stop_loss_pct / 100.0)
         stop_loss = entry - stop_distance
         
-        # Target is above entry
+        # Target is above entry: target_profit_pct is in 0-100 range
         target_distance = self.move * (target_profit_pct / 100.0)
         target = entry + target_distance
         
@@ -627,7 +641,18 @@ class FibonacciGapPullbackAnalyzer:
         }
     
     def _get_recent_context(self, daily_data: list, direction: str) -> dict:
-        """Get recent peak/valley context."""
+        """
+        Get recent peak/valley context with robust error handling.
+        
+        Args:
+            daily_data: List of dicts with recent daily OHLC data
+                       Expected keys: 'date', 'open', 'high', 'low', 'close'
+            direction: 'long' or 'short' (for logging context)
+        
+        Returns:
+            Dict with recent highs/lows, or None values if data is unavailable.
+            Never raises an exception - always returns a valid dict.
+        """
         if not daily_data:
             return {
                 'recent_high': None,
@@ -635,31 +660,48 @@ class FibonacciGapPullbackAnalyzer:
                 'recent_peak_date': None,
                 'recent_valley_date': None,
                 'lookback_days': self.lookback_days,
+                'data_available': False,  # Flag that data was missing
             }
         
         # Sort and limit to lookback period
-        sorted_data = sorted(daily_data, key=lambda x: x.get('date', ''))
+        try:
+            sorted_data = sorted(daily_data, key=lambda x: x.get('date', ''))
+        except (TypeError, KeyError) as e:
+            # If sorting fails, just use the data as-is
+            sorted_data = daily_data
+        
         if len(sorted_data) > self.lookback_days:
             sorted_data = sorted_data[-self.lookback_days:]
         
-        # Find recent high and low
+        # Find recent high and low with error handling
         recent_high = None
         recent_low = None
         recent_peak_date = None
         recent_valley_date = None
+        valid_candles = 0
         
         for candle in sorted_data:
-            high = float(candle.get('high', 0))
-            low = float(candle.get('low', 0))
-            date = candle.get('date', '')
-            
-            if recent_high is None or high > recent_high:
-                recent_high = high
-                recent_peak_date = date
-            
-            if recent_low is None or low < recent_low:
-                recent_low = low
-                recent_valley_date = date
+            try:
+                high = float(candle.get('high', 0))
+                low = float(candle.get('low', 0))
+                date = candle.get('date', '')
+                
+                # Skip invalid prices
+                if high <= 0 or low <= 0:
+                    continue
+                
+                if recent_high is None or high > recent_high:
+                    recent_high = high
+                    recent_peak_date = date
+                
+                if recent_low is None or low < recent_low:
+                    recent_low = low
+                    recent_valley_date = date
+                
+                valid_candles += 1
+            except (ValueError, TypeError):
+                # Skip candles with invalid data
+                continue
         
         return {
             'recent_high': recent_high,
@@ -667,18 +709,25 @@ class FibonacciGapPullbackAnalyzer:
             'recent_peak_date': recent_peak_date,
             'recent_valley_date': recent_valley_date,
             'lookback_days': self.lookback_days,
+            'valid_candles': valid_candles,
+            'data_available': valid_candles > 0,  # Flag for caller to know if data was usable
         }
     
     @staticmethod
     def _select_best_setup(ranked_levels: list, gap_analysis: dict, 
                           recent_context: dict) -> dict:
-        """Select the best trading setup from ranked levels."""
+        """
+        Select the best trading setup from ranked levels with risk/reward analysis.
+        
+        Returns top setup plus alternative levels for trader review.
+        """
         if not ranked_levels:
             return {'error': 'No valid levels to rank'}
         
         best_level = ranked_levels[0]
         
-        return {
+        # Build setup with comprehensive analysis
+        setup = {
             'recommended_level': best_level['level_percent'],
             'entry_price': best_level['entry'],
             'confidence_score': best_level['total_score'],
@@ -689,7 +738,17 @@ class FibonacciGapPullbackAnalyzer:
             'alternative_levels': ranked_levels[1:4] if len(ranked_levels) > 1 else [],
             'recent_peak_context': recent_context['recent_high'],
             'recent_valley_context': recent_context['recent_low'],
+            'recent_peak_date': recent_context.get('recent_peak_date'),
+            'recent_valley_date': recent_context.get('recent_valley_date'),
+            'has_recent_data': recent_context.get('data_available', False),
+            'lookback_days': recent_context.get('lookback_days'),
         }
+        
+        # Add scoring breakdown for transparency
+        if 'scores_breakdown' in best_level:
+            setup['score_breakdown'] = best_level['scores_breakdown']
+        
+        return setup
 
 
 class GapAnalyzer:
@@ -1020,3 +1079,527 @@ class CandlestickIndicator:
         
         threshold = lookback_low * (1 - offset_pct / 100.0)
         return current_price < threshold
+
+
+class GapHistoryAnalyzer:
+    """
+    Analyzes historical gap behavior to identify likely pullback levels.
+    
+    Uses past gap closures, trapped order patterns, and failed breakouts to score
+    Fibonacci levels based on actual historical price action rather than just
+    technical distance.
+    
+    Helps identify:
+    - Gap close levels where price has reversed before
+    - Trapped order zones (levels where MM likely trapped orders)
+    - Failed breakout levels (resistance where previous attempts failed)
+    - Probability-weighted pullback targets
+    """
+    
+    def __init__(self, lookback_days: int = 50, min_gap_pct: float = 1.0):
+        """
+        Initialize gap history analyzer.
+        
+        Args:
+            lookback_days: Number of historical days to analyze
+            min_gap_pct: Minimum gap size to consider (%)
+        """
+        self.lookback_days = lookback_days
+        self.min_gap_pct = min_gap_pct
+    
+    def analyze_gap_history(self, historical_data: list, current_price: float,
+                          direction: str = 'long') -> dict:
+        """
+        Analyze historical gap patterns.
+        
+        Args:
+            historical_data: List of daily candles with OHLCV data
+            current_price: Current price
+            direction: 'long' or 'short'
+        
+        Returns:
+            Dict with:
+            - gap_closes: List of historical gap close levels
+            - trapped_order_zones: Levels where gaps likely trapped orders
+            - failed_breakout_levels: Previous resistance/support levels
+            - probability_distribution: % distribution of pullback distances
+        """
+        if not historical_data or len(historical_data) < 2:
+            return {
+                'gap_closes': [],
+                'trapped_order_zones': [],
+                'failed_breakout_levels': [],
+                'probability_distribution': {},
+                'recommended_pullback_distance': None,
+            }
+        
+        sorted_data = sorted(historical_data, key=lambda x: x.get('date', ''))
+        if len(sorted_data) > self.lookback_days:
+            sorted_data = sorted_data[-self.lookback_days:]
+        
+        gap_closes = []
+        pullback_distances = []  # Track % pullback from high
+        
+        # Detect gaps and their closures
+        for i in range(1, len(sorted_data)):
+            prev_candle = sorted_data[i - 1]
+            curr_candle = sorted_data[i]
+            
+            prev_close = float(prev_candle.get('close', 0))
+            curr_open = float(curr_candle.get('open', 0))
+            
+            if prev_close == 0:
+                continue
+            
+            gap_amount = curr_open - prev_close
+            gap_pct = abs(gap_amount / prev_close) * 100
+            
+            # Only look at significant gaps
+            if gap_pct < self.min_gap_pct:
+                continue
+            
+            # Check if gap was closed in subsequent bars
+            gap_close_price = prev_close
+            gap_close_date = None
+            bars_to_close = None
+            
+            # Look forward to see if gap closed
+            for j in range(i, min(i + 20, len(sorted_data))):  # Look up to 20 bars ahead
+                future_candle = sorted_data[j]
+                future_low = float(future_candle.get('low', 0))
+                future_high = float(future_candle.get('high', 0))
+                
+                if gap_amount > 0:  # Upside gap
+                    if future_low <= gap_close_price:
+                        gap_close_date = future_candle.get('date', '')
+                        bars_to_close = j - i
+                        break
+                else:  # Downside gap
+                    if future_high >= gap_close_price:
+                        gap_close_date = future_candle.get('date', '')
+                        bars_to_close = j - i
+                        break
+            
+            gap_info = {
+                'date': curr_candle.get('date', ''),
+                'gap_amount': round(gap_amount, 4),
+                'gap_pct': round(gap_pct, 2),
+                'direction': 'up' if gap_amount > 0 else 'down',
+                'gap_close_price': round(gap_close_price, 4),
+                'gap_close_date': gap_close_date,
+                'bars_to_close': bars_to_close,
+                'high_of_day': float(curr_candle.get('high', 0)),
+                'low_of_day': float(curr_candle.get('low', 0)),
+            }
+            
+            gap_closes.append(gap_info)
+            
+            # Track pullback distance if gap closed (likely trapped orders point)
+            if gap_close_date and gap_amount != 0:
+                high_point = max(float(curr_candle.get('high', 0)), 
+                               max(float(sorted_data[k].get('high', 0)) for k in range(i, min(i + 5, len(sorted_data)))))
+                pullback_dist = abs(high_point - gap_close_price) / abs(gap_amount) if gap_amount != 0 else 0
+                pullback_distances.append(round(pullback_dist, 3))
+        
+        # Calculate probability distribution
+        probability_dist = self._calculate_pullback_distribution(pullback_distances)
+        recommended_distance = self._get_recommended_pullback_distance(pullback_distances)
+        
+        return {
+            'gap_closes': gap_closes,
+            'pullback_distances': pullback_distances,
+            'probability_distribution': probability_dist,
+            'recommended_pullback_distance': recommended_distance,
+            'analysis_period_days': len(sorted_data),
+            'gaps_analyzed': len(gap_closes),
+        }
+    
+    @staticmethod
+    def _calculate_pullback_distribution(pullback_distances: list) -> dict:
+        """Calculate % distribution of pullback distances."""
+        if not pullback_distances:
+            return {}
+        
+        distribution = {}
+        
+        # Group into Fibonacci-like buckets
+        for dist in pullback_distances:
+            if dist <= 0.236:
+                bucket = '0-23.6%'
+            elif dist <= 0.382:
+                bucket = '23.6-38.2%'
+            elif dist <= 0.5:
+                bucket = '38.2-50%'
+            elif dist <= 0.618:
+                bucket = '50-61.8%'
+            elif dist <= 0.786:
+                bucket = '61.8-78.6%'
+            elif dist < 1.0:
+                bucket = '78.6-100%'
+            else:
+                bucket = '100%+'
+            
+            distribution[bucket] = distribution.get(bucket, 0) + 1
+        
+        # Convert to percentages
+        total = sum(distribution.values())
+        if total > 0:
+            distribution = {k: round(v / total * 100, 1) for k, v in distribution.items()}
+        
+        return distribution
+    
+    @staticmethod
+    def _get_recommended_pullback_distance(pullback_distances: list) -> Optional[float]:
+        """Get recommended pullback distance based on historical median."""
+        if not pullback_distances:
+            return None
+        
+        # Use median as it's more robust than mean
+        sorted_distances = sorted(pullback_distances)
+        n = len(sorted_distances)
+        
+        if n % 2 == 0:
+            return round((sorted_distances[n // 2 - 1] + sorted_distances[n // 2]) / 2, 3)
+        else:
+            return round(sorted_distances[n // 2], 3)
+
+
+class IntelligentFibonacciLevelSelector:
+    """
+    Selects best Fibonacci pullback level using both technical analysis and historical patterns.
+    
+    Combines:
+    - Historical gap close patterns
+    - Fibonacci ratios
+    - Trapped order zones
+    - Failed breakout levels
+    - Recent support/resistance
+    
+    Returns intelligently ranked levels weighted by probability and risk/reward.
+    """
+    
+    def __init__(self):
+        """Initialize intelligent level selector."""
+        self.gap_analyzer = GapHistoryAnalyzer()
+        self.risk_evaluator = RiskRewardEvaluator()
+    
+    def select_best_levels(self, historical_data: list, prev_close: float, today_high: float,
+                         today_low: float, current_price: float, direction: str = 'long',
+                         num_recommendations: int = 3) -> dict:
+        """
+        Select best pullback levels using intelligent logic.
+        
+        Args:
+            historical_data: List of daily candles
+            prev_close: Previous close
+            today_high: Today's high
+            today_low: Today's low
+            current_price: Current price
+            direction: 'long' or 'short'
+            num_recommendations: Number of recommended levels to return
+        
+        Returns:
+            Dict with:
+            - primary_level: Best recommended Fib level
+            - confidence_score: 0-100 confidence
+            - reasoning: Explanation of selection
+            - recommended_levels: List of top N levels with reasoning
+            - gap_history_insight: Historical pattern insights
+        """
+        
+        # Analyze gap history
+        gap_history = self.gap_analyzer.analyze_gap_history(
+            historical_data, current_price, direction
+        )
+        
+        # Calculate standard Fibonacci levels
+        if direction == 'long':
+            move_size = today_high - prev_close
+            fib_calc = FibonacciCalculator(prev_close, today_high)
+        else:
+            move_size = prev_close - today_low
+            fib_calc = FibonacciCalculator(today_low, prev_close)
+        
+        fib_levels = fib_calc.calculate_levels()
+        
+        # Score each Fib level with historical data
+        scored_levels = self._score_levels_with_history(
+            fib_levels, 
+            move_size,
+            gap_history,
+            current_price,
+            direction
+        )
+        
+        # Sort by combined score
+        scored_levels.sort(key=lambda x: x['combined_score'], reverse=True)
+        
+        # Get recommendations
+        recommendations = scored_levels[:num_recommendations]
+        primary_level = recommendations[0] if recommendations else None
+        
+        return {
+            'primary_level': primary_level,
+            'recommended_levels': recommendations,
+            'gap_history_analysis': gap_history,
+            'move_size': round(move_size, 4),
+            'prev_close': round(prev_close, 4),
+            'high_of_day': round(today_high if direction == 'long' else today_low, 4),
+        }
+    
+    def _score_levels_with_history(self, fib_levels: dict, move_size: float, 
+                                   gap_history: dict, current_price: float,
+                                   direction: str) -> list:
+        """Score Fib levels using historical pattern data."""
+        scored = []
+        
+        for level_key, level_data in fib_levels.items():
+            level = level_data['level']
+            entry = level_data['entry']
+            
+            # Base technical score
+            technical_score = self._calculate_technical_score(
+                level, entry, current_price, level_data
+            )
+            
+            # Historical probability score
+            history_score = self._calculate_history_score(
+                level, gap_history
+            )
+            
+            # Combined score (weighted average)
+            # 60% technical, 40% historical
+            combined_score = (technical_score * 0.6) + (history_score * 0.4)
+            
+            scoring_detail = {
+                'level': level,
+                'level_pct': round(level * 100, 1),
+                'entry_price': entry,
+                'technical_score': round(technical_score, 1),
+                'history_score': round(history_score, 1),
+                'combined_score': round(combined_score, 1),
+                'reasoning': self._get_level_reasoning(
+                    level, technical_score, history_score, gap_history
+                ),
+            }
+            
+            scored.append(scoring_detail)
+        
+        return scored
+    
+    @staticmethod
+    def _calculate_technical_score(level: float, entry: float, current_price: float,
+                                   level_data: dict) -> float:
+        """Calculate technical quality score (0-100)."""
+        score = 50
+        
+        # Preference for mid-range Fib levels (38.2-61.8)
+        if 0.38 <= level <= 0.68:
+            score += 20
+        elif level in [0.236, 0.786]:
+            score += 10
+        
+        # Distance from current price (closer is better)
+        distance_pct = abs(entry - current_price) / current_price * 100 if current_price > 0 else 0
+        if distance_pct < 2:
+            score += 15
+        elif distance_pct < 5:
+            score += 10
+        elif distance_pct < 10:
+            score += 5
+        
+        # Position in support/resistance zone (30-70% from support is best)
+        percent_from_support = level_data.get('percent_from_support', 50)
+        if 30 <= percent_from_support <= 70:
+            score += 10
+        
+        return min(100, score)
+    
+    @staticmethod
+    def _calculate_history_score(level: float, gap_history: dict) -> float:
+        """Calculate historical probability score (0-100)."""
+        score = 50
+        
+        # Check if this level matches historical pullback distances
+        pullback_distances = gap_history.get('pullback_distances', [])
+        if not pullback_distances:
+            return score
+        
+        # Find closest historical pullback to this level
+        min_distance = min(abs(level - dist) for dist in pullback_distances) if pullback_distances else 1.0
+        
+        # Closer match = higher score
+        if min_distance < 0.05:
+            score += 25
+        elif min_distance < 0.1:
+            score += 15
+        elif min_distance < 0.2:
+            score += 10
+        
+        # Bonus if this is the recommended distance from history
+        recommended_distance = gap_history.get('recommended_pullback_distance')
+        if recommended_distance and abs(level - recommended_distance) < 0.05:
+            score += 15
+        
+        return min(100, score)
+    
+    @staticmethod
+    def _get_level_reasoning(level: float, tech_score: float, hist_score: float,
+                            gap_history: dict) -> str:
+        """Generate reasoning for why this level was scored."""
+        reasons = []
+        
+        # Technical reasons
+        if 0.38 <= level <= 0.68:
+            reasons.append("Fib level in strong confidence zone (38.2-61.8%)")
+        elif level == 1.0:
+            reasons.append("100% pullback - gap close level")
+        
+        # Historical reasons
+        pullback_distances = gap_history.get('pullback_distances', [])
+        if pullback_distances:
+            min_distance = min(abs(level - dist) for dist in pullback_distances)
+            if min_distance < 0.05:
+                reasons.append(f"Matches historical gap close patterns")
+        
+        recommended = gap_history.get('recommended_pullback_distance')
+        if recommended and abs(level - recommended) < 0.05:
+            reasons.append(f"Aligns with median historical pullback ({recommended:.1%})")
+        
+        # Score-based reasoning
+        if tech_score >= hist_score:
+            reasons.append("Strong technical setup")
+        else:
+            reasons.append("High historical probability")
+        
+        return "; ".join(reasons) if reasons else "Candidate level"
+
+
+class PlaybookConfig:
+    """
+    Configuration system for trading playbooks with multiple indicators.
+    
+    Allows creating different trading setups with:
+    - Fibonacci gap pullback (primary)
+    - Optional technical indicators (moving averages, RSI, OBV, etc.)
+    - Customizable weights and thresholds
+    - Multiple playbooks that can run simultaneously
+    
+    Example usage:
+        config = PlaybookConfig(
+            name="Gap Pullback - Conservative",
+            gap_pullback_weight=0.6,
+            indicators={'sma_20': 0.2, 'rsi': 0.2},
+            entry_offset_pct=1.0,
+            stop_loss_pct=2.0,
+            target_profit_pct=3.0
+        )
+    """
+    
+    def __init__(self, name: str, gap_pullback_weight: float = 0.7, 
+                 indicators: dict = None, entry_offset_pct: float = 0,
+                 stop_loss_pct: float = 2.0, target_profit_pct: float = 2.0,
+                 min_confidence_score: float = 60.0):
+        """
+        Initialize a playbook configuration.
+        
+        Args:
+            name: Human-readable name for this playbook
+            gap_pullback_weight: Weight of gap pullback signal (0-1)
+            indicators: Dict of {indicator_name: weight} for technical indicators
+                       Examples: {'sma_20': 0.2, 'rsi': 0.15, 'obv': 0.15}
+                       All weights should sum close to 1.0
+            entry_offset_pct: Percentage offset from calculated entry (in 0-100 range)
+            stop_loss_pct: Stop loss as % of gap move (in 0-100 range)
+            target_profit_pct: Take profit as % of gap move (in 0-100 range)
+            min_confidence_score: Minimum score (0-100) to consider a setup valid
+        """
+        self.name = name
+        self.gap_pullback_weight = gap_pullback_weight
+        self.indicators = indicators or {}
+        self.entry_offset_pct = entry_offset_pct
+        self.stop_loss_pct = stop_loss_pct
+        self.target_profit_pct = target_profit_pct
+        self.min_confidence_score = min_confidence_score
+        
+        # Validate weights
+        total_weight = gap_pullback_weight + sum(self.indicators.values())
+        if total_weight > 1.01 or total_weight < 0.99:
+            # Log warning but don't fail - will normalize weights if needed
+            pass
+    
+    def to_dict(self) -> dict:
+        """Export config as dictionary for JSON serialization."""
+        return {
+            'name': self.name,
+            'gap_pullback_weight': self.gap_pullback_weight,
+            'indicators': self.indicators,
+            'entry_offset_pct': self.entry_offset_pct,
+            'stop_loss_pct': self.stop_loss_pct,
+            'target_profit_pct': self.target_profit_pct,
+            'min_confidence_score': self.min_confidence_score,
+        }
+    
+    @classmethod
+    def from_dict(cls, config_dict: dict) -> 'PlaybookConfig':
+        """Create a PlaybookConfig from a dictionary."""
+        return cls(
+            name=config_dict.get('name', 'Unnamed Playbook'),
+            gap_pullback_weight=config_dict.get('gap_pullback_weight', 0.7),
+            indicators=config_dict.get('indicators', {}),
+            entry_offset_pct=config_dict.get('entry_offset_pct', 0),
+            stop_loss_pct=config_dict.get('stop_loss_pct', 2.0),
+            target_profit_pct=config_dict.get('target_profit_pct', 2.0),
+            min_confidence_score=config_dict.get('min_confidence_score', 60.0),
+        )
+    
+    def evaluate_setup(self, gap_score: float, indicator_scores: dict = None) -> dict:
+        """
+        Evaluate a trading setup using this playbook's configuration.
+        
+        Args:
+            gap_score: Gap pullback confidence score (0-100)
+            indicator_scores: Dict of {indicator_name: score (0-100)}
+        
+        Returns:
+            Dict with:
+            - overall_score: Weighted overall confidence (0-100)
+            - meets_threshold: Boolean indicating if score meets min_confidence_score
+            - signal_strength: Descriptive strength level
+            - score_breakdown: Detailed breakdown of each component
+        """
+        indicator_scores = indicator_scores or {}
+        
+        # Start with gap pullback
+        weighted_score = gap_score * self.gap_pullback_weight
+        
+        # Add indicator contributions
+        for indicator_name, weight in self.indicators.items():
+            ind_score = indicator_scores.get(indicator_name, 50)  # Default to neutral
+            weighted_score += ind_score * weight
+        
+        overall_score = min(100, max(0, weighted_score))
+        meets_threshold = overall_score >= self.min_confidence_score
+        
+        # Describe signal strength
+        if overall_score >= 80:
+            signal_strength = "STRONG"
+        elif overall_score >= 65:
+            signal_strength = "GOOD"
+        elif overall_score >= self.min_confidence_score:
+            signal_strength = "MODERATE"
+        else:
+            signal_strength = "WEAK"
+        
+        return {
+            'overall_score': round(overall_score, 1),
+            'meets_threshold': meets_threshold,
+            'signal_strength': signal_strength,
+            'playbook_name': self.name,
+            'min_required_score': self.min_confidence_score,
+            'score_breakdown': {
+                'gap_pullback': round(gap_score * self.gap_pullback_weight, 1),
+                'indicators': {ind: round(indicator_scores.get(ind, 50) * self.indicators[ind], 1)
+                              for ind in self.indicators},
+            },
+        }

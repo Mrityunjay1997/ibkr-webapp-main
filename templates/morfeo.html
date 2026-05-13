@@ -55,6 +55,108 @@
 	<script src="js/respond.min.js"></script>
 	<![endif]-->
 
+	<!-- ===== SORTING & LAYOUT FIXES ===== -->
+	<style>
+	/* FIX #1: STICKY HEADERS */
+	.data-table-wrapper table thead {
+		position: sticky;
+		top: 0;
+		z-index: 10;
+		background-color: #f5f5f5;
+		border-bottom: 2px solid #333;
+	}
+
+	.data-table-wrapper table thead th {
+		background-color: #f0f0f0;
+		color: #333;
+		font-weight: 600;
+		padding: 12px 8px;
+		text-align: left;
+		white-space: normal;
+		border-bottom: 2px solid #999;
+	}
+
+	/* FIX #2: CONSISTENT LAYOUT - Ensure uniform spacing regardless of sort direction */
+	.data-table-wrapper table tbody {
+		display: table-row-group;
+		width: 100%;
+	}
+
+	.data-table-wrapper table tbody tr {
+		display: table-row;
+		width: 100%;
+		border-bottom: 1px solid #eee;
+	}
+
+	.data-table-wrapper table tbody tr:nth-child(even) {
+		background-color: #fafafa;
+	}
+
+	.data-table-wrapper table tbody td {
+		padding: 10px 8px;
+		text-align: left;
+		border-right: 1px solid #eee;
+		font-size: 13px;
+		vertical-align: middle;
+	}
+
+	/* Sticky symbol column */
+	.data-table-wrapper table thead th.sticky-col,
+	.data-table-wrapper table tbody td.sticky-col {
+		position: sticky;
+		left: 0;
+		z-index: 5;
+		background-color: inherit;
+		min-width: 80px;
+	}
+
+	.data-table-wrapper table thead th.sticky-col {
+		z-index: 11;
+	}
+
+	/* News row styling - FIX #3: Add stock symbol to news */
+	.news-row-inline {
+		background-color: #f0f8ff;
+		border-top: 2px solid #0073aa;
+	}
+
+	.news-row-inline td {
+		padding: 12px 8px;
+		background-color: #f0f8ff;
+	}
+
+	.news-section-header {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 15px;
+		font-weight: 600;
+		color: #0969da;
+		margin-bottom: 12px;
+		padding: 8px 0;
+	}
+
+	.news-section-header .news-symbol-badge {
+		display: inline-block;
+		background-color: #0073aa;
+		color: white;
+		padding: 4px 10px;
+		border-radius: 3px;
+		font-weight: 700;
+		font-size: 12px;
+		margin-right: 8px;
+	}
+
+	/* Responsive adjustments */
+	@media (max-width: 768px) {
+		.data-table-wrapper table thead th,
+		.data-table-wrapper table tbody td {
+			padding: 8px 4px;
+			font-size: 12px;
+		}
+	}
+	</style>
+
 	</head>
 	<body>
 
@@ -251,6 +353,28 @@
 						   			</div>
 						   		{% endfor %}
 						   		{{ Param.hidden_tag() }}
+
+                                <!-- ========== DYNAMIC INDICATOR MANAGEMENT SECTION ========== -->
+                                <div style="margin-top: 15px; padding: 15px; background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 6px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                        <h4 style="margin: 0;">Indicators Management</h4>
+                                        <div>
+                                            <button type="button" class="btn btn-sm btn-success" onclick="indicatorManager.showAddIndicatorForm('addIndicatorModalContainer');" title="Add a new indicator">
+                                                <span class="glyphicon glyphicon-plus"></span> Add Indicator
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <!-- Hidden field to store indicator configuration JSON -->
+                                    <input type="hidden" id="indicatorConfigField" name="indicatorConfig" value="{{ Param.indicatorConfig.data or '[]' }}">
+                                    
+                                    <!-- Container for indicator table/list -->
+                                    <div id="indicatorsContainer" style="border-top: 1px solid #ddd; padding-top: 10px;">
+                                        <!-- Will be populated by JavaScript -->
+                                    </div>
+                                </div>
+                                <!-- Modal container for adding indicators -->
+                                <div id="addIndicatorModalContainer"></div>
+                                <!-- ========== END DYNAMIC INDICATOR MANAGEMENT SECTION ========== -->
 
 						   		<div class="two-col-grid">
 						   		<table class = "firstTable">
@@ -1460,6 +1584,21 @@
 										</div>
 									</div>
 
+									<!-- TIF & Notes -->
+									<div class="ao-row">
+										<div class="ao-field">
+											<label class="ao-label">Time in Force</label>
+											<select id="ho_tif" class="ao-select">
+												<option value="DAY" selected>Day</option>
+												<option value="GTC">Good Till Cancel</option>
+											</select>
+										</div>
+										<div class="ao-field">
+											<label class="ao-label">Notes</label>
+											<input type="text" id="ho_notes" class="ao-input" placeholder="e.g., Short at high of day +0.5%">
+										</div>
+									</div>
+
 									<!-- Entry Condition: Candle Breakout -->
 									<details class="ao-collapsible" open>
 										<summary class="ao-section-title" style="cursor:pointer;user-select:none;padding:8px;">▶ Entry: Candle Breakout</summary>
@@ -1661,7 +1800,7 @@
 
 									<!-- Active Orders List -->
 									<div class="ao-section-title" style="margin-top:14px;">Active Held Orders</div>
-									<div id="ho_orders_list" style="background:#f6f8fa;border:1px solid #d0d7de;border-radius:4px;padding:10px;max-height:300px;overflow-y:auto;font-size:12px;">
+									<div id="ho_active_orders_list" style="background:#f6f8fa;border:1px solid #d0d7de;border-radius:4px;padding:10px;max-height:300px;overflow-y:auto;font-size:12px;">
 										<div style="color:#999;text-align:center;padding:20px;">No held orders yet</div>
 									</div>
 								</div>
@@ -2225,6 +2364,10 @@ function cleanNewsArticleText(rawText) {
 	<!-- Main -->
 	<script src="{{url_for('static', filename='js/main.js')}}"></script>
 	<script src="{{url_for('static', filename='js/togglechange.js')}}"></script>
+	<!-- Dynamic Indicator Manager -->
+	<script src="{{url_for('static', filename='js/indicator-manager.js')}}"></script>
+	<!-- Held Orders Manager -->
+	<script src="{{url_for('static', filename='js/held-orders.js')}}"></script>
 	<!-- Table -->
 
 
@@ -2656,6 +2799,10 @@ function cleanNewsArticleText(rawText) {
   // Track loop cycle to prevent reading headlines multiple times per loop
   let _lastLoopReadTime = 0;
   let _loopReadInterval = 2000; // Minimum 2 seconds between headline reads per loop
+  // Track headlines that have been read recently to prevent duplicate reads across scan loops
+  // Maps headline text to timestamp when it was last read (to allow stale headlines to be re-read after 1 hour)
+  let _recentlyReadHeadlines = new Map();
+  let _headlineRereadThreshold = 3600000; // 1 hour in milliseconds - after this, a headline can be re-read
   
   // Get available voices and select based on preference
   function _getPreferredVoice() {
@@ -2819,9 +2966,23 @@ function cleanNewsArticleText(rawText) {
   function readHeadlineAloud(text) {
     if (!text || text.trim() === "") return;
     
-    // Don't queue if already read in this scan cycle
+    const now = Date.now();
+    const normalizedText = text.trim().toLowerCase();
+    
+    // Check if already read in this scan cycle
     if (_readHeadlinesCache.has(text)) {
+      console.debug("Headline already read in this scan cycle, skipping:", text);
       return; // Already read, skip
+    }
+    
+    // Check if recently read (within threshold) - prevent duplicate reads across scan loops
+    if (_recentlyReadHeadlines.has(normalizedText)) {
+      const lastReadTime = _recentlyReadHeadlines.get(normalizedText);
+      const timeSinceLastRead = now - lastReadTime;
+      if (timeSinceLastRead < _headlineRereadThreshold) {
+        console.debug("Headline recently read " + Math.round(timeSinceLastRead / 1000) + " seconds ago, skipping:", text);
+        return; // Read too recently, skip
+      }
     }
     
     // Don't queue if already in current queue
@@ -2835,8 +2996,11 @@ function cleanNewsArticleText(rawText) {
     // Mark as read and as queued, then add to queue
     _readHeadlinesCache.add(text);
     _queuedHeadlines.add(text);
+    _recentlyReadHeadlines.set(normalizedText, now); // Track this headline across scan cycles
     _headlineQueue.push(formattedText);
     _processHeadlineQueue();
+    
+    console.debug("Headline queued for reading:", text);
   }
   
   // Clear the cache at the start of each new scan (called from renderResultsFromBackend)
@@ -3256,6 +3420,12 @@ function renderResultsFromBackend(response) {
                     if ("emaSlow1" in dta) headerCols.push({ key: "emaSlow1", label: "SlowEMA1" });
                     headerCols.push({ key: "obv", label: "OBV" });
                     if ("obv1" in dta) headerCols.push({ key: "obv1", label: "OBV1" });
+                    headerCols.push({ key: "fast_obv", label: "Fast OBV" });
+                    if ("fast_obv1" in dta) headerCols.push({ key: "fast_obv1", label: "FastOBV1" });
+                    headerCols.push({ key: "medium_obv", label: "Medium OBV" });
+                    if ("medium_obv1" in dta) headerCols.push({ key: "medium_obv1", label: "MediumOBV1" });
+                    headerCols.push({ key: "slow_obv", label: "Slow OBV" });
+                    if ("slow_obv1" in dta) headerCols.push({ key: "slow_obv1", label: "SlowOBV1" });
                     headerCols.push({ key: "atr", label: "ATR" });
                     if ("atr1" in dta) headerCols.push({ key: "atr1", label: "ATR1" });
                     headerCols.push({ key: "prevClose", label: "Previous Close" });
@@ -3329,12 +3499,26 @@ function renderResultsFromBackend(response) {
                         for (const pp of pivotPointVariables) if (pp in dta.Pivot1) pivotSecondary.push(pp);
                     }
 
+                    // pivot tertiary
+                    const pivotTertiary = [];
+                    if (dta.Pivot2 && typeof dta.Pivot2 === "object") {
+                        for (const pp of pivotPointVariables) if (pp in dta.Pivot2) pivotTertiary.push(pp);
+                    }
+
+                    // pivot quaternary
+                    const pivotQuaternary = [];
+                    if (dta.Pivot3 && typeof dta.Pivot3 === "object") {
+                        for (const pp of pivotPointVariables) if (pp in dta.Pivot3) pivotQuaternary.push(pp);
+                    }
+
                     // Build the ordered list of ALL columns (for control bar & reorder)
                     const allColDefs = [];
                     headerCols.forEach(c => allColDefs.push({ key: c.key, label: c.label, group: 'indicators' }));
                     pivotPrimary.forEach(p => allColDefs.push({ key: 'pivot_' + p, label: p, group: 'pivot' }));
                     allColDefs.push({ key: 'netPosition', label: 'Net Position', group: 'position' });
                     if (pivotSecondary.length > 0) pivotSecondary.forEach(p => allColDefs.push({ key: 'pivot1_' + p, label: p, group: 'pivot' }));
+                    if (pivotTertiary.length > 0) pivotTertiary.forEach(p => allColDefs.push({ key: 'pivot2_' + p, label: p, group: 'pivot' }));
+                    if (pivotQuaternary.length > 0) pivotQuaternary.forEach(p => allColDefs.push({ key: 'pivot3_' + p, label: p, group: 'pivot' }));
                     allColDefs.push({ key: '_placeOrder', label: 'Place Order', group: 'actions' });
                     allColDefs.push({ key: '_news', label: 'News', group: 'actions' });
 
@@ -3381,6 +3565,8 @@ function renderResultsFromBackend(response) {
                     var groupHeaderCols = headerCols;
                     var groupPivotPrimary = pivotPrimary;
                     var groupPivotSecondary = pivotSecondary;
+                    var groupPivotTertiary = pivotTertiary;
+                    var groupPivotQuaternary = pivotQuaternary;
                     var groupAllColDefs = allColDefs;
                 }
 
@@ -3566,6 +3752,8 @@ function renderResultsFromBackend(response) {
                 const headerCols = groupHeaderCols || [];
                 const pivotPrimary = groupPivotPrimary || [];
                 const pivotSecondary = groupPivotSecondary || [];
+                const pivotTertiary = groupPivotTertiary || [];
+                const pivotQuaternary = groupPivotQuaternary || [];
                 const allColDefs = groupAllColDefs || [];
 
                 const symbolCusipMap = {};
@@ -3657,6 +3845,26 @@ function renderResultsFromBackend(response) {
                     }
                 }
 
+                // --- Tertiary pivots ---
+                for (const pp of pivotTertiary) {
+                    const pKey = 'pivot2_' + pp;
+                    if (dta.Pivot2 && typeof dta.Pivot2 === "object") {
+                        cellMap[pKey] = `<td data-col='${pKey}'>${fmt(dta.Pivot2[pp])}</td>`;
+                    } else {
+                        cellMap[pKey] = `<td data-col='${pKey}'>n.d</td>`;
+                    }
+                }
+
+                // --- Quaternary pivots ---
+                for (const pp of pivotQuaternary) {
+                    const pKey = 'pivot3_' + pp;
+                    if (dta.Pivot3 && typeof dta.Pivot3 === "object") {
+                        cellMap[pKey] = `<td data-col='${pKey}'>${fmt(dta.Pivot3[pp])}</td>`;
+                    } else {
+                        cellMap[pKey] = `<td data-col='${pKey}'>n.d</td>`;
+                    }
+                }
+
                 // --- Place order ---
                 const totalIdBuySell = idBuySell + secondIdBuySell;
                 cellMap['_placeOrder'] = `<td data-col='_placeOrder'><button type='button' id='${totalIdBuySell}' data-toggle='modal' data-target='#exampleModalCenter' class='buttonbuysell' onclick='addButtonBuy(${idPlaceOrder}, "${totalIdBuySell}")'>click</button></td>`;
@@ -3702,14 +3910,17 @@ function renderResultsFromBackend(response) {
                         + (groupPivotPrimary || []).length
                         + 1 /* netPosition */
                         + (groupPivotSecondary || []).length
+                        + (groupPivotTertiary || []).length
+                        + (groupPivotQuaternary || []).length
                         + 2 /* change + place order */
                         + 1 /* news col */;
                     txt1 += `<tr id='${newsRowId}' style='display:none;background:#f6f8fa'>`;
                     txt1 += `<td colspan='${totalCols}' style='padding:10px 18px'>`;
-                    txt1 += `<div style='font-size:15px;font-weight:600;color:#0969da;margin-bottom:6px'>&#128240; News for ${(dta.symbol||'').replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>`;
+                    const stockSymbol = (dta.symbol || dta.cusip || 'UNKNOWN').replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+                    txt1 += `<div class='news-section-header'><span class='news-symbol-badge'>${stockSymbol}</span><span>&#128240; News Headlines</span></div>`;
                     if (newsItems.length > 0) {
-                        txt1 += `<table style='width:100%;border-collapse:collapse;font-size:14px'>`;
-                        txt1 += `<tr style='border-bottom:1px solid #d0d7de'><th style='padding:5px 6px;text-align:left;color:#57606a;font-size:14px'>Date/Time</th><th style='padding:5px 6px;text-align:left;color:#57606a;font-size:14px'>Source</th><th style='padding:5px 6px;text-align:left;color:#57606a;font-size:14px'>Headline</th></tr>`;
+                        txt1 += `<table style='width:100%;border-collapse:collapse;font-size:14px;background:white;border:1px solid #ddd'>`;
+                        txt1 += `<tr style='background-color:#e8eef5;border-bottom:1px solid #ddd'><th style='padding:8px 6px;text-align:left;color:#57606a;font-size:13px;font-weight:600'>Date/Time</th><th style='padding:8px 6px;text-align:left;color:#57606a;font-size:13px;font-weight:600'>Source</th><th style='padding:8px 6px;text-align:left;color:#57606a;font-size:13px;font-weight:600'>Headline</th></tr>`;
                         const _matchedHls = new Set((dta.matchedKeywordHeadlines || []).map(h => h.toLowerCase()));
                         for (const ni of newsItems) {
                             let displayTime = ni.parsedTime || ni.time || "";
@@ -3831,60 +4042,68 @@ function renderResultsFromBackend(response) {
 
         // TTS: read matched keyword headlines aloud if enabled AND within time window
         {
-            const readAloud = document.querySelector('.NewsReadAloud');
-            const autoReadAllNews = document.querySelector('.NewsAutoReadAll');
-            const autoReadAllEnabled = autoReadAllNews && (autoReadAllNews.value === 'on' || autoReadAllNews.value === 'True');
-            if (readAloud && readAloud.value === 'on' && !autoReadAllEnabled) {
-                // Get time window settings
-                const withinValueInput = document.querySelector('.NewsReadAloudWithinValue');
-                const timeUnitSelect = document.querySelector('.NewsReadAloudTimeUnit');
-                let withinMinutes = 0;
-                
-                if (withinValueInput && timeUnitSelect) {
-                    try {
-                        const withinValue = parseInt(withinValueInput.value) || 0;
-                        const timeUnit = (timeUnitSelect.value || 'minutes').toLowerCase();
-                        
-                        if (withinValue > 0) {
-                            if (timeUnit === 'hours') {
-                                withinMinutes = withinValue * 60;
-                            } else if (timeUnit === 'days') {
-                                withinMinutes = withinValue * 1440;
-                            } else {
-                                withinMinutes = withinValue;
-                            }
-                        }
-                    } catch (e) {
-                        console.warn("Error parsing read aloud time window:", e);
-                    }
-                }
-                
-                const now = Date.now();
-                const cutoffTime = withinMinutes > 0 ? now - (withinMinutes * 60 * 1000) : 0;
-                
-                for (const groupKey in msg) {
-                    const rows = Array.isArray(msg[groupKey])
-                        ? msg[groupKey]
-                        : Object.values(msg[groupKey] || {});
-                    for (const dta of rows) {
-                        const matched = dta.matchedKeywordHeadlines || [];
-                        const sym = dta.symbol || dta.cusip || "";
-                        for (const hl of matched) {
-                            // Check if headline is within time window
-                            let shouldRead = true;
-                            if (withinMinutes > 0 && dta.newsHeadlines && Array.isArray(dta.newsHeadlines)) {
-                                // Find the full headline object to get timestamp
-                                const fullHeadline = dta.newsHeadlines.find(h => 
-                                    (h.headline || "").trim() === hl.trim()
-                                );
-                                if (fullHeadline) {
-                                    const headlineTime = fullHeadline.parsedTime ? new Date(fullHeadline.parsedTime).getTime() : now;
-                                    shouldRead = headlineTime >= cutoffTime;
+            // FIRST: Check if news is ENABLED in the ComparisonNews dropdown (required for news processing)
+            const comparisonNewsSelect = document.querySelector('.ComparisonNews');
+            const isNewsEnabled = comparisonNewsSelect && comparisonNewsSelect.value === 'enabled';
+            
+            if (!isNewsEnabled) {
+                console.log("News is disabled (ComparisonNews != 'enabled'), skipping keyword headline reading");
+            } else {
+                const readAloud = document.querySelector('.NewsReadAloud');
+                const autoReadAllNews = document.querySelector('.NewsAutoReadAll');
+                const autoReadAllEnabled = autoReadAllNews && (autoReadAllNews.value === 'on' || autoReadAllNews.value === 'True');
+                if (readAloud && readAloud.value === 'on' && !autoReadAllEnabled) {
+                    // Get time window settings
+                    const withinValueInput = document.querySelector('.NewsReadAloudWithinValue');
+                    const timeUnitSelect = document.querySelector('.NewsReadAloudTimeUnit');
+                    let withinMinutes = 0;
+                    
+                    if (withinValueInput && timeUnitSelect) {
+                        try {
+                            const withinValue = parseInt(withinValueInput.value) || 0;
+                            const timeUnit = (timeUnitSelect.value || 'minutes').toLowerCase();
+                            
+                            if (withinValue > 0) {
+                                if (timeUnit === 'hours') {
+                                    withinMinutes = withinValue * 60;
+                                } else if (timeUnit === 'days') {
+                                    withinMinutes = withinValue * 1440;
+                                } else {
+                                    withinMinutes = withinValue;
                                 }
                             }
-                            
-                            if (shouldRead) {
-                                readHeadlineAloud(sym + ": " + hl);
+                        } catch (e) {
+                            console.warn("Error parsing read aloud time window:", e);
+                        }
+                    }
+                    
+                    const now = Date.now();
+                    const cutoffTime = withinMinutes > 0 ? now - (withinMinutes * 60 * 1000) : 0;
+                    
+                    for (const groupKey in msg) {
+                        const rows = Array.isArray(msg[groupKey])
+                            ? msg[groupKey]
+                            : Object.values(msg[groupKey] || {});
+                        for (const dta of rows) {
+                            const matched = dta.matchedKeywordHeadlines || [];
+                            const sym = dta.symbol || dta.cusip || "";
+                            for (const hl of matched) {
+                                // Check if headline is within time window
+                                let shouldRead = true;
+                                if (withinMinutes > 0 && dta.newsHeadlines && Array.isArray(dta.newsHeadlines)) {
+                                    // Find the full headline object to get timestamp
+                                    const fullHeadline = dta.newsHeadlines.find(h => 
+                                        (h.headline || "").trim() === hl.trim()
+                                    );
+                                    if (fullHeadline) {
+                                        const headlineTime = fullHeadline.parsedTime ? new Date(fullHeadline.parsedTime).getTime() : now;
+                                        shouldRead = headlineTime >= cutoffTime;
+                                    }
+                                }
+                                
+                                if (shouldRead) {
+                                    readHeadlineAloud(sym + ": " + hl);
+                                }
                             }
                         }
                     }
@@ -3894,18 +4113,25 @@ function renderResultsFromBackend(response) {
 
         // Auto-read all news headlines (not just keyword matches) if enabled AND within time window
         {
-            const autoReadAllNews = document.querySelector('.NewsAutoReadAll');
-            // Debug: log the element and its value
-            if (autoReadAllNews) {
-                console.log("NewsAutoReadAll element found, value:", autoReadAllNews.value);
-            }
+            // FIRST: Check if news is ENABLED in the ComparisonNews dropdown
+            const comparisonNewsSelect = document.querySelector('.ComparisonNews');
+            const isNewsEnabled = comparisonNewsSelect && comparisonNewsSelect.value === 'enabled';
             
-            if (autoReadAllNews && (autoReadAllNews.value === 'on' || autoReadAllNews.value === 'True')) {
-                console.log("Auto-read all news is enabled, processing headlines...");
-                // Get time window settings (same as Read Headlines Aloud)
-                const withinValueInput = document.querySelector('.NewsReadAloudWithinValue');
-                const timeUnitSelect = document.querySelector('.NewsReadAloudTimeUnit');
-                let withinMinutes = 0;
+            if (!isNewsEnabled) {
+                console.log("News is disabled (ComparisonNews != 'enabled'), skipping news processing");
+            } else {
+                const autoReadAllNews = document.querySelector('.NewsAutoReadAll');
+                // Debug: log the element and its value
+                if (autoReadAllNews) {
+                    console.log("NewsAutoReadAll element found, value:", autoReadAllNews.value);
+                }
+                
+                if (autoReadAllNews && (autoReadAllNews.value === 'on' || autoReadAllNews.value === 'True')) {
+                    console.log("Auto-read all news is enabled, processing headlines...");
+                    // Get time window settings (same as Read Headlines Aloud)
+                    const withinValueInput = document.querySelector('.NewsReadAloudWithinValue');
+                    const timeUnitSelect = document.querySelector('.NewsReadAloudTimeUnit');
+                    let withinMinutes = 0;
                 
                 if (withinValueInput && timeUnitSelect) {
                     try {
@@ -3976,6 +4202,7 @@ function renderResultsFromBackend(response) {
                         }
                     }
                 }
+            }
             }
         }
 
@@ -4467,14 +4694,37 @@ function _sortTable(tableId, sortColumn) {
     const state = window._tablesSortState[tableId];
     if (!state) return;
 
-    // Get the table and rows
+    // Get the table and rows (exclude news rows which have IDs like newsRow_*)
     const table = document.querySelector(`#responsive-data-table-${tableId}`);
     const tbody = table.querySelector('tbody');
-    const rows = Array.from(tbody.querySelectorAll('tr:not([id*="newsRow"])'));
+    
+    // Get only stock rows (not news rows), but preserve the news rows associated with them
+    const stockRows = Array.from(tbody.querySelectorAll('tr')).filter(row => {
+        const rowId = row.id || '';
+        return !rowId.startsWith('newsRow_');
+    });
+    
+    // Build map of stock rows to their associated news rows
+    const newsRowMap = {};
+    for (const stockRow of stockRows) {
+        const rowId = stockRow.id || '';
+        if (rowId) {
+            const newsRowId = `newsRow_${rowId.substring(rowId.lastIndexOf('_') + 1)}`;
+            const newsRow = tbody.querySelector(`#${newsRowId}`);
+            if (newsRow) {
+                newsRowMap[rowId] = newsRow;
+            }
+        }
+    }
 
     // Capture original row order if not done yet
     if (!state.originalRowOrder) {
-        state.originalRowOrder = rows.map(row => row.cloneNode(true));
+        state.originalRowOrder = stockRows.map(row => {
+            return {
+                element: row.cloneNode(true),
+                newsElement: newsRowMap[row.id] ? newsRowMap[row.id].cloneNode(true) : null
+            };
+        });
     }
 
     // Handle three-state cycle: default → ascending → descending → back to default
@@ -4496,19 +4746,22 @@ function _sortTable(tableId, sortColumn) {
     // Reset to original order if in default state
     if (state.sortState === 'default') {
         const newTbody = tbody.cloneNode(false);
-        for (let origRow of state.originalRowOrder) {
-            newTbody.appendChild(origRow.cloneNode(true));
+        for (let item of state.originalRowOrder) {
+            newTbody.appendChild(item.element.cloneNode(true));
+            if (item.newsElement) {
+                newTbody.appendChild(item.newsElement.cloneNode(true));
+            }
         }
         while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
-        for (let row of newTbody.childNodes) tbody.appendChild(row.cloneNode(true));
+        for (let node of newTbody.childNodes) tbody.appendChild(node.cloneNode(true));
     } else {
         // Sort rows based on current sort state
         const rowsData = [];
-        for (let row of rows) {
+        for (let row of stockRows) {
             // Get symbol from first cell for matching original data
             const symbolCell = row.querySelector('td:first-child');
             const symbol = symbolCell ? symbolCell.textContent.trim().split(/\s+/)[0] : '';
-            rowsData.push({ element: row, symbol: symbol });
+            rowsData.push({ element: row, symbol: symbol, newsElement: newsRowMap[row.id] || null });
         }
 
         // Sort by the selected column value only (no priorities)
@@ -4554,9 +4807,12 @@ function _sortTable(tableId, sortColumn) {
             return state.sortState === 'ascending' ? cmp : -cmp;
         });
 
-        // Re-insert sorted rows in tbody
+        // Re-insert sorted rows in tbody (with their associated news rows)
         for (let item of rowsData) {
             tbody.appendChild(item.element);
+            if (item.newsElement) {
+                tbody.appendChild(item.newsElement);
+            }
         }
     }
 
@@ -4576,7 +4832,7 @@ function _sortTable(tableId, sortColumn) {
         if (activeTh) {
             activeTh.style.fontWeight = 'bold';
             activeTh.style.color = '#0969da';
-            const arrow = state.sortState === 'ascending' ? '▲ HIGH→LOW' : '▼ LOW→HIGH';
+            const arrow = state.sortState === 'ascending' ? '↑ LOW→HIGH' : '↓ HIGH→LOW';
             const span = document.createElement('span');
             span.className = 'sort-indicator';
             span.textContent = ' ' + arrow;
@@ -6055,21 +6311,20 @@ function _aoApplySettings(s) {
 
 // Auto-order preset CRUD
 function _aoRefreshPresetDropdown() {
-    $.get("/order-presets/list").done(function(resp) {
+    $.get("/auto-order-presets/list").done(function(resp) {
         var presets = (resp && resp.presets) ? resp.presets : [];
         var dd = document.getElementById("ao_preset_dropdown");
         if (!dd) return;
         dd.innerHTML = '<option value="">-- Select --</option>';
         presets.forEach(function(p) {
-            // only show auto-order presets (prefixed with "ao_")
-            if (p.name && p.name.indexOf("ao_") === 0) {
-                var opt = document.createElement("option");
-                opt.value = p.name;
-                var display = (p.title || p.name).replace(/^ao_/, "");
-                opt.textContent = display + (p.isDefault ? ' (default)' : '');
-                dd.appendChild(opt);
-            }
+            var opt = document.createElement("option");
+            opt.value = p.name;
+            var display = p.name.replace(/^ao_/, "");
+            opt.textContent = display + (p.isDefault ? ' (default)' : '');
+            dd.appendChild(opt);
         });
+    }).fail(function() {
+        console.error('Failed to load auto-order presets');
     });
 }
 
@@ -6078,30 +6333,30 @@ function _aoSavePreset() {
     var nameInput = document.getElementById("ao_preset_name");
     var rawName = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : (dd ? dd.value : '');
     if (!rawName) { alert('Enter a preset name or select one to overwrite'); return; }
-    // Ensure ao_ prefix for namespace
-    var name = rawName.indexOf("ao_") === 0 ? rawName : ("ao_" + rawName);
     var isDefault = document.getElementById("ao_preset_default") ? document.getElementById("ao_preset_default").checked : false;
     var settings = _aoGetSettings();
-    var payload = { name: name, overwrite: false, isDefault: isDefault, settings: settings };
+    var payload = { name: rawName, overwrite: false, isDefault: isDefault, settings: settings };
 
     $.ajax({
-        url: "/order-presets/save",
+        url: "/auto-order-presets/save",
         type: "POST",
         contentType: "application/json",
         data: JSON.stringify(payload),
         success: function(r) {
             if (r && r.ok) {
-                alert('Auto-order preset saved: ' + name.replace(/^ao_/, ""));
+                alert('Auto-order preset saved: ' + rawName);
                 if (nameInput) nameInput.value = '';
                 _aoRefreshPresetDropdown();
+            } else {
+                alert('Save failed: ' + (r.message || 'Unknown error'));
             }
         },
         error: function(xhr) {
             if (xhr.status === 409) {
-                if (confirm("Preset '" + name.replace(/^ao_/, "") + "' already exists. Overwrite?")) {
+                if (confirm("Preset '" + rawName + "' already exists. Overwrite?")) {
                     payload.overwrite = true;
                     $.ajax({
-                        url: "/order-presets/save",
+                        url: "/auto-order-presets/save",
                         type: "POST",
                         contentType: "application/json",
                         data: JSON.stringify(payload),
@@ -6110,12 +6365,20 @@ function _aoSavePreset() {
                                 alert('Preset overwritten');
                                 if (nameInput) nameInput.value = '';
                                 _aoRefreshPresetDropdown();
+                            } else {
+                                alert('Overwrite failed: ' + (r.message || 'Unknown error'));
                             }
                         },
-                        error: function() { alert('Save failed'); }
+                        error: function(err) { alert('Overwrite failed: ' + (err.responseJSON?.message || 'Unknown error')); }
                     });
                 }
-            } else { alert('Save failed'); }
+            } else {
+                var errMsg = 'Save failed';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errMsg += ': ' + xhr.responseJSON.message;
+                }
+                alert(errMsg);
+            }
         }
     });
 }
@@ -6125,16 +6388,29 @@ function _aoLoadPreset() {
     var name = dd ? dd.value : '';
     if (!name) { alert('Select a preset first'); return; }
     $.ajax({
-        url: "/order-presets/load",
+        url: "/auto-order-presets/load",
         type: "POST",
         contentType: "application/json",
         data: JSON.stringify({ name: name }),
         success: function(doc) {
-            _aoApplySettings(doc.settings);
-            var cb = document.getElementById("ao_preset_default");
-            if (cb) cb.checked = !!(doc.meta && doc.meta.isDefault);
+            if (doc && doc.settings) {
+                _aoApplySettings(doc.settings);
+                var cb = document.getElementById("ao_preset_default");
+                if (cb) cb.checked = !!(doc.meta && doc.meta.isDefault);
+                console.log('Auto-order preset loaded: ' + name);
+            } else {
+                alert('Invalid preset format');
+            }
         },
-        error: function() { alert('Failed to load preset'); }
+        error: function(xhr) {
+            var errMsg = 'Failed to load preset';
+            if (xhr.status === 404) {
+                errMsg = 'Preset not found';
+            } else if (xhr.responseJSON && xhr.responseJSON.message) {
+                errMsg += ': ' + xhr.responseJSON.message;
+            }
+            alert(errMsg);
+        }
     });
 }
 
@@ -6142,9 +6418,9 @@ function _aoDeletePreset() {
     var dd = document.getElementById("ao_preset_dropdown");
     var name = dd ? dd.value : '';
     if (!name) { alert('Select a preset first'); return; }
-    if (!confirm("Delete auto-order preset '" + name.replace(/^ao_/, "") + "'?")) return;
+    if (!confirm("Delete auto-order preset '" + name + "'?")) return;
     $.ajax({
-        url: "/order-presets/delete",
+        url: "/auto-order-presets/delete",
         type: "POST",
         contentType: "application/json",
         data: JSON.stringify({ name: name }),
@@ -6152,31 +6428,50 @@ function _aoDeletePreset() {
             if (r && r.ok) {
                 alert('Preset deleted');
                 _aoRefreshPresetDropdown();
+                dd.value = '';
+            } else {
+                alert('Delete failed: ' + (r.message || 'Unknown error'));
             }
         },
-        error: function() { alert('Delete failed'); }
+        error: function(xhr) {
+            var errMsg = 'Delete failed';
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                errMsg += ': ' + xhr.responseJSON.message;
+            }
+            alert(errMsg);
+        }
     });
 }
 
 function _aoLoadDefaultPreset() {
-    $.get("/order-presets/list").done(function(resp) {
+    $.get("/auto-order-presets/list").done(function(resp) {
         var presets = (resp && resp.presets) ? resp.presets : [];
-        var def = presets.find(function(p) { return p.isDefault && p.name && p.name.indexOf("ao_") === 0; });
+        var def = presets.find(function(p) { return p.isDefault; });
         if (def) {
             $.ajax({
-                url: "/order-presets/load",
+                url: "/auto-order-presets/load",
                 type: "POST",
                 contentType: "application/json",
                 data: JSON.stringify({ name: def.name }),
                 success: function(doc) {
-                    _aoApplySettings(doc.settings);
-                    var dd = document.getElementById("ao_preset_dropdown");
-                    if (dd) dd.value = def.name;
-                    var cb = document.getElementById("ao_preset_default");
-                    if (cb) cb.checked = true;
+                    if (doc && doc.settings) {
+                        _aoApplySettings(doc.settings);
+                        var dd = document.getElementById("ao_preset_dropdown");
+                        if (dd) dd.value = def.name;
+                        var cb = document.getElementById("ao_preset_default");
+                        if (cb) cb.checked = true;
+                        console.log('Default auto-order preset loaded: ' + def.name);
+                    }
+                },
+                error: function() {
+                    console.error('Failed to load default preset');
                 }
             });
+        } else {
+            console.log('No default auto-order preset found');
         }
+    }).fail(function() {
+        console.error('Failed to list auto-order presets');
     });
 }
 
@@ -6596,6 +6891,7 @@ function _hoCreateOrder() {
     
     // Update display
     _hoRefreshOrdersList();
+    _pmRenderHeldOrders();  // Also update position panel display
     
     // Clear form
     _hoClearForm();
@@ -6671,6 +6967,7 @@ function _hoCancelOrder(orderId) {
         _heldOrdersDB[orderId].status = "cancelled";
         _hoSaveOrders();
         _hoRefreshOrdersList();
+        _pmRenderHeldOrders();  // Also update position panel display
         alert("Order cancelled");
     }
 }
@@ -6734,6 +7031,7 @@ function _hoEditOrder(orderId) {
     delete _heldOrdersDB[orderId];
     _hoSaveOrders();
     _hoRefreshOrdersList();
+    _pmRenderHeldOrders();  // Also update position panel display
 }
 
 // Initialize auto-order panel on page load
@@ -6934,7 +7232,12 @@ const BG_RESULTS_POLL_MS = {{ cfg_dict.get("bg_results_poll_ms", 5000) | int }};
         const currentIntervalValue = $("#bg_interval_value").val();
         const currentIntervalUnit = $("#bg_interval_unit").val();
         // stop
-        $.ajax({ url: "/background/stop", type: "POST" }).always(function(){
+        $.ajax({ 
+          url: "/background/stop", 
+          type: "POST",
+          contentType: "application/json; charset=utf-8",
+          data: JSON.stringify({ tab_unique_id: _bg_unique_id })
+        }).always(function(){
           // start after short delay to ensure server cleaned up
           setTimeout(function(){
             startBackgroundScanner(currentIntervalValue, currentIntervalUnit, _bg_lastForm, _bg_lastSecurities)
@@ -7016,7 +7319,13 @@ const BG_RESULTS_POLL_MS = {{ cfg_dict.get("bg_results_poll_ms", 5000) | int }};
     setBgStatus("stopping");
     _bg_last_run_time = null;
     _bg_run_count = 0;
-    return $.ajax({ url: "/background/stop", type: "POST", timeout: 10000 })
+    return $.ajax({ 
+      url: "/background/stop", 
+      type: "POST", 
+      contentType: "application/json; charset=utf-8",
+      data: JSON.stringify({ tab_unique_id: _bg_unique_id }),
+      timeout: 10000 
+    })
       .always(function(){
         _bg_enabled = false;
         setBgStatus("stopped");
@@ -7045,7 +7354,7 @@ const BG_RESULTS_POLL_MS = {{ cfg_dict.get("bg_results_poll_ms", 5000) | int }};
          $("#bg_client_last_poll").text(new Date().toLocaleString());
 
         $.ajax({
-            url: "/background/results",
+            url: "/background/results?tab_unique_id=" + encodeURIComponent(_bg_unique_id),
             type: "GET",
             dataType: "json",
             timeout: 8000
@@ -7251,7 +7560,7 @@ const BG_RESULTS_POLL_MS = {{ cfg_dict.get("bg_results_poll_ms", 5000) | int }};
     setBgStatus("stopped");
     setBgMessage("", false);
     // optionally restore status from server on page load
-    $.get("/background/status").done(function(st){
+    $.get("/background/status?tab_unique_id=" + encodeURIComponent(_bg_unique_id)).done(function(st){
       if (st && st.enabled) {
         // we don't know the securities on page load; leave button ON but disabled until user runs screening
         $("#bg_toggle").text("Stop");
@@ -7391,7 +7700,7 @@ const BG_RESULTS_POLL_MS = {{ cfg_dict.get("bg_results_poll_ms", 5000) | int }};
 
   function pollOnceSLResults(){
     $.ajax({
-      url: "/scanner-loop/results",
+      url: "/scanner-loop/results?tab_unique_id=" + encodeURIComponent(_sl_unique_id),
       type: "GET",
       dataType: "json",
       timeout: 8000
@@ -7494,7 +7803,7 @@ const BG_RESULTS_POLL_MS = {{ cfg_dict.get("bg_results_poll_ms", 5000) | int }};
     });
 
     // Restore state on page load
-    $.get("/scanner-loop/status").done(function(st){
+    $.get("/scanner-loop/status?tab_unique_id=" + encodeURIComponent(_sl_unique_id)).done(function(st){
       if (st && st.enabled) {
         _sl_enabled = true;
         $("#sl_toggle").text("Stop Scanner Loop");
@@ -8153,7 +8462,7 @@ async function _pmLoadPositions() {
             return;
         }
         
-        _pmRenderPositionTable(data.positions, data.summary);
+        _pmRenderPositionTable(data.positions, data.summary, data.account);
     } catch (e) {
         console.error('Failed to load positions:', e);
     }
@@ -8162,7 +8471,7 @@ async function _pmLoadPositions() {
 /**
  * Render positions in a table format
  */
-function _pmRenderPositionTable(positions, summary) {
+function _pmRenderPositionTable(positions, summary, account) {
     let html = `
         <div id="position-monitor-panel" style="
             background: #f8f9fa;
@@ -8179,7 +8488,7 @@ function _pmRenderPositionTable(positions, summary) {
                 border-bottom: 2px solid #007bff;
                 padding-bottom: 10px;
             ">
-                <h3 style="margin: 0; color: #333;">📊 Open Positions (${positions.length})</h3>
+                <h3 style="margin: 0; color: #333;">💰 Account & Positions</h3>
                 <button 
                     class="btn btn-sm btn-info" 
                     onclick="_pmRefreshPositions()"
@@ -8190,7 +8499,48 @@ function _pmRenderPositionTable(positions, summary) {
             </div>
     `;
     
-    // Summary stats
+    // Account data display
+    if (account) {
+        html += `
+            <div style="
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 12px;
+                margin-bottom: 15px;
+                font-size: 13px;
+                background: #fff3cd;
+                padding: 12px;
+                border-radius: 4px;
+                border-left: 4px solid #ffc107;
+            ">
+                <div style="background: #fff; padding: 10px; border-radius: 4px; border-left: 3px solid #28a745;">
+                    <div style="color: #666; font-size: 11px;">💵 Cash Available</div>
+                    <div style="font-weight: bold; color: #28a745; font-size: 14px;">$${(account.cash_balance || 0).toFixed(2)}</div>
+                </div>
+                <div style="background: #fff; padding: 10px; border-radius: 4px; border-left: 3px solid #17a2b8;">
+                    <div style="color: #666; font-size: 11px;">📊 Buying Power</div>
+                    <div style="font-weight: bold; color: #17a2b8; font-size: 14px;">$${(account.buying_power || 0).toFixed(2)}</div>
+                </div>
+                <div style="background: #fff; padding: 10px; border-radius: 4px; border-left: 3px solid #007bff;">
+                    <div style="color: #666; font-size: 11px;">💎 Total Value</div>
+                    <div style="font-weight: bold; color: #007bff; font-size: 14px;">$${(account.equity_with_loan || 0).toFixed(2)}</div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Open Positions header
+    html += `
+        <div style="
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+            margin-bottom: 12px;
+        ">
+            <h4 style="margin: 0; color: #333;">📊 Open Positions (${positions.length})</h4>
+        </div>
+    `;
+    
+    // Position Summary stats
     if (summary) {
         html += `
             <div style="
@@ -8239,21 +8589,6 @@ function _pmRenderPositionTable(positions, summary) {
             </thead>
             <tbody>
     `;
-    
-    positions.forEach(pos => {
-        const entryTime = new Date(pos.entry_time);
-        const now = new Date();
-        const ageMs = now - entryTime;
-        const ageSec = Math.floor(ageMs / 1000);
-        let ageStr;
-        if (ageSec < 60) ageStr = ageSec + 's';
-        else if (ageSec < 3600) ageStr = Math.floor(ageSec / 60) + 'm';
-        else if (ageSec < 86400) ageStr = Math.floor(ageSec / 3600) + 'h';
-        else ageStr = Math.floor(ageSec / 86400) + 'd';
-        
-        const pnl = (pos.current_price - pos.entry_price) * pos.quantity_remaining;
-        const pnlPercent = ((pos.current_price - pos.entry_price) / pos.entry_price) * 100;
-        const gainColor = pnl >= 0 ? '#28a745' : '#dc3545';
         
         html += `
             <tr style="border-bottom: 1px solid #dee2e6; background: ${pnl >= 0 ? '#f0f8f5' : '#fef5f5'};">
@@ -8280,6 +8615,18 @@ function _pmRenderPositionTable(positions, summary) {
     html += `
             </tbody>
         </table>
+        
+        <!-- Held Orders Section (moved below open positions) -->
+        <div style="
+            margin-top: 20px;
+            border-top: 2px solid #007bff;
+            padding-top: 15px;
+        ">
+            <h4 style="margin: 0 0 12px 0; color: #333;">⏸️ Active Held Orders</h4>
+            <div id="pm_held_orders_display" style="background:#f6f8fa;border:1px solid #d0d7de;border-radius:4px;padding:10px;font-size:12px;">
+                <div style="color:#999;text-align:center;padding:20px;">No held orders yet</div>
+            </div>
+        </div>
         </div>
     `;
     
@@ -8294,6 +8641,53 @@ function _pmRenderPositionTable(positions, summary) {
     } else {
         container.outerHTML = html;
     }
+    
+    // Render held orders in the new location
+    _pmRenderHeldOrders();
+}
+
+/**
+ * Render held orders below open positions
+ */
+function _pmRenderHeldOrders() {
+    const displayEl = document.getElementById('pm_held_orders_display');
+    if (!displayEl) return;
+    
+    const activeOrders = Object.values(_heldOrdersDB || {}).filter(o => o.status === "active");
+    
+    if (activeOrders.length === 0) {
+        displayEl.innerHTML = '<div style="color:#999;text-align:center;padding:20px;">No held orders yet</div>';
+        return;
+    }
+    
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:11px;">';
+    html += '<tr style="background:#e8f4f8;font-weight:bold;"><th style="padding:6px;border:1px solid #d0d7de;text-align:left;">Symbol</th><th style="padding:6px;border:1px solid #d0d7de;text-align:left;">Side</th><th style="padding:6px;border:1px solid #d0d7de;text-align:right;">Qty</th><th style="padding:6px;border:1px solid #d0d7de;text-align:left;">Conditions</th><th style="padding:6px;border:1px solid #d0d7de;text-align:center;">Actions</th></tr>';
+    
+    activeOrders.forEach(order => {
+        const condLabels = [];
+        if (order.entry_conditions) {
+            order.entry_conditions.forEach(c => {
+                if (c.type === "candle_breakout") {
+                    condLabels.push("Candle:" + c.timeframe);
+                } else if (c.type === "ma_crossover") {
+                    condLabels.push(c.ma_type.toUpperCase() + c.ma_period + ":" + c.timeframe);
+                }
+            });
+        }
+        
+        html += '<tr style="border-bottom:1px solid #d0d7de;">';
+        html += '<td style="padding:6px;border:1px solid #d0d7de;font-weight:bold;">' + order.symbol + '</td>';
+        html += '<td style="padding:6px;border:1px solid #d0d7de;">' + (order.side === 'long' ? '📈' : '📉') + ' ' + order.side.toUpperCase() + '</td>';
+        html += '<td style="padding:6px;border:1px solid #d0d7de;text-align:right;">' + order.quantity + '</td>';
+        html += '<td style="padding:6px;border:1px solid #d0d7de;font-size:10px;">' + condLabels.join(', ') + '</td>';
+        html += '<td style="padding:6px;border:1px solid #d0d7de;text-align:center;">';
+        html += '<button class="oe-btn oe-btn-sm" onclick="_hoEditOrder(\'' + order.order_id + '\')" style="padding:3px 6px;font-size:10px;">Edit</button> ';
+        html += '<button class="oe-btn oe-btn-sm oe-btn-danger" onclick="_hoCancelOrder(\'' + order.order_id + '\')" style="padding:3px 6px;font-size:10px;">Cancel</button>';
+        html += '</td></tr>';
+    });
+    
+    html += '</table>';
+    displayEl.innerHTML = html;
 }
 
 /**

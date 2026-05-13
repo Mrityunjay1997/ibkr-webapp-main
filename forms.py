@@ -1493,6 +1493,13 @@ class Parameters(FlaskForm):
     filterMarketCap = BooleanField("Filter by Market Cap", default=False)
     filterVolume = BooleanField("Filter by Volume", default=False)
 
+    # ------------------------------------------------------------------
+    # Dynamic indicator configuration (JSON)
+    # ------------------------------------------------------------------
+    # Stores indicator configuration as JSON array for dynamic indicator management
+    # Format: [{"id": 0, "type": "FastSMA", "window": 5, "comparison": "greater", "percentage": 0, "timeframe": "1 day", "usePercentage": false}]
+    indicatorConfig = StringField("Indicator Configuration", default="[]")
+
     submit = SubmitField("Submit")
 
 

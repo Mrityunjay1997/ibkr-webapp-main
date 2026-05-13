@@ -1076,6 +1076,20 @@ class IBapi(EWrapper, EClient):
         self._fundamental_done = {}   # reqId -> bool
         self._fundamental_lock = threading.Lock()
 
+        # ---------------------------
+        # Account data
+        # ---------------------------
+        self._account_data = {}  # tag -> value (e.g., "CashBalance", "BuyingPower")
+        self._account_lock = threading.Lock()
+        self._account_values = {
+            'CashBalance': 0.0,
+            'BuyingPower': 0.0,
+            'EquityWithLoanValue': 0.0,
+            'AccountType': '',
+            'AccountCode': ''
+        }
+        self._account_request_id = None
+
     # =========================================================================
     # Stock Exclusion List Management
     # =========================================================================
@@ -1329,6 +1343,61 @@ class IBapi(EWrapper, EClient):
             self.reqNewsProviders()
         except Exception:
             pass
+        # Request account summary as soon as connected
+        try:
+            self.request_account_summary()
+        except Exception as e:
+            logger.warning(f"Failed to request account summary: {e}")
+
+    def request_account_summary(self):
+        """Request account summary data from IBKR"""
+        try:
+            if self._account_request_id is None:
+                self._account_request_id = 10001
+            # Request account summary with tags we care about
+            tags = "AccountType,NetLiquidation,TotalCashValue,CashBalance,BuyingPower,EquityWithLoanValue"
+            self.reqAccountSummary(self._account_request_id, "All", tags)
+            logger.info("Requested account summary with ID %s", self._account_request_id)
+        except Exception as e:
+            logger.error(f"Failed to request account summary: {e}")
+
+    def accountSummary(self, req_id, account, tag, value, currency):
+        """
+        Callback for account summary data.
+        Called for each tag in the account summary request.
+        """
+        try:
+            with self._account_lock:
+                # Store the value with tag as key
+                key = f"{tag}_{currency}" if currency else tag
+                self._account_values[key] = value
+                
+                # Try to convert to float for numeric values
+                if tag in ['CashBalance', 'BuyingPower', 'EquityWithLoanValue', 'NetLiquidation', 'TotalCashValue']:
+                    try:
+                        self._account_values[tag] = float(value)
+                    except (ValueError, TypeError):
+                        self._account_values[tag] = 0.0
+                
+                logger.debug(f"Account {tag}: {value} {currency}")
+        except Exception as e:
+            logger.error(f"Error processing account summary: {e}")
+
+    def accountSummaryEnd(self, req_id):
+        """Called when account summary request completes"""
+        logger.info(f"Account summary request {req_id} completed")
+
+    def get_account_data(self):
+        """Get current account data"""
+        with self._account_lock:
+            return {
+                'cash_balance': float(self._account_values.get('CashBalance', 0.0)),
+                'buying_power': float(self._account_values.get('BuyingPower', 0.0)),
+                'equity_with_loan': float(self._account_values.get('EquityWithLoanValue', 0.0)),
+                'net_liquidation': float(self._account_values.get('NetLiquidation', 0.0)),
+                'total_cash_value': float(self._account_values.get('TotalCashValue', 0.0)),
+                'account_type': str(self._account_values.get('AccountType', '')),
+            }
 
     def checkForConnection(self):
         """
@@ -2608,10 +2677,17 @@ class IBapi(EWrapper, EClient):
             except Exception:
                 w = 10
             try:
-                sma_fast = SMAIndicator(close=result_full["close"], window=w)
-                indicators["smaFast"] = last_value(sma_fast.sma_indicator())
+                num_bars = len(result_full)
+                if num_bars >= w:
+                    sma_fast = SMAIndicator(close=result_full["close"], window=w)
+                    indicators["smaFast"] = last_value(sma_fast.sma_indicator())
+                    indicators["smaFast_sufficient_data"] = True
+                else:
+                    indicators["smaFast"] = None
+                    indicators["smaFast_sufficient_data"] = False
             except Exception:
                 indicators["smaFast"] = None
+                indicators["smaFast_sufficient_data"] = False
 
             if form.get("ComparisonFastSMA") == "between":
                 try:
@@ -2619,10 +2695,17 @@ class IBapi(EWrapper, EClient):
                 except Exception:
                     w1 = w
                 try:
-                    sma_fast1 = SMAIndicator(close=result_full["close"], window=w1)
-                    indicators["smaFast1"] = last_value(sma_fast1.sma_indicator())
+                    num_bars = len(result_full)
+                    if num_bars >= w1:
+                        sma_fast1 = SMAIndicator(close=result_full["close"], window=w1)
+                        indicators["smaFast1"] = last_value(sma_fast1.sma_indicator())
+                        indicators["smaFast1_sufficient_data"] = True
+                    else:
+                        indicators["smaFast1"] = None
+                        indicators["smaFast1_sufficient_data"] = False
                 except Exception:
                     indicators["smaFast1"] = None
+                    indicators["smaFast1_sufficient_data"] = False
 
         # --- Medium SMA ---
         if form.get("ComparisonMediumSMA") != "Not used":
@@ -2631,10 +2714,17 @@ class IBapi(EWrapper, EClient):
             except Exception:
                 w = 10
             try:
-                sma_medium = SMAIndicator(close=result_full["close"], window=w)
-                indicators["smaMedium"] = last_value(sma_medium.sma_indicator())
+                num_bars = len(result_full)
+                if num_bars >= w:
+                    sma_medium = SMAIndicator(close=result_full["close"], window=w)
+                    indicators["smaMedium"] = last_value(sma_medium.sma_indicator())
+                    indicators["smaMedium_sufficient_data"] = True
+                else:
+                    indicators["smaMedium"] = None
+                    indicators["smaMedium_sufficient_data"] = False
             except Exception:
                 indicators["smaMedium"] = None
+                indicators["smaMedium_sufficient_data"] = False
 
             if form.get("ComparisonMediumSMA") == "between":
                 try:
@@ -2642,10 +2732,17 @@ class IBapi(EWrapper, EClient):
                 except Exception:
                     w1 = w
                 try:
-                    sma_medium1 = SMAIndicator(close=result_full["close"], window=w1)
-                    indicators["smaMedium1"] = last_value(sma_medium1.sma_indicator())
+                    num_bars = len(result_full)
+                    if num_bars >= w1:
+                        sma_medium1 = SMAIndicator(close=result_full["close"], window=w1)
+                        indicators["smaMedium1"] = last_value(sma_medium1.sma_indicator())
+                        indicators["smaMedium1_sufficient_data"] = True
+                    else:
+                        indicators["smaMedium1"] = None
+                        indicators["smaMedium1_sufficient_data"] = False
                 except Exception:
                     indicators["smaMedium1"] = None
+                    indicators["smaMedium1_sufficient_data"] = False
 
         # --- Slow SMA ---
         if form.get("ComparisonSlowSMA") != "Not used":
@@ -2654,10 +2751,21 @@ class IBapi(EWrapper, EClient):
             except Exception:
                 w = 50
             try:
-                sma_slow = SMAIndicator(close=result_full["close"], window=w)
-                indicators["smaSlow"] = last_value(sma_slow.sma_indicator())
-            except Exception:
+                # Check if we have enough bars for the SMA window
+                num_bars = len(result_full)
+                if num_bars >= w:
+                    sma_slow = SMAIndicator(close=result_full["close"], window=w)
+                    indicators["smaSlow"] = last_value(sma_slow.sma_indicator())
+                    indicators["smaSlow_sufficient_data"] = True
+                else:
+                    # Insufficient data for this SMA window
+                    indicators["smaSlow"] = None
+                    indicators["smaSlow_sufficient_data"] = False
+                    logger.warning(f"Insufficient data for Slow SMA: only {num_bars} bars, need {w}")
+            except Exception as e:
                 indicators["smaSlow"] = None
+                indicators["smaSlow_sufficient_data"] = False
+                logger.warning(f"Error calculating Slow SMA: {e}")
 
             if form.get("ComparisonSlowSMA") == "between":
                 try:
@@ -2665,10 +2773,17 @@ class IBapi(EWrapper, EClient):
                 except Exception:
                     w1 = w
                 try:
-                    sma_slow1 = SMAIndicator(close=result_full["close"], window=w1)
-                    indicators["smaSlow1"] = last_value(sma_slow1.sma_indicator())
-                except Exception:
+                    num_bars = len(result_full)
+                    if num_bars >= w1:
+                        sma_slow1 = SMAIndicator(close=result_full["close"], window=w1)
+                        indicators["smaSlow1"] = last_value(sma_slow1.sma_indicator())
+                        indicators["smaSlow1_sufficient_data"] = True
+                    else:
+                        indicators["smaSlow1"] = None
+                        indicators["smaSlow1_sufficient_data"] = False
+                except Exception as e:
                     indicators["smaSlow1"] = None
+                    indicators["smaSlow1_sufficient_data"] = False
 
         # --- RSI ---
         if form.get("ComparisonRSI") != "Not used":
@@ -2784,74 +2899,71 @@ class IBapi(EWrapper, EClient):
                 except Exception:
                     indicators["obv1"] = None
 
-        # --- Fast OBV (5-bar MA) ---
-        if form.get("ComparisonFastOBV", "Not used") != "Not used":
+        # --- Fast OBV (5-bar MA) - ALWAYS CALCULATE ---
+        try:
+            fast_obv = FastOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=5)
             try:
-                fast_obv = FastOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=5)
-                try:
-                    fast_obv_series = fast_obv.fast_obv()
-                except Exception:
-                    fast_obv_series = fast_obv.obv()
-                indicators["fast_obv"] = last_value(fast_obv_series)
+                fast_obv_series = fast_obv.fast_obv()
             except Exception:
-                indicators["fast_obv"] = None
+                fast_obv_series = fast_obv.obv()
+            indicators["fast_obv"] = last_value(fast_obv_series)
+        except Exception:
+            indicators["fast_obv"] = None
 
-            if form.get("ComparisonFastOBV") == "between":
-                try:
-                    fast_obv1 = FastOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=5)
-                    try:
-                        fast_obv1_series = fast_obv1.fast_obv()
-                    except Exception:
-                        fast_obv1_series = fast_obv1.obv()
-                    indicators["fast_obv1"] = last_value(fast_obv1_series)
-                except Exception:
-                    indicators["fast_obv1"] = None
-
-        # --- Medium OBV (10-bar MA) ---
-        if form.get("ComparisonMediumOBV", "Not used") != "Not used":
+        if form.get("ComparisonFastOBV") == "between":
             try:
-                medium_obv = MediumOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=10)
+                fast_obv1 = FastOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=5)
                 try:
-                    medium_obv_series = medium_obv.medium_obv()
+                    fast_obv1_series = fast_obv1.fast_obv()
                 except Exception:
-                    medium_obv_series = medium_obv.obv()
-                indicators["medium_obv"] = last_value(medium_obv_series)
+                    fast_obv1_series = fast_obv1.obv()
+                indicators["fast_obv1"] = last_value(fast_obv1_series)
             except Exception:
-                indicators["medium_obv"] = None
+                indicators["fast_obv1"] = None
 
-            if form.get("ComparisonMediumOBV") == "between":
-                try:
-                    medium_obv1 = MediumOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=10)
-                    try:
-                        medium_obv1_series = medium_obv1.medium_obv()
-                    except Exception:
-                        medium_obv1_series = medium_obv1.obv()
-                    indicators["medium_obv1"] = last_value(medium_obv1_series)
-                except Exception:
-                    indicators["medium_obv1"] = None
-
-        # --- Slow OBV (20-bar MA) ---
-        if form.get("ComparisonSlowOBV", "Not used") != "Not used":
+        # --- Medium OBV (10-bar MA) - ALWAYS CALCULATE ---
+        try:
+            medium_obv = MediumOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=10)
             try:
-                slow_obv = SlowOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=20)
-                try:
-                    slow_obv_series = slow_obv.slow_obv()
-                except Exception:
-                    slow_obv_series = slow_obv.obv()
-                indicators["slow_obv"] = last_value(slow_obv_series)
+                medium_obv_series = medium_obv.medium_obv()
             except Exception:
-                indicators["slow_obv"] = None
+                medium_obv_series = medium_obv.obv()
+            indicators["medium_obv"] = last_value(medium_obv_series)
+        except Exception:
+            indicators["medium_obv"] = None
 
-            if form.get("ComparisonSlowOBV") == "between":
+        if form.get("ComparisonMediumOBV") == "between":
+            try:
+                medium_obv1 = MediumOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=10)
                 try:
-                    slow_obv1 = SlowOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=20)
-                    try:
-                        slow_obv1_series = slow_obv1.slow_obv()
-                    except Exception:
-                        slow_obv1_series = slow_obv1.obv()
-                    indicators["slow_obv1"] = last_value(slow_obv1_series)
+                    medium_obv1_series = medium_obv1.medium_obv()
                 except Exception:
-                    indicators["slow_obv1"] = None
+                    medium_obv1_series = medium_obv1.obv()
+                indicators["medium_obv1"] = last_value(medium_obv1_series)
+            except Exception:
+                indicators["medium_obv1"] = None
+
+        # --- Slow OBV (20-bar MA) - ALWAYS CALCULATE ---
+        try:
+            slow_obv = SlowOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=20)
+            try:
+                slow_obv_series = slow_obv.slow_obv()
+            except Exception:
+                slow_obv_series = slow_obv.obv()
+            indicators["slow_obv"] = last_value(slow_obv_series)
+        except Exception:
+            indicators["slow_obv"] = None
+
+        if form.get("ComparisonSlowOBV") == "between":
+            try:
+                slow_obv1 = SlowOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=20)
+                try:
+                    slow_obv1_series = slow_obv1.slow_obv()
+                except Exception:
+                    slow_obv1_series = slow_obv1.obv()
+                indicators["slow_obv1"] = last_value(slow_obv1_series)
+            except Exception:
+                indicators["slow_obv1"] = None
 
         # --- ATR ---
         if form.get("ComparisonATR", "Not used") != "Not used":
@@ -2900,8 +3012,15 @@ class IBapi(EWrapper, EClient):
                 prev_mask = result_full.index.normalize() == prev_date
                 prev_close = float(result_full.loc[prev_mask]["close"].iloc[-1])
             else:
-                prev_close = float(result_full["close"].iloc[-2]) if len(result_full) >= 2 else float(
-                    result_full["close"].iloc[-1])
+                # Only today's data available
+                # For intraday data, use today's opening price as previous close reference
+                # (opening price is closest to yesterday's close, avoiding intraday noise)
+                if not result_session.empty and len(result_session) > 0:
+                    prev_close = float(result_session["open"].iloc[0])
+                elif len(result_full) >= 2:
+                    prev_close = float(result_full["close"].iloc[-2])
+                else:
+                    prev_close = float(result_full["close"].iloc[-1])
             indicators["prevClose"] = prev_close
             if form.get("ComparisonPrevClose") == "between":
                 indicators["prevClose1"] = prev_close
@@ -2990,9 +3109,12 @@ class IBapi(EWrapper, EClient):
                 pp_name = form.get("PivotPoint", "Pivot")
                 # try to return requested pivot value, otherwise return the main pivot
                 val = pivots.get(pp_name, P)
-                indicators["Pivot"] = {pp_name: val}
+                
+                # Store all pivot levels so all display in results (PP, R1, S1, R2, S2)
+                # This allows the user to see all pivot points and exclude any they don't want
+                indicators["Pivot"] = pivots.copy()
 
-                # Store full pivot dictionary so other features can inspect all levels
+                # Also store full pivot dictionary for backward compatibility
                 indicators["PivotLevels"] = pivots.copy()
 
                 if form.get("ComparisonPivotPoint") == "between":
@@ -3882,7 +4004,17 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         fast_sma_condition = None
 
-        if (
+        # Check if we have sufficient data for fast SMA
+        fast_sufficient_data = data.get("smaFast_sufficient_data", True)
+        
+        # If insufficient data and this criterion is enabled, mark as not meeting criteria
+        if form["ComparisonFastSMA"] != "Not used" and not fast_sufficient_data:
+            fast_sma_condition = False
+            variable_results["smaFast"] = False
+            variable_results["smaFast_criteria_not_met"] = "N/A - Insufficient trading days"
+            logger.warning(f"Fast SMA criteria not met: insufficient data for this timeframe")
+
+        elif (
                 form["ComparisonFastSMA"] not in _NON_SIMPLE_MODES
                 and form["SMAFastBool"] == "percentage"
         ):
@@ -3969,7 +4101,17 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         medium_sma_condition = None
 
-        if (
+        # Check if we have sufficient data for medium SMA
+        medium_sufficient_data = data.get("smaMedium_sufficient_data", True)
+        
+        # If insufficient data and this criterion is enabled, mark as not meeting criteria
+        if form["ComparisonMediumSMA"] != "Not used" and not medium_sufficient_data:
+            medium_sma_condition = False
+            variable_results["smaMedium"] = False
+            variable_results["smaMedium_criteria_not_met"] = "N/A - Insufficient trading days"
+            logger.warning(f"Medium SMA criteria not met: insufficient data for this timeframe")
+
+        elif (
                 form["ComparisonMediumSMA"] not in _NON_SIMPLE_MODES
                 and form["SMAMediumBool"] == "percentage"
         ):
@@ -4056,7 +4198,17 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         slow_sma_condition = None
 
-        if (
+        # Check if we have sufficient data for slow SMA
+        sufficient_data = data.get("smaSlow_sufficient_data", True)
+        
+        # If insufficient data and this criterion is enabled, mark as not meeting criteria
+        if form["ComparisonSlowSMA"] != "Not used" and not sufficient_data:
+            slow_sma_condition = False
+            variable_results["smaSlow"] = False
+            variable_results["smaSlow_criteria_not_met"] = "N/A - Insufficient trading days (need 200+ for 200 SMA)"
+            logger.warning(f"Slow SMA criteria not met: insufficient data for this timeframe")
+
+        elif (
                 form["ComparisonSlowSMA"] not in _NON_SIMPLE_MODES
                 and form["smaslowyesno"] == "percentage"
         ):
@@ -4278,6 +4430,111 @@ class IBapi(EWrapper, EClient):
             condition = condition and obv_condition
             counting_ += 1
             variable_results["obv"] = bool(obv_condition)
+
+        # -------------------------
+        # FAST OBV
+        # -------------------------
+        fast_obv_condition = None
+
+        if form.get("ComparisonFastOBV", "Not used") not in _NON_SIMPLE_MODES:
+            if form.get("ComparisonFastOBV") == "greater":
+                fast_obv_condition = _safe_compare(data.get("fast_obv"), ">", float(form.get("PercentageFastOBV")))
+            elif form.get("ComparisonFastOBV") == "greaterEqual":
+                fast_obv_condition = _safe_compare(data.get("fast_obv"), ">=", float(form.get("PercentageFastOBV")))
+            elif form.get("ComparisonFastOBV") == "lower":
+                fast_obv_condition = _safe_compare(data.get("fast_obv"), "<", float(form.get("PercentageFastOBV")))
+            elif form.get("ComparisonFastOBV") == "lowerEqual":
+                fast_obv_condition = _safe_compare(data.get("fast_obv"), "<=", float(form.get("PercentageFastOBV")))
+        elif form.get("ComparisonFastOBV") == "between":
+            fast_obv_condition = (
+                    _safe_compare(data.get("fast_obv"), ">=", float(form.get("PercentageFastOBV")))
+                    and _safe_compare(data.get("fast_obv1"), "<=", float(form.get("PercentageFastOBV1")))
+            )
+
+        elif form.get("ComparisonFastOBV") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form.get("PercentageFastOBV", 5))
+            except Exception:
+                threshold = 5.0
+            fast_obv_condition = _within_percent_check(
+                data.get("fast_obv"), data.get("close"),
+                form.get("ComparisonFastOBV"), threshold
+            )
+
+        if fast_obv_condition is not None:
+            condition = condition and fast_obv_condition
+            counting_ += 1
+            variable_results["fast_obv"] = bool(fast_obv_condition)
+
+        # -------------------------
+        # MEDIUM OBV
+        # -------------------------
+        medium_obv_condition = None
+
+        if form.get("ComparisonMediumOBV", "Not used") not in _NON_SIMPLE_MODES:
+            if form.get("ComparisonMediumOBV") == "greater":
+                medium_obv_condition = _safe_compare(data.get("medium_obv"), ">", float(form.get("PercentageMediumOBV")))
+            elif form.get("ComparisonMediumOBV") == "greaterEqual":
+                medium_obv_condition = _safe_compare(data.get("medium_obv"), ">=", float(form.get("PercentageMediumOBV")))
+            elif form.get("ComparisonMediumOBV") == "lower":
+                medium_obv_condition = _safe_compare(data.get("medium_obv"), "<", float(form.get("PercentageMediumOBV")))
+            elif form.get("ComparisonMediumOBV") == "lowerEqual":
+                medium_obv_condition = _safe_compare(data.get("medium_obv"), "<=", float(form.get("PercentageMediumOBV")))
+        elif form.get("ComparisonMediumOBV") == "between":
+            medium_obv_condition = (
+                    _safe_compare(data.get("medium_obv"), ">=", float(form.get("PercentageMediumOBV")))
+                    and _safe_compare(data.get("medium_obv1"), "<=", float(form.get("PercentageMediumOBV1")))
+            )
+
+        elif form.get("ComparisonMediumOBV") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form.get("PercentageMediumOBV", 5))
+            except Exception:
+                threshold = 5.0
+            medium_obv_condition = _within_percent_check(
+                data.get("medium_obv"), data.get("close"),
+                form.get("ComparisonMediumOBV"), threshold
+            )
+
+        if medium_obv_condition is not None:
+            condition = condition and medium_obv_condition
+            counting_ += 1
+            variable_results["medium_obv"] = bool(medium_obv_condition)
+
+        # -------------------------
+        # SLOW OBV
+        # -------------------------
+        slow_obv_condition = None
+
+        if form.get("ComparisonSlowOBV", "Not used") not in _NON_SIMPLE_MODES:
+            if form.get("ComparisonSlowOBV") == "greater":
+                slow_obv_condition = _safe_compare(data.get("slow_obv"), ">", float(form.get("PercentageSlowOBV")))
+            elif form.get("ComparisonSlowOBV") == "greaterEqual":
+                slow_obv_condition = _safe_compare(data.get("slow_obv"), ">=", float(form.get("PercentageSlowOBV")))
+            elif form.get("ComparisonSlowOBV") == "lower":
+                slow_obv_condition = _safe_compare(data.get("slow_obv"), "<", float(form.get("PercentageSlowOBV")))
+            elif form.get("ComparisonSlowOBV") == "lowerEqual":
+                slow_obv_condition = _safe_compare(data.get("slow_obv"), "<=", float(form.get("PercentageSlowOBV")))
+        elif form.get("ComparisonSlowOBV") == "between":
+            slow_obv_condition = (
+                    _safe_compare(data.get("slow_obv"), ">=", float(form.get("PercentageSlowOBV")))
+                    and _safe_compare(data.get("slow_obv1"), "<=", float(form.get("PercentageSlowOBV1")))
+            )
+
+        elif form.get("ComparisonSlowOBV") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+            try:
+                threshold = float(form.get("PercentageSlowOBV", 5))
+            except Exception:
+                threshold = 5.0
+            slow_obv_condition = _within_percent_check(
+                data.get("slow_obv"), data.get("close"),
+                form.get("ComparisonSlowOBV"), threshold
+            )
+
+        if slow_obv_condition is not None:
+            condition = condition and slow_obv_condition
+            counting_ += 1
+            variable_results["slow_obv"] = bool(slow_obv_condition)
 
         # -------------------------
         # ATR
@@ -4518,8 +4775,8 @@ class IBapi(EWrapper, EClient):
                 form["ComparisonPivotPoint"] not in _NON_SIMPLE_MODES
                 and form["pivotPointBool"] == "percentage"
         ):
-            pp_name = list(data["Pivot"].keys())[0]
-            pivot = data["Pivot"][pp_name]
+            pp_name = form.get("PivotPoint", "Pivot")
+            pivot = data["Pivot"].get(pp_name) if isinstance(data["Pivot"], dict) else None
 
             if pivot is None:
                 pivot_condition = False
@@ -4541,10 +4798,10 @@ class IBapi(EWrapper, EClient):
                 form["ComparisonPivotPoint"] == "between"
                 and form["pivotPointBool"] == "percentage"
         ):
-            pp_name = list(data["Pivot"].keys())[0]
-            pp_name1 = list(data["Pivot1"].keys())[0]
-            pivot = data["Pivot"][pp_name]
-            pivot1 = data["Pivot1"][pp_name1]
+            pp_name = form.get("PivotPoint", "Pivot")
+            pp_name1 = form.get("PivotPoint1", "Pivot")
+            pivot = data["Pivot"].get(pp_name) if isinstance(data["Pivot"], dict) else None
+            pivot1 = data["Pivot1"].get(pp_name1) if isinstance(data["Pivot1"], dict) else None
 
             close_val = data.get("close")
 
@@ -4563,8 +4820,8 @@ class IBapi(EWrapper, EClient):
                 form["ComparisonPivotPoint"] not in _NON_SIMPLE_MODES
                 and form["pivotPointBool"] == "value"
         ):
-            pp_name = list(data["Pivot"].keys())[0]
-            pivot = data["Pivot"][pp_name]
+            pp_name = form.get("PivotPoint", "Pivot")
+            pivot = data["Pivot"].get(pp_name) if isinstance(data["Pivot"], dict) else None
 
             if pivot is None:
                 pivot_condition = False
@@ -4582,10 +4839,10 @@ class IBapi(EWrapper, EClient):
                 form["ComparisonPivotPoint"] == "between"
                 and form["pivotPointBool"] == "value"
         ):
-            pp_name = list(data["Pivot"].keys())[0]
-            pp_name1 = list(data["Pivot1"].keys())[0]
-            pivot = data["Pivot"][pp_name]
-            pivot1 = data["Pivot1"][pp_name1]
+            pp_name = form.get("PivotPoint", "Pivot")
+            pp_name1 = form.get("PivotPoint1", "Pivot")
+            pivot = data["Pivot"].get(pp_name) if isinstance(data["Pivot"], dict) else None
+            pivot1 = data["Pivot1"].get(pp_name1) if isinstance(data["Pivot1"], dict) else None
 
             pivot_condition = (
                     _safe_compare(pivot, ">=", float(form["PercentagePivotPoint"]))
@@ -4594,8 +4851,8 @@ class IBapi(EWrapper, EClient):
 
         elif form["ComparisonPivotPoint"] in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
             try:
-                pp_name = list(data["Pivot"].keys())[0]
-                pivot = data["Pivot"][pp_name]
+                pp_name = form.get("PivotPoint", "Pivot")
+                pivot = data["Pivot"].get(pp_name) if isinstance(data["Pivot"], dict) else None
             except Exception:
                 pivot = None
             try:
@@ -4838,6 +5095,19 @@ class IBapi(EWrapper, EClient):
             condition = condition and cross_50_condition
             counting_ += 1
             variable_results["cross50SMA"] = bool(cross_50_condition)
+        elif cross50_mode != "Not used":
+            # Even if condition wasn't set, ensure we populate variable_results for display
+            # by checking if there was a bullish or bearish cross
+            cross_50_above = data.get("cross50SMA_above", False)
+            cross_50_below = data.get("cross50SMA_below", False)
+            if cross50_mode == "crossAbove":
+                variable_results["cross50SMA"] = bool(cross_50_above)
+            elif cross50_mode == "crossBelow":
+                variable_results["cross50SMA"] = bool(cross_50_below)
+        else:
+            # Populate cross50SMA for display even when not used as a filter
+            # Green if above 50 SMA, red if below
+            variable_results["cross50SMA"] = data.get("cross50SMA_isAbove", False)
 
         # -------------------------
         # CROSS 200 SMA
@@ -4923,6 +5193,19 @@ class IBapi(EWrapper, EClient):
             condition = condition and cross_200_condition
             counting_ += 1
             variable_results["cross200SMA"] = bool(cross_200_condition)
+        elif cross200_mode != "Not used":
+            # Even if condition wasn't set, ensure we populate variable_results for display
+            # by checking if there was a bullish or bearish cross
+            cross_200_above = data.get("cross200SMA_above", False)
+            cross_200_below = data.get("cross200SMA_below", False)
+            if cross200_mode == "crossAbove":
+                variable_results["cross200SMA"] = bool(cross_200_above)
+            elif cross200_mode == "crossBelow":
+                variable_results["cross200SMA"] = bool(cross_200_below)
+        else:
+            # Populate cross200SMA for display even when not used as a filter
+            # Green if above 200 SMA, red if below
+            variable_results["cross200SMA"] = data.get("cross200SMA_isAbove", False)
 
         # -------------------------
         # BREAK HIGH
@@ -5249,7 +5532,8 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         news_condition = None
 
-        if form.get("ComparisonNews", "Not used") != "Not used":
+        # ComparisonNews form value: "enabled" or "disabled" (not "Not used" which is display text)
+        if form.get("ComparisonNews") == "enabled":
             # Support both the new NewsWithinValue+NewsTimeUnit fields
             # and the legacy NewsWithinHours field for backward compat.
             news_within_minutes = 0
@@ -5337,12 +5621,14 @@ class IBapi(EWrapper, EClient):
         else:
             logger.debug("[KEYWORDS DEBUG] No keywords entered")
 
-        if news_keyword_match is not None:
-            variable_results["newsKeyword"] = bool(news_keyword_match)
+        # Always set the result, even if news_keyword_match is None
+        # If keywords were provided but no headlines match, set to False
+        # If no keywords provided, set to False (no keyword filter active)
+        variable_results["newsKeyword"] = bool(news_keyword_match) if news_keyword_match else False
 
         data["newsKeywordMatch"] = bool(news_keyword_match) if news_keyword_match else False
         data["matchedKeywordHeadlines"] = matched_keyword_headlines
-        logger.debug(f"[KEYWORDS DEBUG] Final result: news_keyword_match={news_keyword_match}")
+        logger.debug(f"[KEYWORDS DEBUG] Final result: news_keyword_match={news_keyword_match}, variable_results['newsKeyword']={variable_results.get('newsKeyword')}")
 
         # -------------------------
         # FINAL
@@ -5498,6 +5784,9 @@ class IBapi(EWrapper, EClient):
                 symbol = data.get("symbol")
                 if symbol and symbol in self.HistoricalDt:
                     hist_data = self.HistoricalDt[symbol]
+                    # Convert list to DataFrame if needed
+                    if isinstance(hist_data, list) and len(hist_data) > 0:
+                        hist_data = pd.DataFrame(hist_data, columns=["date", "open", "high", "low", "close", "volume"])
                     if isinstance(hist_data, pd.DataFrame) and len(hist_data) >= lookback_bars:
                         pct_change = calculate_pct_change(hist_data, lookback_bars)
                         pct_change_condition = abs(pct_change) >= threshold_pct
@@ -5529,6 +5818,9 @@ class IBapi(EWrapper, EClient):
                 symbol = data.get("symbol")
                 if symbol and symbol in self.HistoricalDt:
                     hist_data = self.HistoricalDt[symbol]
+                    # Convert list to DataFrame if needed
+                    if isinstance(hist_data, list) and len(hist_data) > 0:
+                        hist_data = pd.DataFrame(hist_data, columns=["date", "open", "high", "low", "close", "volume"])
                     if isinstance(hist_data, pd.DataFrame) and len(hist_data) >= 1:
                         rvol_value = calculate_rvol(hist_data, lookback_days)
                         rvol_monitor_condition = rvol_value >= rvol_threshold
@@ -5618,6 +5910,9 @@ class IBapi(EWrapper, EClient):
                 
                 if symbol and symbol in self.HistoricalDt:
                     hist_df = self.HistoricalDt[symbol]
+                    # Convert list to DataFrame if needed
+                    if isinstance(hist_df, list) and len(hist_df) > 0:
+                        hist_df = pd.DataFrame(hist_df, columns=["date", "open", "high", "low", "close", "volume"])
                     if isinstance(hist_df, pd.DataFrame) and len(hist_df) >= 20:
                         hist_data = hist_df
                 
@@ -5677,6 +5972,9 @@ class IBapi(EWrapper, EClient):
                 symbol = data.get("symbol")
                 if symbol and symbol in self.HistoricalDt:
                     hist_df = self.HistoricalDt[symbol]
+                    # Convert list to DataFrame if needed
+                    if isinstance(hist_df, list) and len(hist_df) > 0:
+                        hist_df = pd.DataFrame(hist_df, columns=["date", "open", "high", "low", "close", "volume"])
                     if isinstance(hist_df, pd.DataFrame) and len(hist_df) >= 2:
                         try:
                             # Get previous bar's OBV values
@@ -5923,11 +6221,23 @@ class IBapi(EWrapper, EClient):
                 continue
             filtered.append(h)
 
-        # Deduplicate by headline text (keep first occurrence)
+        # Deduplicate by (provider, articleId) tuple first - prevents same article from different sources
+        # Then by headline text - prevents minor variations of same story
+        seen_article_ids = set()
         seen_headlines = set()
         deduped = []
         for h in filtered:
+            provider = (h.get("provider") or "").strip().lower()
+            article_id = (h.get("articleId") or "").strip()
             hl_text = (h.get("headline") or "").strip()
+            
+            # Skip if we've already seen this exact article from this provider
+            article_key = (provider, article_id)
+            if article_key in seen_article_ids:
+                continue
+            seen_article_ids.add(article_key)
+            
+            # Also skip if headline text is duplicate (catches similar headlines from different sources)
             if hl_text in seen_headlines:
                 continue
             seen_headlines.add(hl_text)
@@ -5986,6 +6296,7 @@ class IBapi(EWrapper, EClient):
         if news_within_minutes > 0:
             cutoff = datetime.now(timezone.utc) - timedelta(minutes=news_within_minutes)
             filtered_by_time = []
+            parse_failures = 0
             for h in deduped:
                 time_str = h.get("time", "")
                 parsed_time = None
@@ -5999,18 +6310,22 @@ class IBapi(EWrapper, EClient):
                         parsed_time = datetime.fromtimestamp(
                             int(time_str) / 1000, tz=timezone.utc
                         )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Failed to parse headline time '{time_str}': {e}")
+                    parse_failures += 1
 
-                # Include headline if it's within the timeframe, or if time couldn't be parsed
-                # (to be conservative and not drop headlines with parsing issues)
-                if parsed_time is None or parsed_time >= cutoff:
+                # ONLY include headline if it's within the timeframe
+                # Changed: DO NOT include unparseable times - require valid timestamp
+                # If we can't parse the time, we should not include the headline
+                if parsed_time is not None and parsed_time >= cutoff:
                     filtered_by_time.append(h)
+                elif parsed_time is None:
+                    logger.warning(f"Skipping headline with unparseable time '{time_str}': {h.get('headline', 'N/A')[:50]}")
             
             deduped = filtered_by_time
             logger.info(
-                "fetchNews timeframe filter: requested last %d minutes, returned %d / %d headlines",
-                news_within_minutes, len(deduped), len(filtered_by_time) if 'filtered_by_time' in locals() else 0
+                "fetchNews timeframe filter: requested last %d minutes, returned %d / %d headlines (parse failures: %d)",
+                news_within_minutes, len(deduped), len(filtered_by_time) if 'filtered_by_time' in locals() else 0, parse_failures
             )
 
         # Parse times and build clean output
@@ -6531,11 +6846,11 @@ class IBapi(EWrapper, EClient):
 
                 # -------------------------
                 # Fetch news headlines only if news is ENABLED or keyword filtering is enabled
+                # ComparisonNews form value: "enabled" or "disabled" (not "Not used" which is display text)
                 # -------------------------
-                should_fetch_news = (
-                    form.get("ComparisonNews", "Not used") != "Not used" or 
-                    bool(form.get("NewsKeywords", "").strip())
-                )
+                is_news_enabled = form.get("ComparisonNews") == "enabled"
+                has_keywords = bool(form.get("NewsKeywords", "").strip())
+                should_fetch_news = is_news_enabled or has_keywords
                 
                 con_id = getattr(contract, "conId", None)
                 if con_id and should_fetch_news:
