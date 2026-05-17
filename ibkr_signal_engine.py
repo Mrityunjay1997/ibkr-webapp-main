@@ -6846,13 +6846,18 @@ class IBapi(EWrapper, EClient):
 
                 # -------------------------
                 # Fetch news headlines only if news is ENABLED or keyword filtering is enabled
-                # ComparisonNews form value: "enabled" or "disabled" (not "Not used" which is display text)
+                # ComparisonNews form value: "enabled" or "disabled" (default: "enabled")
                 # -------------------------
-                is_news_enabled = form.get("ComparisonNews") == "enabled"
+                news_setting = form.get("ComparisonNews", "enabled")
+                # More robust check: treat as enabled unless explicitly set to "disabled" or "false"
+                is_news_enabled = str(news_setting).lower() not in ("disabled", "false", "0", "")
                 has_keywords = bool(form.get("NewsKeywords", "").strip())
                 should_fetch_news = is_news_enabled or has_keywords
                 
                 con_id = getattr(contract, "conId", None)
+                logger.debug("News fetch check for %s: enabled=%s keywords=%s conId=%s should_fetch=%s", 
+                            m, is_news_enabled, has_keywords, con_id, should_fetch_news)
+                
                 if con_id and should_fetch_news:
                     try:
                         with self.Locking:

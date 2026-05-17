@@ -62,9 +62,16 @@ function changePage4() {
 }
 */
 
-document.getElementById("lichange1").addEventListener("click", changePage3);
-document.getElementById("lichange2").addEventListener("click", changePage3);
-document.getElementById("lichange3").addEventListener("click", changePage4);
+["lichange1","lichange2"].forEach(function(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.addEventListener("click", changePage3);
+  }
+});
+const el3 = document.getElementById("lichange3");
+if (el3) {
+  el3.addEventListener("click", changePage4);
+}
 
 function handleFormmm(e) {
   document.getElementById("myFormSubmit").submit();
@@ -86,8 +93,8 @@ function warningResult1(data_) {
         mywarningTable += "<td>" + mywarning[0] + "</td> <td>" + mywarning[1] + "</td> <td>" + mywarning[2] + "</td>";
         mywarningTable += "</tr>";
       }
-      mywarningTable += "<t/body>";
-      mywarningTable += "<t/table>";
+      mywarningTable += "</tbody>";
+      mywarningTable += "</table>";
       document.getElementById("WarningData").innerHTML = myheader + mywarningTable;
     }
   } 
@@ -97,26 +104,33 @@ function warningResult1(data_) {
 /*******************************************************/
 /**********On Change Table Input***************/
 
-document.getElementById("ComparisonFastSMA").addEventListener("change", changeInput);
-document.getElementById("ComparisonSlowSMA").addEventListener("change", changeInput);
-document.getElementById("ComparisonVWAP").addEventListener("change", changeInput);
-document.getElementById("ComparisonRSI").addEventListener("change", changeInput);
-document.getElementById("ComparisonAverageVolume").addEventListener("change", changeInput);
-document.getElementById("ComparisonVolume").addEventListener("change", changeInput);
-document.getElementById("ComparisonRelativeVolume").addEventListener("change", changeInput);
+(function() {
+  const listeners = [
+    "ComparisonFastSMA",
+    "ComparisonSlowSMA",
+    "ComparisonVWAP",
+    "ComparisonRSI",
+    "ComparisonAverageVolume",
+    "ComparisonVolume",
+    "ComparisonRelativeVolume",
+    "ComparisonEMA",
+    "ComparisonOBV",
+    "ComparisonATR",
+    "ComparisonPrevClose",
+    "ComparisonLowOfDay",
+    "ComparisonHighOfDay",
+    "ComparisonPullbackPct2",
+    "ComparisonFibGap",
+    "ComparisonMarketCap"
+  ];
 
-document.getElementById("ComparisonEMA").addEventListener("change", changeInput);
-document.getElementById("ComparisonOBV").addEventListener("change", changeInput);
-document.getElementById("ComparisonATR").addEventListener("change", changeInput);
-
-document.getElementById("ComparisonPrevClose").addEventListener("change", changeInput);
-document.getElementById("ComparisonLowOfDay").addEventListener("change", changeInput);
-document.getElementById("ComparisonHighOfDay").addEventListener("change", changeInput);
-document.getElementById("ComparisonPullbackPct2").addEventListener("change", changeInput);
-document.getElementById("ComparisonFibGap").addEventListener("change", changeInput);
-document.getElementById("ComparisonMarketCap").addEventListener("change", changeInput);
-//document.getElementById("ComparisonPrice").addEventListener("change", changeInput);
-
+  listeners.forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener("change", changeInput);
+    }
+  });
+})();
 function changeInput() {
   var x = document.getElementById(this.id);
   x.value = x.value;

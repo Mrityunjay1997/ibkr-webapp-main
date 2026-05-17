@@ -1129,14 +1129,15 @@ class Parameters(FlaskForm):
     ComparisonNews = SelectField(
         "News",
         choices=[
-            ("Not used", "disabled"),
-            ("Used", "enabled"),
+            ("disabled", "Not used"),
+            ("enabled", "Used"),
         ],
+        default="enabled",
     )
 
-    NewsMaxHeadlines = IntegerField("Max Headlines")
+    NewsMaxHeadlines = IntegerField("Max Headlines", default=20)
     NewsWithinHours = IntegerField("News Within Hours")
-    NewsWithinValue = IntegerField("News Within Value")
+    NewsWithinValue = IntegerField("News Within Value", default=0)
     NewsTimeUnit = SelectField(
         "Time Unit",
         choices=[
@@ -1154,7 +1155,7 @@ class Parameters(FlaskForm):
             ("off", "Off"),
             ("on", "On"),
         ],
-        default="off",
+        default="on",
     )
     # Read Headlines Aloud time window configuration
     NewsReadAloudWithinValue = IntegerField(
@@ -1177,7 +1178,7 @@ class Parameters(FlaskForm):
             ("off", "Off"),
             ("on", "On"),
         ],
-        default="off",
+        default="on",
         render_kw={"title": "Automatically read all news headlines aloud after results are returned"}
     )
 

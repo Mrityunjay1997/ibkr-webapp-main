@@ -48,6 +48,7 @@
 	<link rel="stylesheet" href="{{ url_for('static',filename='css/style.css') }}">
 	<link rel="stylesheet" href="{{ url_for('static',filename='css/table.css') }}">
 	<link rel="stylesheet" href="{{ url_for('static',filename='css/paginations.css') }}">
+	<script src="{{ url_for('static', filename='js/jquery-3.6.0.min.js') }}"></script>
 	<!-- Modernizr JS -->
 
 	<!-- FOR IE9 below -->
@@ -2349,8 +2350,6 @@ function cleanNewsArticleText(rawText) {
 		<a href="#" class="js-gotop"><i class="icon-arrow-up2"></i></a>
 	</div>
 
-	<!-- jQuery -->
-	<script src="{{url_for('static', filename='js/jquery-3.6.0.min.js')}}"></script>
 	<!-- jQuery Easing -->
 	<script src="{{url_for('static', filename='js/jquery.easing.1.3.js')}}"></script>
 	<!-- Bootstrap -->
@@ -2518,8 +2517,8 @@ function cleanNewsArticleText(rawText) {
       // Build announcement text
       const announcement = `${symbol} ${indicatorName}`;
       
-      // Use existing TTS function
-      speakText(announcement);
+      // Use existing TTS function - readHeadlineAloud handles queuing and voice selection
+      readHeadlineAloud(announcement);
     } catch(e) {
       console.warn("Stock alert announcement failed:", e);
     }
@@ -2796,9 +2795,6 @@ function cleanNewsArticleText(rawText) {
   let _ttsVolume = parseFloat(localStorage.getItem('ttsVolume')) || 0.7;
   // Mute state tracking
   let _ttsMuted = localStorage.getItem('ttsMuted') === 'true' ? true : false;
-  // Track loop cycle to prevent reading headlines multiple times per loop
-  let _lastLoopReadTime = 0;
-  let _loopReadInterval = 2000; // Minimum 2 seconds between headline reads per loop
   // Track headlines that have been read recently to prevent duplicate reads across scan loops
   // Maps headline text to timestamp when it was last read (to allow stale headlines to be re-read after 1 hour)
   let _recentlyReadHeadlines = new Map();
@@ -2843,7 +2839,10 @@ function cleanNewsArticleText(rawText) {
   }
 
   function _processHeadlineQueue() {
-    if (_isPlayingHeadline || _headlineQueue.length === 0) return;
+    if (_isPlayingHeadline || _headlineQueue.length === 0) {
+      console.log("TTS queue state:", "playing=", _isPlayingHeadline, "queueLength=", _headlineQueue.length);
+      return;
+    }
     
     const text = _headlineQueue.shift();
     _isPlayingHeadline = true;
@@ -2882,6 +2881,7 @@ function cleanNewsArticleText(rawText) {
       };
       
       window.speechSynthesis.speak(utter);
+      console.log("TTS started speaking:", text, "voice:", preferredVoice ? preferredVoice.name : "default", "volume:", utter.volume);
     } catch(e) {
       console.warn("TTS failed:", e);
       _isPlayingHeadline = false;
@@ -2971,7 +2971,7 @@ function cleanNewsArticleText(rawText) {
     
     // Check if already read in this scan cycle
     if (_readHeadlinesCache.has(text)) {
-      console.debug("Headline already read in this scan cycle, skipping:", text);
+      console.log("Headline already read in this scan cycle, skipping:", text);
       return; // Already read, skip
     }
     
@@ -2980,13 +2980,14 @@ function cleanNewsArticleText(rawText) {
       const lastReadTime = _recentlyReadHeadlines.get(normalizedText);
       const timeSinceLastRead = now - lastReadTime;
       if (timeSinceLastRead < _headlineRereadThreshold) {
-        console.debug("Headline recently read " + Math.round(timeSinceLastRead / 1000) + " seconds ago, skipping:", text);
+        console.log("Headline recently read " + Math.round(timeSinceLastRead / 1000) + " seconds ago, skipping:", text);
         return; // Read too recently, skip
       }
     }
     
     // Don't queue if already in current queue
     if (_queuedHeadlines.has(text)) {
+      console.log("Headline already queued, skipping duplicate:", text);
       return; // Already queued, skip duplicate
     }
     
@@ -2998,9 +2999,8 @@ function cleanNewsArticleText(rawText) {
     _queuedHeadlines.add(text);
     _recentlyReadHeadlines.set(normalizedText, now); // Track this headline across scan cycles
     _headlineQueue.push(formattedText);
+    console.log("Headline queued for reading:", text, "queueLength:", _headlineQueue.length);
     _processHeadlineQueue();
-    
-    console.debug("Headline queued for reading:", text);
   }
   
   // Clear the cache at the start of each new scan (called from renderResultsFromBackend)
@@ -3234,8 +3234,8 @@ function cleanNewsArticleText(rawText) {
 				mywarningTable += "<td>" + mywarning[0] + "</td> <td>" + mywarning[1] + "</td> <td>" + mywarning[2] + "</td>";
 				mywarningTable += "</tr>";
 			}
-			mywarningTable += "<t/body>";
-			mywarningTable += "<t/table>";
+			mywarningTable += "</tbody>";
+			mywarningTable += "</table>";
 			document.getElementById("WarningData").innerHTML = myheader + mywarningTable;
 		}
 	}
@@ -4040,19 +4040,48 @@ function renderResultsFromBackend(response) {
             }
         }
 
+        // DEBUG: Log form settings and data availability
+        console.log("=== NEWS PROCESSING DEBUG ===");
+        const comparisonNewsDebug = document.querySelector('.ComparisonNews');
+        const newsReadAloudDebug = document.querySelector('.NewsReadAloud');
+        const newsAutoReadDebug = document.querySelector('.NewsAutoReadAll');
+        console.log("ComparisonNews value:", comparisonNewsDebug ? comparisonNewsDebug.value : "ELEMENT NOT FOUND");
+        console.log("NewsReadAloud value:", newsReadAloudDebug ? newsReadAloudDebug.value : "ELEMENT NOT FOUND");
+        console.log("NewsAutoReadAll value:", newsAutoReadDebug ? newsAutoReadDebug.value : "ELEMENT NOT FOUND");
+        
+        // Count total headlines in response
+        let totalHeadlinesInResponse = 0;
+        for (const groupKey in msg) {
+            const rows = Array.isArray(msg[groupKey]) ? msg[groupKey] : Object.values(msg[groupKey] || {});
+            for (const row of rows) {
+                if (row.newsHeadlines && Array.isArray(row.newsHeadlines)) {
+                    totalHeadlinesInResponse += row.newsHeadlines.length;
+                }
+            }
+        }
+        console.log("Total headlines in response:", totalHeadlinesInResponse);
+        console.log("=== END DEBUG ===");
+
+        function _isNewsEnabled() {
+            const comparisonNewsSelect = document.querySelector('.ComparisonNews');
+            if (!comparisonNewsSelect) return false;
+            const value = (comparisonNewsSelect.value || '').toLowerCase();
+            return value === 'enabled' || value === 'used' || value === 'true';
+        }
+
         // TTS: read matched keyword headlines aloud if enabled AND within time window
         {
             // FIRST: Check if news is ENABLED in the ComparisonNews dropdown (required for news processing)
-            const comparisonNewsSelect = document.querySelector('.ComparisonNews');
-            const isNewsEnabled = comparisonNewsSelect && comparisonNewsSelect.value === 'enabled';
+            const isNewsEnabled = _isNewsEnabled();
             
             if (!isNewsEnabled) {
-                console.log("News is disabled (ComparisonNews != 'enabled'), skipping keyword headline reading");
+                const comparisonNewsSelect = document.querySelector('.ComparisonNews');
+                console.log("News is disabled (ComparisonNews value not enabled):", comparisonNewsSelect ? comparisonNewsSelect.value : 'not found');
             } else {
                 const readAloud = document.querySelector('.NewsReadAloud');
                 const autoReadAllNews = document.querySelector('.NewsAutoReadAll');
                 const autoReadAllEnabled = autoReadAllNews && (autoReadAllNews.value === 'on' || autoReadAllNews.value === 'True');
-                if (readAloud && readAloud.value === 'on' && !autoReadAllEnabled) {
+                if (readAloud && readAloud.value === 'on') {
                     // Get time window settings
                     const withinValueInput = document.querySelector('.NewsReadAloudWithinValue');
                     const timeUnitSelect = document.querySelector('.NewsReadAloudTimeUnit');
@@ -4114,11 +4143,11 @@ function renderResultsFromBackend(response) {
         // Auto-read all news headlines (not just keyword matches) if enabled AND within time window
         {
             // FIRST: Check if news is ENABLED in the ComparisonNews dropdown
-            const comparisonNewsSelect = document.querySelector('.ComparisonNews');
-            const isNewsEnabled = comparisonNewsSelect && comparisonNewsSelect.value === 'enabled';
+            const isNewsEnabled = _isNewsEnabled();
             
             if (!isNewsEnabled) {
-                console.log("News is disabled (ComparisonNews != 'enabled'), skipping news processing");
+                const comparisonNewsSelect = document.querySelector('.ComparisonNews');
+                console.log("News is disabled (ComparisonNews value not enabled):", comparisonNewsSelect ? comparisonNewsSelect.value : 'not found');
             } else {
                 const autoReadAllNews = document.querySelector('.NewsAutoReadAll');
                 // Debug: log the element and its value
@@ -4132,77 +4161,80 @@ function renderResultsFromBackend(response) {
                     const withinValueInput = document.querySelector('.NewsReadAloudWithinValue');
                     const timeUnitSelect = document.querySelector('.NewsReadAloudTimeUnit');
                     let withinMinutes = 0;
-                
-                if (withinValueInput && timeUnitSelect) {
-                    try {
-                        const withinValue = parseInt(withinValueInput.value) || 0;
-                        const timeUnit = (timeUnitSelect.value || 'minutes').toLowerCase();
-                        
-                        if (withinValue > 0) {
-                            if (timeUnit === 'hours') {
-                                withinMinutes = withinValue * 60;
-                            } else if (timeUnit === 'days') {
-                                withinMinutes = withinValue * 1440;
-                            } else {
-                                withinMinutes = withinValue;
-                            }
-                        }
-                    } catch (e) {
-                        console.warn("Error parsing read aloud time window:", e);
-                    }
-                }
-                
-                const now = Date.now();
-                const cutoffTime = withinMinutes > 0 ? now - (withinMinutes * 60 * 1000) : 0;
-                
-                // Check if enough time has passed since last loop read (apply ONCE for entire batch of stocks)
-                const shouldReadNews = (now - _lastLoopReadTime >= _loopReadInterval);
-                if (!shouldReadNews) {
-                    console.log("Skipping all headline reads - too soon since last loop read (" + (now - _lastLoopReadTime) + "ms ago)");
-                }
-                
-                if (shouldReadNews) {
-                    _lastLoopReadTime = now;
-                }
-                
-                for (const groupKey in msg) {
-                    const rows = Array.isArray(msg[groupKey])
-                        ? msg[groupKey]
-                        : Object.values(msg[groupKey] || {});
-                    for (const dta of rows) {
-                        const allHeadlines = dta.newsHeadlines || [];
-                        const sym = dta.symbol || dta.cusip || "";
-                        if (allHeadlines.length > 0) {
-                            // Filter headlines by time window and read symbol once for the group
-                            const headlinesToRead = [];
-                            for (const hl of allHeadlines) {
-                                const headline = hl.headline || "";
-                                if (headline.trim()) {
-                                    // Check if headline is within time window
-                                    let shouldRead = true;
-                                    if (withinMinutes > 0) {
-                                        const headlineTime = hl.parsedTime ? new Date(hl.parsedTime).getTime() : now;
-                                        shouldRead = headlineTime >= cutoffTime;
-                                    }
-                                    
-                                    if (shouldRead) {
-                                        headlinesToRead.push(headline);
-                                    }
-                                }
-                            }
+                    
+                    if (withinValueInput && timeUnitSelect) {
+                        try {
+                            const withinValue = parseInt(withinValueInput.value) || 0;
+                            const timeUnit = (timeUnitSelect.value || 'minutes').toLowerCase();
                             
-                            // Only read symbol and headlines if we have any to read AND time check passed
-                            if (headlinesToRead.length > 0 && shouldReadNews) {
-                                console.log("Reading headlines for symbol:", sym, "Count:", headlinesToRead.length);
-                                readHeadlineAloud("News for " + sym);
-                                for (const headline of headlinesToRead) {
-                                    readHeadlineAloud(headline);
+                            if (withinValue > 0) {
+                                if (timeUnit === 'hours') {
+                                    withinMinutes = withinValue * 60;
+                                } else if (timeUnit === 'days') {
+                                    withinMinutes = withinValue * 1440;
+                                } else {
+                                    withinMinutes = withinValue;
+                                }
+                            }
+                        } catch (e) {
+                            console.warn("Error parsing read aloud time window:", e);
+                        }
+                    }
+                    
+                    const now = Date.now();
+                    const cutoffTime = withinMinutes > 0 ? now - (withinMinutes * 60 * 1000) : 0;
+                    console.log("News auto-read time window: withinMinutes=" + withinMinutes + " cutoffTime=" + cutoffTime);
+                    
+                    let totalHeadlinesProcessed = 0;
+                    let totalHeadlinesRead = 0;
+                    
+                    for (const groupKey in msg) {
+                        const rows = Array.isArray(msg[groupKey])
+                            ? msg[groupKey]
+                            : Object.values(msg[groupKey] || {});
+                        for (const dta of rows) {
+                            const allHeadlines = dta.newsHeadlines || [];
+                            const sym = dta.symbol || dta.cusip || "";
+                            
+                            if (allHeadlines.length > 0) {
+                                console.log("Symbol " + sym + " has " + allHeadlines.length + " headlines");
+                                totalHeadlinesProcessed += allHeadlines.length;
+                                
+                                // Filter headlines by time window and read symbol once for the group
+                                const headlinesToRead = [];
+                                for (const hl of allHeadlines) {
+                                    const headline = hl.headline || "";
+                                    if (headline.trim()) {
+                                        // Check if headline is within time window
+                                        let shouldRead = true;
+                                        if (withinMinutes > 0) {
+                                            const headlineTime = hl.parsedTime ? new Date(hl.parsedTime).getTime() : now;
+                                            shouldRead = headlineTime >= cutoffTime;
+                                        }
+                                        
+                                        if (shouldRead) {
+                                            headlinesToRead.push(headline);
+                                        }
+                                    }
+                                }
+                                
+                                // Read symbol and headlines if we have any to read
+                                if (headlinesToRead.length > 0) {
+                                    totalHeadlinesRead += headlinesToRead.length;
+                                    console.log("Reading " + headlinesToRead.length + " headlines for symbol: " + sym);
+                                    readHeadlineAloud("News for " + sym);
+                                    for (const headline of headlinesToRead) {
+                                        console.log("Queuing headline: " + headline);
+                                        readHeadlineAloud(headline);
+                                    }
                                 }
                             }
                         }
                     }
+                    console.log("News auto-read complete: processed=" + totalHeadlinesProcessed + " read=" + totalHeadlinesRead);
+                } else if (autoReadAllNews) {
+                    console.log("Auto-read all news is disabled or not found. Value:", autoReadAllNews ? autoReadAllNews.value : "element not found");
                 }
-            }
             }
         }
 
