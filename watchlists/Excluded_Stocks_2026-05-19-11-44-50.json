@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "title": "Excluded Stocks 2026-05-19-11-44-50",
+    "created_at": "2026-05-19T11:44:51.351888+00:00"
+  },
+  "tickers": [
+    {
+      "ticker": "NOW",
+      "cusip": "excluded0"
+    },
+    {
+      "ticker": "SAP",
+      "cusip": "excluded1"
+    },
+    {
+      "ticker": "ZETA",
+      "cusip": "excluded2"
+    }
+  ]
+}

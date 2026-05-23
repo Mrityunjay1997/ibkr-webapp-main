@@ -10,6 +10,11 @@ import pandas as pd
 from config import Config
 from typing import Any, Dict, Optional
 from datetime import time as datetime_time
+from news_utils import (
+    is_within_news_window,
+    news_within_minutes,
+    parse_news_datetime,
+)
 
 import pytz
 
@@ -93,11 +98,133 @@ def _within_percent_check(indicator_value, close_value, mode, threshold):
         return abs(pct_from) <= threshold
 
 
+def _safe_float(value, default=0.0):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _round_obv_value(value):
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except Exception:
+        pass
+    try:
+        return int(round(float(value)))
+    except (TypeError, ValueError):
+        return None
+
+
+def _compare_indicator_value(value, comparison, threshold):
+    threshold = _safe_float(threshold)
+    if comparison == "greater":
+        return _safe_compare(value, ">", threshold)
+    if comparison == "greaterEqual":
+        return _safe_compare(value, ">=", threshold)
+    if comparison == "lower":
+        return _safe_compare(value, "<", threshold)
+    if comparison == "lowerEqual":
+        return _safe_compare(value, "<=", threshold)
+    return None
+
+
+def _compare_price_to_indicator(indicator_value, close_value, comparison, pct_threshold):
+    if indicator_value is None:
+        return False
+    base = indicator_value * (1.0 + _safe_float(pct_threshold) / 100.0)
+    return _compare_indicator_value(close_value, comparison, base)
+
+
+def _compare_indicator_condition(data, form, *, data_key, comparison_key, threshold_key,
+                                 mode_key=None, upper_data_key=None, upper_threshold_key=None):
+    comparison = form.get(comparison_key, "Not used")
+    mode = form.get(mode_key, "value") if mode_key else "value"
+
+    if comparison not in _NON_SIMPLE_MODES:
+        if mode == "percentage":
+            return _compare_price_to_indicator(
+                data.get(data_key),
+                data.get("close"),
+                comparison,
+                form.get(threshold_key, 0),
+            )
+        return _compare_indicator_value(data.get(data_key), comparison, form.get(threshold_key, 0))
+
+    if comparison == "between":
+        if mode == "percentage":
+            lower_value = data.get(data_key)
+            upper_value = data.get(upper_data_key or f"{data_key}1")
+            if lower_value is None or upper_value is None:
+                return False
+            lower_base = lower_value * (1.0 + _safe_float(form.get(threshold_key, 0)) / 100.0)
+            upper_base = upper_value * (1.0 + _safe_float(form.get(upper_threshold_key, 0)) / 100.0)
+            return _safe_compare(data.get("close"), ">=", lower_base) and _safe_compare(data.get("close"), "<=", upper_base)
+        return (
+            _safe_compare(data.get(data_key), ">=", _safe_float(form.get(threshold_key, 0)))
+            and _safe_compare(data.get(upper_data_key or f"{data_key}1"), "<=", _safe_float(form.get(upper_threshold_key, 0)))
+        )
+
+    if comparison in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
+        return _within_percent_check(
+            data.get(data_key),
+            data.get("close"),
+            comparison,
+            _safe_float(form.get(threshold_key, 5), 5.0),
+        )
+
+    return None
+
+
 # Modes that are NOT simple > >= < <= comparisons
 _NON_SIMPLE_MODES = frozenset(
     ("Not used", "between",
      "withinPercentAbove", "withinPercentBelow", "withinPercentEither")
 )
+
+
+class _SignalFormDefaults:
+    """Read-only form adapter that makes older saved setups safe to evaluate."""
+
+    def __init__(self, form):
+        self._form = form or {}
+
+    def _default_for(self, key):
+        key_text = str(key)
+        lower_key = key_text.lower()
+
+        if key_text.startswith("Comparison"):
+            return "Not used"
+        if key_text.endswith("Bool") or lower_key.endswith("yesno"):
+            return "value"
+        if key_text.startswith("Percentage"):
+            return 0
+        if key_text.startswith("Enable"):
+            return False
+        if key_text.startswith("News"):
+            return ""
+        return ""
+
+    def __getitem__(self, key):
+        value = self.get(key, None)
+        if value is None:
+            return self._default_for(key)
+        return value
+
+    def get(self, key, default=None):
+        try:
+            return self._form.get(key, default)
+        except AttributeError:
+            return self._form[key] if key in self._form else default
+
+    def keys(self):
+        try:
+            return self._form.keys()
+        except AttributeError:
+            return []
 
 
 def _normalize_market_cap(value):
@@ -457,21 +584,26 @@ def apply_result_filters(stock_data: dict, form: dict) -> bool:
         
         comparison = form.get(comparison_key, "Not used")
         if comparison == "Not used":
-            return True  # If not configured, consider it "met"
+            # Filter was enabled, but no comparison operator was selected.
+            # Do not treat this as a pass, otherwise invalid filter config can show false positives.
+            logger.debug("Filter %s enabled but comparison %s is Not used", indicator_key, comparison_key)
+            return False
         
         # Get comparison thresholds
         threshold = form.get(value_key)
         threshold1 = form.get(value_key1) if value_key1 else None
         
         if threshold in (None, ""):
-            return True
+            logger.debug("Filter %s enabled but threshold %s is missing", indicator_key, value_key)
+            return False
         
         # Safely convert thresholds to float
         threshold = _safe_to_float(threshold)
         threshold1 = _safe_to_float(threshold1) if threshold1 else None
         
         if threshold is None:
-            return True
+            logger.debug("Filter %s enabled but threshold %s could not be parsed", indicator_key, value_key)
+            return False
         
         # If threshold1 was provided but conversion failed, use threshold as fallback
         if threshold1 is None and value_key1:
@@ -490,7 +622,8 @@ def apply_result_filters(stock_data: dict, form: dict) -> bool:
             elif comparison == "between":
                 # Both thresholds required for 'between'
                 if threshold1 is None:
-                    return True
+                    logger.debug("Filter %s enabled with 'between' but second threshold %s is missing", indicator_key, value_key1)
+                    return False
                 # Ensure threshold <= threshold1
                 min_val, max_val = min(threshold, threshold1), max(threshold, threshold1)
                 return min_val <= indicator_value <= max_val
@@ -505,7 +638,8 @@ def apply_result_filters(stock_data: dict, form: dict) -> bool:
                 pct_diff = abs(threshold1 - threshold) if threshold1 else 0
                 return _within_percent_check(threshold, indicator_value, "withinPercentEither", pct_diff)
             else:
-                return True
+                logger.debug("Unknown comparison operator %s for filter %s", comparison, indicator_key)
+                return False
         except Exception as e:
             logger.debug("Error evaluating condition %s: %s", comparison_key, e)
             return False
@@ -1119,15 +1253,17 @@ class IBapi(EWrapper, EClient):
             exclude_path = self.config.watchlists_dir / "excluded_stocks.json"
             exclude_path.parent.mkdir(parents=True, exist_ok=True)
             
+            # Normalize: trim, uppercase, remove duplicates
+            normalized = sorted(set(s.strip().upper() for s in symbols if str(s).strip()))
             data = {
-                "excluded": [s.upper() for s in symbols],
+                "excluded": normalized,
                 "last_updated": str(time.time())
             }
             
             with exclude_path.open("w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
             
-            logger.info(f"Saved {len(symbols)} excluded stocks")
+            logger.info(f"Saved {len(data['excluded'])} excluded stocks")
             return True
         except Exception as e:
             logger.error(f"Failed to save excluded stocks: {e}")
@@ -1239,9 +1375,13 @@ class IBapi(EWrapper, EClient):
                 continue
 
     def _save_contract_cache_to_disk(self, updated_symbols=None):
-
-        if not self.config.enable_contract_cache:
-            return
+        """DISABLED: Cache write operations are disabled to stabilize the core app.
+        Cache is read-only from disk to provide performance benefits without write overhead."""
+        # DISABLED: Cache writes disabled
+        return
+        # Original implementation below (disabled):
+        # if not self.config.enable_contract_cache:
+        #     return
 
         updated_symbols = set(updated_symbols or [])
 
@@ -2192,6 +2332,12 @@ class IBapi(EWrapper, EClient):
         "emaSlow1": "SlowEMA1_tf",
         "obv": "OBV_tf",
         "obv1": "OBV1_tf",
+        "fast_obv": "FastOBV_tf",
+        "fast_obv1": "FastOBV_tf",
+        "medium_obv": "MediumOBV_tf",
+        "medium_obv1": "MediumOBV_tf",
+        "slow_obv": "SlowOBV_tf",
+        "slow_obv1": "SlowOBV_tf",
         "atr": "ATR_tf",
         "atr1": "ATR1_tf",
         "averageVolume": "averageVolume_tf",
@@ -2269,6 +2415,9 @@ class IBapi(EWrapper, EClient):
             ("FastEMA1", "FastEMA1_tf", 21),
             ("SlowEMA", "SlowEMA_tf", 21),
             ("SlowEMA1", "SlowEMA1_tf", 21),
+            ("FastOBV", "FastOBV_tf", 5),
+            ("MediumOBV", "MediumOBV_tf", 10),
+            ("SlowOBV", "SlowOBV_tf", 20),
             ("OBV", "OBV_tf", 14),
             ("OBV1", "OBV1_tf", 14),
             ("ATR", "ATR_tf", 14),
@@ -2899,69 +3048,147 @@ class IBapi(EWrapper, EClient):
                 except Exception:
                     indicators["obv1"] = None
 
-        # --- Fast OBV (5-bar MA) - ALWAYS CALCULATE ---
+        # --- Fast OBV (configurable bar MA) - ALWAYS CALCULATE ---
         try:
-            fast_obv = FastOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=5)
+            fast_window = 5
+            try:
+                fast_window = int(form.get("FastOBV", fast_window))
+            except Exception:
+                fast_window = 5
+
+            fast_obv = FastOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=fast_window)
             try:
                 fast_obv_series = fast_obv.fast_obv()
             except Exception:
                 fast_obv_series = fast_obv.obv()
-            indicators["fast_obv"] = last_value(fast_obv_series)
+            indicators["fast_obv"] = _round_obv_value(last_value(fast_obv_series))
+
+            if logger.isEnabledFor(logging.DEBUG):
+                tf_freq = result_full.index.inferred_freq
+                if not tf_freq and len(result_full) >= 2:
+                    tf_freq = str(result_full.index[-1] - result_full.index[-2])
+                logger.debug(
+                    "[OBV] symbol=%s indicator=fast_obv tf_field=%s timeframe=%s bars=%d window=%d value=%s",
+                    symbol,
+                    form.get("FastOBV_tf"),
+                    tf_freq,
+                    len(result_full),
+                    fast_window,
+                    indicators["fast_obv"],
+                )
         except Exception:
             indicators["fast_obv"] = None
 
         if form.get("ComparisonFastOBV") == "between":
             try:
-                fast_obv1 = FastOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=5)
+                fast_window = 5
+                try:
+                    fast_window = int(form.get("FastOBV", fast_window))
+                except Exception:
+                    fast_window = 5
+
+                fast_obv1 = FastOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=fast_window)
                 try:
                     fast_obv1_series = fast_obv1.fast_obv()
                 except Exception:
                     fast_obv1_series = fast_obv1.obv()
-                indicators["fast_obv1"] = last_value(fast_obv1_series)
+                indicators["fast_obv1"] = _round_obv_value(last_value(fast_obv1_series))
             except Exception:
                 indicators["fast_obv1"] = None
 
-        # --- Medium OBV (10-bar MA) - ALWAYS CALCULATE ---
+        # --- Medium OBV (configurable bar MA) - ALWAYS CALCULATE ---
         try:
-            medium_obv = MediumOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=10)
+            medium_window = 10
+            try:
+                medium_window = int(form.get("MediumOBV", medium_window))
+            except Exception:
+                medium_window = 10
+
+            medium_obv = MediumOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=medium_window)
             try:
                 medium_obv_series = medium_obv.medium_obv()
             except Exception:
                 medium_obv_series = medium_obv.obv()
-            indicators["medium_obv"] = last_value(medium_obv_series)
+            indicators["medium_obv"] = _round_obv_value(last_value(medium_obv_series))
+
+            if logger.isEnabledFor(logging.DEBUG):
+                tf_freq = result_full.index.inferred_freq
+                if not tf_freq and len(result_full) >= 2:
+                    tf_freq = str(result_full.index[-1] - result_full.index[-2])
+                logger.debug(
+                    "[OBV] symbol=%s indicator=medium_obv tf_field=%s timeframe=%s bars=%d window=%d value=%s",
+                    symbol,
+                    form.get("MediumOBV_tf"),
+                    tf_freq,
+                    len(result_full),
+                    medium_window,
+                    indicators["medium_obv"],
+                )
         except Exception:
             indicators["medium_obv"] = None
 
         if form.get("ComparisonMediumOBV") == "between":
             try:
-                medium_obv1 = MediumOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=10)
+                medium_window = 10
+                try:
+                    medium_window = int(form.get("MediumOBV", medium_window))
+                except Exception:
+                    medium_window = 10
+
+                medium_obv1 = MediumOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=medium_window)
                 try:
                     medium_obv1_series = medium_obv1.medium_obv()
                 except Exception:
                     medium_obv1_series = medium_obv1.obv()
-                indicators["medium_obv1"] = last_value(medium_obv1_series)
+                indicators["medium_obv1"] = _round_obv_value(last_value(medium_obv1_series))
             except Exception:
                 indicators["medium_obv1"] = None
 
-        # --- Slow OBV (20-bar MA) - ALWAYS CALCULATE ---
+        # --- Slow OBV (configurable bar MA) - ALWAYS CALCULATE ---
         try:
-            slow_obv = SlowOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=20)
+            slow_window = 20
+            try:
+                slow_window = int(form.get("SlowOBV", slow_window))
+            except Exception:
+                slow_window = 20
+
+            slow_obv = SlowOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=slow_window)
             try:
                 slow_obv_series = slow_obv.slow_obv()
             except Exception:
                 slow_obv_series = slow_obv.obv()
-            indicators["slow_obv"] = last_value(slow_obv_series)
+            indicators["slow_obv"] = _round_obv_value(last_value(slow_obv_series))
+
+            if logger.isEnabledFor(logging.DEBUG):
+                tf_freq = result_full.index.inferred_freq
+                if not tf_freq and len(result_full) >= 2:
+                    tf_freq = str(result_full.index[-1] - result_full.index[-2])
+                logger.debug(
+                    "[OBV] symbol=%s indicator=slow_obv tf_field=%s timeframe=%s bars=%d window=%d value=%s",
+                    symbol,
+                    form.get("SlowOBV_tf"),
+                    tf_freq,
+                    len(result_full),
+                    slow_window,
+                    indicators["slow_obv"],
+                )
         except Exception:
             indicators["slow_obv"] = None
 
         if form.get("ComparisonSlowOBV") == "between":
             try:
-                slow_obv1 = SlowOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=20)
+                slow_window = 20
+                try:
+                    slow_window = int(form.get("SlowOBV", slow_window))
+                except Exception:
+                    slow_window = 20
+
+                slow_obv1 = SlowOBVIndicator(close=result_full["close"], volume=result_full["volume"], window=slow_window)
                 try:
                     slow_obv1_series = slow_obv1.slow_obv()
                 except Exception:
                     slow_obv1_series = slow_obv1.obv()
-                indicators["slow_obv1"] = last_value(slow_obv1_series)
+                indicators["slow_obv1"] = _round_obv_value(last_value(slow_obv1_series))
             except Exception:
                 indicators["slow_obv1"] = None
 
@@ -2982,6 +3209,17 @@ class IBapi(EWrapper, EClient):
                     except Exception:
                         atr_series = atr.averageTrueRange()
                 indicators["atr"] = last_value(atr_series)
+
+                # Debug logging for ATR computation
+                try:
+                    tf_info = form.get("ATR_tf") or "(unspecified)"
+                    bars_used = len(result_full)
+                    logger.debug(
+                        "[ATR] symbol=%s tf=%s bars=%d window=%d atr=%s",
+                        symbol, tf_info, bars_used, w, indicators.get("atr")
+                    )
+                except Exception:
+                    logger.exception("Failed to log ATR debug info")
             except Exception:
                 indicators["atr"] = None
 
@@ -3667,6 +3905,7 @@ class IBapi(EWrapper, EClient):
         Returns:
             Tuple[bool, dict]: (overall_condition, variable_results)
         """
+        form = _SignalFormDefaults(form)
         condition = True
         counting_ = 0
         variable_results = {}  # track pass/fail per variable
@@ -4329,32 +4568,16 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         # FAST EMA
         # -------------------------
-        emaFast_condition = None
-
-        if form.get("ComparisonFastEMA", "Not used") not in _NON_SIMPLE_MODES:
-            if form.get("ComparisonFastEMA") == "greater":
-                emaFast_condition = _safe_compare(data.get("emaFast"), ">", float(form.get("PercentageFastEMA")))
-            elif form.get("ComparisonFastEMA") == "greaterEqual":
-                emaFast_condition = _safe_compare(data.get("emaFast"), ">=", float(form.get("PercentageFastEMA")))
-            elif form.get("ComparisonFastEMA") == "lower":
-                emaFast_condition = _safe_compare(data.get("emaFast"), "<", float(form.get("PercentageFastEMA")))
-            elif form.get("ComparisonFastEMA") == "lowerEqual":
-                emaFast_condition = _safe_compare(data.get("emaFast"), "<=", float(form.get("PercentageFastEMA")))
-        elif form.get("ComparisonFastEMA") == "between":
-            emaFast_condition = (
-                    _safe_compare(data.get("emaFast"), ">=", float(form.get("PercentageFastEMA")))
-                    and _safe_compare(data.get("emaFast1"), "<=", float(form.get("PercentageFastEMA1")))
-            )
-
-        elif form.get("ComparisonFastEMA") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
-            try:
-                threshold = float(form.get("PercentageFastEMA", 5))
-            except Exception:
-                threshold = 5.0
-            emaFast_condition = _within_percent_check(
-                data.get("emaFast"), data.get("close"),
-                form.get("ComparisonFastEMA"), threshold
-            )
+        emaFast_condition = _compare_indicator_condition(
+            data,
+            form,
+            data_key="emaFast",
+            comparison_key="ComparisonFastEMA",
+            threshold_key="PercentageFastEMA",
+            mode_key="FastEMABool",
+            upper_data_key="emaFast1",
+            upper_threshold_key="PercentageFastEMA1",
+        )
 
         if emaFast_condition is not None:
             condition = condition and emaFast_condition
@@ -4364,32 +4587,16 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         # SLOW EMA
         # -------------------------
-        emaSlow_condition = None
-
-        if form.get("ComparisonSlowEMA", "Not used") not in _NON_SIMPLE_MODES:
-            if form.get("ComparisonSlowEMA") == "greater":
-                emaSlow_condition = _safe_compare(data.get("emaSlow"), ">", float(form.get("PercentageSlowEMA")))
-            elif form.get("ComparisonSlowEMA") == "greaterEqual":
-                emaSlow_condition = _safe_compare(data.get("emaSlow"), ">=", float(form.get("PercentageSlowEMA")))
-            elif form.get("ComparisonSlowEMA") == "lower":
-                emaSlow_condition = _safe_compare(data.get("emaSlow"), "<", float(form.get("PercentageSlowEMA")))
-            elif form.get("ComparisonSlowEMA") == "lowerEqual":
-                emaSlow_condition = _safe_compare(data.get("emaSlow"), "<=", float(form.get("PercentageSlowEMA")))
-        elif form.get("ComparisonSlowEMA") == "between":
-            emaSlow_condition = (
-                    _safe_compare(data.get("emaSlow"), ">=", float(form.get("PercentageSlowEMA")))
-                    and _safe_compare(data.get("emaSlow1"), "<=", float(form.get("PercentageSlowEMA1")))
-            )
-
-        elif form.get("ComparisonSlowEMA") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
-            try:
-                threshold = float(form.get("PercentageSlowEMA", 5))
-            except Exception:
-                threshold = 5.0
-            emaSlow_condition = _within_percent_check(
-                data.get("emaSlow"), data.get("close"),
-                form.get("ComparisonSlowEMA"), threshold
-            )
+        emaSlow_condition = _compare_indicator_condition(
+            data,
+            form,
+            data_key="emaSlow",
+            comparison_key="ComparisonSlowEMA",
+            threshold_key="PercentageSlowEMA",
+            mode_key="SlowEMABool",
+            upper_data_key="emaSlow1",
+            upper_threshold_key="PercentageSlowEMA1",
+        )
 
         if emaSlow_condition is not None:
             condition = condition and emaSlow_condition
@@ -5536,41 +5743,15 @@ class IBapi(EWrapper, EClient):
         if form.get("ComparisonNews") == "enabled":
             # Support both the new NewsWithinValue+NewsTimeUnit fields
             # and the legacy NewsWithinHours field for backward compat.
-            news_within_minutes = 0
-            try:
-                time_unit = form.get("NewsTimeUnit", "minutes").lower()
-                within_value = int(form.get("NewsWithinValue", 0))
-                if within_value > 0:
-                    if time_unit == "hours":
-                        news_within_minutes = within_value * 60
-                    elif time_unit == "days":
-                        news_within_minutes = within_value * 1440
-                    else:  # minutes
-                        news_within_minutes = within_value
-                else:
-                    # fallback to legacy field
-                    legacy_hours = int(form.get("NewsWithinHours", 0))
-                    news_within_minutes = legacy_hours * 60
-            except Exception:
-                pass
+            news_window_minutes = news_within_minutes(form)
 
-            if news_within_minutes > 0:
+            if news_window_minutes > 0:
                 # Check if any headline falls within the time window
-                from datetime import datetime, timezone, timedelta
-                cutoff = datetime.now(timezone.utc) - timedelta(minutes=news_within_minutes)
                 headlines = data.get("newsHeadlines", [])
-                has_recent = False
-                for h in headlines:
-                    parsed = h.get("parsedTime", "")
-                    if parsed:
-                        try:
-                            dt = datetime.fromisoformat(parsed)
-                            if dt >= cutoff:
-                                has_recent = True
-                                break
-                        except Exception:
-                            pass
-                news_condition = has_recent
+                news_condition = any(
+                    is_within_news_window(h.get("parsedTime") or h.get("time"), news_window_minutes)
+                    for h in headlines
+                )
             else:
                 # No time filter — just check if any headlines exist
                 news_condition = len(data.get("newsHeadlines", [])) > 0
@@ -5981,18 +6162,46 @@ class IBapi(EWrapper, EClient):
                             prev_close = hist_df.iloc[-2]['close'] if len(hist_df) >= 2 else hist_df.iloc[-1]['close']
                             prev_volume = hist_df.iloc[-2]['volume'] if len(hist_df) >= 2 else hist_df.iloc[-1]['volume']
                             
-                            # Calculate previous OBV values using the indicator classes
-                            if len(hist_df) >= 6:  # Fast OBV needs 5-bar window
-                                fast_obv_ind = FastOBVIndicator(close=hist_df['close'], volume=hist_df['volume'], window=5)
+                            # Calculate previous OBV values using the configured indicator windows
+                            fast_window = 5
+                            medium_window = 10
+                            slow_window = 20
+                            try:
+                                fast_window = int(form.get("FastOBV", fast_window))
+                            except Exception:
+                                fast_window = 5
+                            try:
+                                medium_window = int(form.get("MediumOBV", medium_window))
+                            except Exception:
+                                medium_window = 10
+                            try:
+                                slow_window = int(form.get("SlowOBV", slow_window))
+                            except Exception:
+                                slow_window = 20
+
+                            if len(hist_df) >= fast_window + 1:
+                                fast_obv_ind = FastOBVIndicator(close=hist_df['close'], volume=hist_df['volume'], window=fast_window)
                                 prev_fast = last_value(fast_obv_ind.fast_obv().iloc[:-1])
-                            
-                            if len(hist_df) >= 11:  # Medium OBV needs 10-bar window
-                                medium_obv_ind = MediumOBVIndicator(close=hist_df['close'], volume=hist_df['volume'], window=10)
+
+                            if len(hist_df) >= medium_window + 1:
+                                medium_obv_ind = MediumOBVIndicator(close=hist_df['close'], volume=hist_df['volume'], window=medium_window)
                                 prev_medium = last_value(medium_obv_ind.medium_obv().iloc[:-1])
-                            
-                            if len(hist_df) >= 21:  # Slow OBV needs 20-bar window
-                                slow_obv_ind = SlowOBVIndicator(close=hist_df['close'], volume=hist_df['volume'], window=20)
+
+                            if len(hist_df) >= slow_window + 1:
+                                slow_obv_ind = SlowOBVIndicator(close=hist_df['close'], volume=hist_df['volume'], window=slow_window)
                                 prev_slow = last_value(slow_obv_ind.slow_obv().iloc[:-1])
+
+                            if logger.isEnabledFor(logging.DEBUG):
+                                logger.debug(
+                                    "[OBV PREV] symbol=%s windows=%s/%s/%s prev_fast=%s prev_medium=%s prev_slow=%s",
+                                    symbol,
+                                    fast_window,
+                                    medium_window,
+                                    slow_window,
+                                    prev_fast,
+                                    prev_medium,
+                                    prev_slow,
+                                )
                         except Exception as e:
                             logger.debug(f"Could not calculate previous OBV values: {e}")
                             prev_fast = fast_obv
@@ -6086,8 +6295,6 @@ class IBapi(EWrapper, EClient):
         Uses reqHistoricalNews which requires conId.
         Returns list of headline dicts, filtered by exclude list and deduped.
         """
-        from datetime import datetime, timezone, timedelta
-
         max_headlines = 20
         try:
             max_headlines = int(form.get("NewsMaxHeadlines", 20))
@@ -6119,11 +6326,11 @@ class IBapi(EWrapper, EClient):
         if self._subscribed_news_providers is None:
             logger.debug("Waiting for news provider discovery...")
             _pw = 0.0
-            while self._subscribed_news_providers is None and _pw < 2.0:
+            while self._subscribed_news_providers is None and _pw < 0.5:  # Reduced wait time from 2.0s to 0.5s
                 time.sleep(0.05)
                 _pw += 0.05
             if self._subscribed_news_providers is None:
-                logger.warning("News provider discovery did not complete, will use fallback providers")
+                logger.warning("News provider discovery did not complete (waited %.2fs), will use fallback providers", _pw)
 
         # -------------------------
         # Determine which news providers to request
@@ -6271,62 +6478,51 @@ class IBapi(EWrapper, EClient):
                 mixed.extend(dj_items[:max_dj_allowed])
                 deduped = mixed
         
-        # Limit to max requested (show all if fewer available)
-        deduped = deduped[:max_headlines]
-
         # -------------------------
-        # Filter by timeframe if specified
+        # Filter by the News Within window if specified.
+        # Read-aloud has its own client-side window and should not hide headlines here.
         # -------------------------
-        # Extract time window configuration for "Read Headlines Aloud" feature
-        news_within_minutes = 0
-        try:
-            time_unit = form.get("NewsTimeUnit", "minutes").lower()
-            within_value = int(form.get("NewsWithinValue", 0))
-            if within_value > 0:
-                if time_unit == "hours":
-                    news_within_minutes = within_value * 60
-                elif time_unit == "days":
-                    news_within_minutes = within_value * 1440
-                else:  # minutes (default)
-                    news_within_minutes = within_value
-        except Exception:
-            pass
-
-        # Apply timeframe filter if configured
-        if news_within_minutes > 0:
-            cutoff = datetime.now(timezone.utc) - timedelta(minutes=news_within_minutes)
-            filtered_by_time = []
+        news_window_minutes = news_within_minutes(form)
+        if news_window_minutes > 0:
+            original_count = len(deduped)
             parse_failures = 0
+            filtered_by_time = []
+            
+            # Debug: Log form fields
+            logger.debug(
+                "fetchNews time filter DEBUG: NewsWithinValue=%s, NewsTimeUnit=%s, NewsWithinHours=%s",
+                form.get("NewsWithinValue"), form.get("NewsTimeUnit"), form.get("NewsWithinHours")
+            )
+            
             for h in deduped:
                 time_str = h.get("time", "")
-                parsed_time = None
-                try:
-                    # Try standard IBKR format
-                    if " " in time_str:
-                        parsed_time = datetime.strptime(
-                            time_str.split(".")[0], "%Y-%m-%d %H:%M:%S"
-                        ).replace(tzinfo=timezone.utc)
-                    elif time_str.isdigit():
-                        parsed_time = datetime.fromtimestamp(
-                            int(time_str) / 1000, tz=timezone.utc
-                        )
-                except Exception as e:
-                    logger.debug(f"Failed to parse headline time '{time_str}': {e}")
+                parsed_time = parse_news_datetime(time_str)
+                if parsed_time is None:
                     parse_failures += 1
-
-                # ONLY include headline if it's within the timeframe
-                # Changed: DO NOT include unparseable times - require valid timestamp
-                # If we can't parse the time, we should not include the headline
-                if parsed_time is not None and parsed_time >= cutoff:
+                    logger.debug(
+                        "Skipping headline with unparseable time '%s': %s",
+                        time_str,
+                        h.get("headline", "N/A")[:50],
+                    )
+                    continue
+                if is_within_news_window(parsed_time, news_window_minutes):
                     filtered_by_time.append(h)
-                elif parsed_time is None:
-                    logger.warning(f"Skipping headline with unparseable time '{time_str}': {h.get('headline', 'N/A')[:50]}")
-            
+
             deduped = filtered_by_time
             logger.info(
-                "fetchNews timeframe filter: requested last %d minutes, returned %d / %d headlines (parse failures: %d)",
-                news_within_minutes, len(deduped), len(filtered_by_time) if 'filtered_by_time' in locals() else 0, parse_failures
+                "fetchNews timeframe filter: requested last %d minutes, returned %d / %d headlines (parse failures: %d) [DEBUG: form_value=%s, form_unit=%s]",
+                news_window_minutes, len(deduped), original_count, parse_failures,
+                form.get("NewsWithinValue"), form.get("NewsTimeUnit")
             )
+        else:
+            # Debug: Log when no time filter is applied
+            logger.info(
+                "fetchNews: No time filter applied (showing all %d headlines) [DEBUG: form_value=%s, form_unit=%s, form_hours=%s]",
+                len(deduped), form.get("NewsWithinValue"), form.get("NewsTimeUnit"), form.get("NewsWithinHours")
+            )
+
+        # Limit to max requested (show all if fewer available)
+        deduped = deduped[:max_headlines]
 
         # Parse times and build clean output
         import re as _re
@@ -6343,20 +6539,7 @@ class IBapi(EWrapper, EClient):
             headline = _re.sub(r"\{[^}]*\}", "", raw_headline)
             headline = headline.replace("!", "").strip()
 
-            # IBKR time format: "2024-03-25 14:30:00.0" or epoch
-            parsed_time = None
-            try:
-                # Try standard IBKR format
-                if " " in time_str:
-                    parsed_time = datetime.strptime(
-                        time_str.split(".")[0], "%Y-%m-%d %H:%M:%S"
-                    ).replace(tzinfo=timezone.utc)
-                elif time_str.isdigit():
-                    parsed_time = datetime.fromtimestamp(
-                        int(time_str) / 1000, tz=timezone.utc
-                    )
-            except Exception:
-                pass
+            parsed_time = parse_news_datetime(time_str)
 
             # Build the article URL pointing to IBKR article detail endpoint
             url = ""
@@ -6585,16 +6768,18 @@ class IBapi(EWrapper, EClient):
                 contract = self.marketContract(m, "STK", "SMART", "", "USD")
 
             # Cache the Contract object under both the resolved symbol and the original key 'm'
-            # try block out section to see if where repeated posting same results
+            # DISABLED: Cache writes are disabled to stabilize the core app
+            # Cache is read-only from disk to improve performance without write overhead
             try:
                 self.Locking.acquire()
                 if symbol_for_contract:
                     self.contract_cache[symbol_for_contract] = contract
                 self.contract_cache[m] = contract
             finally:
-                self._save_contract_cache_to_disk(
-                    updated_symbols={m, symbol_for_contract}
-                )
+                # DISABLED: Cache write operations are disabled for stability
+                # self._save_contract_cache_to_disk(
+                #     updated_symbols={m, symbol_for_contract}
+                # )
                 self.Locking.release()
         else:
             # cached contract found: ensure `m` variable aligns with contract.symbol (for later messages)

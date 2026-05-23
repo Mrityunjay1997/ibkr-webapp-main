@@ -4,11 +4,22 @@ SETLOCAL
 SET VENV_PATH=VENV\IBKR
 SET PYTHON=%VENV_PATH%\Scripts\python.exe
 
-REM Make sure venv exists
-IF NOT EXIST "%PYTHON%" (
+REM Prefer the project venv, but fall back to the system Python if this copied
+REM venv points at a Python install from another machine/user.
+IF EXIST "%PYTHON%" (
+    "%PYTHON%" --version >nul 2>&1
+    IF ERRORLEVEL 1 (
+        SET PYTHON=python
+    )
+) ELSE (
+    SET PYTHON=python
+)
+
+%PYTHON% --version >nul 2>&1
+IF ERRORLEVEL 1 (
     echo.
-    echo Virtual environment not found!
-    echo Please run install_requirements.bat first.
+    echo Python could not be started.
+    echo Please repair VENV\IBKR or install Python on PATH.
     echo.
     pause
     exit /b

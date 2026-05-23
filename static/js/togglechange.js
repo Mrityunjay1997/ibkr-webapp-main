@@ -288,54 +288,6 @@ function changeInput() {
 }
 
 
-/*
-var cell = document.createElement("button");
-cell.innerHTML = "Add";
-cell.setAttribute("id", "buttontobuy" + 1); //cell.setAttribute("id", "buttontobuy" + i);
-cell.setAttribute("style", "width: 100%;");
-document.getElementById("demotest").appendChild(cell); //row.appendChild(cell);
-*/
-
-/*
-var nelm =  0; //number of elements
-cell.onclick = function () {
-  event.preventDefault();
-  var currentId = this.id;
-  console.log(nelm, " tuturu");
-
-  var stockName = "ELFEO";//document.getElementById(currentId).parentElement.children[1].innerHTML;
-  var longshort = "LONG" //document.getElementsByClassName("LongShort")[0].value";
-  var parentChildren = 7 //document.getElementById("appendFormIndicator").children.length;
-  var actualPrice = 20 //document.getElementById(currentId).parentElement.children[2].innerHTML;
-  var supporT = (parseFloat(actualPrice) * 0.95).toFixed(2) //(actualPrice)toFixed(2)
-  var resistencE = (parseFloat(actualPrice) * 1.05).toFixed(2) //(actualPrice)toFixed(2)
-  var divBuySell = "<div class = 'buysell'>";
-  var divStock = "<div class = 'makeColum'> <label class='labelbuysell'>Stock</label> <input type='text' value=" +stockName + " class = 'buysellinput'></div>";
-  var divNShare = "<div class = 'makeColum'> <label class='labelbuysell'>N Share</label> <input type='number' value='1' class = 'buysellinput'></div>";
-  var divBrackteLimit = "<div class = 'makeColum'> <label class='labelbuysell'>Type</label> <select class = 'buysellSelect' id = 'changevalues" + nelm + "'> <option value='bracket' selected=''>Bracket </option> <option value='limit'>Limit</option> </select> </div>";
-  var divBuySell = "<div class = 'makeColum'> <label class='labelbuysell'>Side</label> <select class = 'buysellSelect'> <option value='long' selected=''>Long </option> <option value='short'>Short</option> </select> </div>";
-  var thecurrentPrice = "<div class = 'makeColum'> <label class='labelbuysell'>Price</label> <input type='number' value='" + actualPrice + "' class = 'buysellinput'></div>";
-
-  var supportLevel = "<div class = 'makeColum'> <label class='labelbuysell'>Support</label> <input type='number' value='' class = 'buysellinput' id = 'support" + nelm + "'></div>";
-  var StopLoss = "<div class = 'makeColum'> <label class='labelbuysell'>StopLoss(%)</label> <input type='number' value='10' class = 'buysellinput'></div>";
-  var resistenceLevel = "<div class = 'makeColum'> <label class='labelbuysell'>Resistence</label> <input type='number' value='' class = 'buysellinput' id = 'resistence" + nelm + "'></div>";
-  var ema = "<div class = 'makeColum'> <label class='labelbuysell'>EMA</label> <input type='number' value='13' class = 'buysellinput'></div>";
-  var send = "<div class = 'makeColum'> <label class='labelbuysell'>Order</label> <button class = 'buysellinput' id = 'sendToFlask" + parentChildren + "'>Send</button></div>";
-  var send1 = "<div class = 'makeColum'> <label class='labelbuysell'>Order</label> <button class = 'buysellinput'>Send</button></div>";
-  var divBuySellClose = "</div>";
-  var elementToAppend =  divStock + divNShare + divBrackteLimit + divBuySell + thecurrentPrice + supportLevel + StopLoss + resistenceLevel + ema + send; // + send1;
-  myelement = document.createElement("DIV");
-  myelement.setAttribute("class", "buysell");
-  myelement.innerHTML = elementToAppend;
-  document.getElementById("elfeo").appendChild(myelement);
-
-  document.getElementById('changevalues' + nelm).addEventListener("change", changeOptions);
-  nelm = nelm + 1;
-
-
-}
-
-*/
 
 function changeOptions() {
   if ( parseInt(this.id.slice(-1)) >= 0) { idnumber = this.id.slice(-1);}
@@ -431,3 +383,189 @@ function formatInstrument() {
     myArray = {"securities": myArray};
     return myArray;
 }
+
+window._excludeRefreshList = _excludeRefreshList = async function() {
+  try {
+    const response = await fetch('/exclude/list', { method: 'GET' });
+    const data = await response.json();
+
+    const display = document.getElementById('excludeListDisplay');
+    const count = document.getElementById('excludeCount');
+    if (!display || !count) return;
+
+    if (data.ok) {
+      if (!data.excluded || data.excluded.length === 0) {
+        display.innerHTML = '<div style="color: #999; text-align: center;">No stocks excluded</div>';
+      } else {
+        let html = '<div style="display: flex; flex-wrap: wrap; gap: 6px;">';
+        for (const symbol of data.excluded) {
+          html += `
+            <div style="
+              background: #f0f0f0;
+              border: 1px solid #ddd;
+              border-radius: 3px;
+              padding: 4px 8px;
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              font-size: 11px;
+            ">
+              <strong>${symbol}</strong>
+              <button onclick="_excludeRemoveStock('${symbol}')" style="
+                background: #dc3545;
+                color: white;
+                border: none;
+                border-radius: 2px;
+                padding: 2px 6px;
+                cursor: pointer;
+                font-size: 10px;
+              ">✕</button>
+            </div>
+          `;
+        }
+        html += '</div>';
+        display.innerHTML = html;
+      }
+      count.textContent = data.count || 0;
+    }
+  } catch (e) {
+    console.error('Failed to refresh exclude list:', e);
+  }
+};
+
+window._excludeAddStock = _excludeAddStock = async function() {
+  try {
+    const input = document.getElementById('excludeSymbolInput');
+    if (!input) return;
+
+    const value = input.value.trim();
+    const symbols = value.split(/[\s,]+/).filter(s => s);
+
+    if (symbols.length === 0) {
+      alert('Please enter one or more stock symbols');
+      return;
+    }
+
+    const response = await fetch('/exclude/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbols: symbols.map(s => s.toUpperCase()) })
+    });
+
+    const data = await response.json();
+    if (data.ok) {
+      input.value = '';
+      _excludeRefreshList();
+      console.log(`Added ${symbols.join(', ')} to exclusion list`);
+    } else {
+      alert('Error: ' + (data.error || 'Unknown error'));
+    }
+  } catch (e) {
+    console.error('Failed to add stock:', e);
+    alert('Error adding stock');
+  }
+};
+
+window._excludeRemoveStock = _excludeRemoveStock = async function(symbol) {
+  try {
+    const response = await fetch('/exclude/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol })
+    });
+
+    const data = await response.json();
+    if (data.ok) {
+      _excludeRefreshList();
+      console.log(`Removed ${symbol} from exclusion list`);
+    } else {
+      alert('Error: ' + (data.error || 'Unknown error'));
+    }
+  } catch (e) {
+    console.error('Failed to remove stock:', e);
+    alert('Error removing stock');
+  }
+};
+
+window._excludeImportCSV = _excludeImportCSV = async function() {
+  try {
+    const fileInput = document.getElementById('excludeCSVInput');
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) return;
+
+    const file = fileInput.files[0];
+    const formData = new FormData();
+    formData.append('csvfile', file);
+
+    const response = await fetch('/exclude/import-csv', {
+      method: 'POST',
+      body: formData
+    });
+
+    const data = await response.json();
+    if (data.ok) {
+      _excludeRefreshList();
+      alert(`Imported ${data.count || 0} stocks to exclusion list`);
+      fileInput.value = '';
+    } else {
+      alert('Error: ' + (data.error || 'Unknown error'));
+    }
+  } catch (e) {
+    console.error('Failed to import CSV:', e);
+    alert('Error importing CSV');
+  }
+};
+
+window._excludeOpenImport = _excludeOpenImport = function() {
+  const fileInput = document.getElementById('excludeCSVInput');
+  if (fileInput) {
+    fileInput.click();
+  }
+};
+
+window._excludeExportCSV = _excludeExportCSV = async function() {
+  try {
+    const response = await fetch('/exclude/export-csv', { method: 'GET' });
+    if (!response.ok) {
+      alert('Error exporting CSV');
+      return;
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'excluded_stocks.csv';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    console.log('Exported excluded stocks to CSV');
+  } catch (e) {
+    console.error('Failed to export CSV:', e);
+    alert('Error exporting CSV');
+  }
+};
+
+window._excludeClearAll = _excludeClearAll = async function() {
+  try {
+    if (!confirm('Are you sure you want to clear all excluded stocks?')) {
+      return;
+    }
+
+    const response = await fetch('/exclude/clear', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    const data = await response.json();
+    if (data.ok) {
+      _excludeRefreshList();
+      alert('Cleared excluded stocks');
+    } else {
+      alert('Error: ' + (data.error || 'Unknown error'));
+    }
+  } catch (e) {
+    console.error('Failed to clear exclude list:', e);
+    alert('Error clearing list');
+  }
+};

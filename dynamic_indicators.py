@@ -255,7 +255,14 @@ def _calculate_single_indicator(indicator_type: str, window: int, df: pd.DataFra
     elif indicator_type == 'ATR':
         try:
             atr = ATRIndicator(df['high'], df['low'], df['close'], window=window)
-            return last_value(atr.atr())
+            atr_series = atr.atr()
+            val = last_value(atr_series)
+            # Debug logging: timeframe inference, bars, window, symbol not available here
+            try:
+                logger.debug("[DYN-ATR] window=%d bars=%d result=%s", int(window), len(df), val)
+            except Exception:
+                logger.exception("Failed to log dynamic ATR info")
+            return val
         except Exception as e:
             logger.debug(f"ATR calculation error: {e}")
             return None

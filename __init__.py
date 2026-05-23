@@ -238,6 +238,13 @@ def exclude_stocks_page():
     """Render the exclude stocks management page."""
     return render_template("exclude_stocks.html")
 
+
+@app.route("/news-reader", methods=["GET"])
+def news_reader_page():
+    """Render a dedicated page for monitoring and reading scan news aloud."""
+    return render_template("news_reader.html")
+
+
 @app.route("/updatepdf", methods=["GET", "POST"])
 def updatepdf():
     # import when used
@@ -1160,10 +1167,21 @@ def setups_save():
         if p.exists() and not overwrite:
             return jsonify({"error": "setup already exists", "exists": True}), 409
 
+        # Preserve created_at when overwriting an existing setup
+        created_at = datetime.now(UTC).isoformat()
+        if p.exists():
+            try:
+                with p.open("r", encoding="utf-8") as fh:
+                    old = json.load(fh)
+                    created_at = old.get("meta", {}).get("created_at", created_at)
+            except Exception:
+                pass
+
         doc = {
             "meta": {
                 "title": name,
-                "created_at": datetime.now(UTC).isoformat(),
+                "created_at": created_at,
+                "updated_at": datetime.now(UTC).isoformat()
             },
             "form": form,
             "securities": securities or {}
@@ -1419,7 +1437,7 @@ def exclude_add():
 
         return jsonify({
             "ok": True,
-            "message": f"Added {len(symbols)} symbol(s) to exclusion list",
+            "message": f"Added {len(symbols)} ticker(s) to excluded list",
             "excluded": sorted(list(excluded)),
             "count": len(excluded)
         }), 200
@@ -1446,7 +1464,7 @@ def exclude_remove():
             excluded = IBAPI.get_excluded_stocks()
             return jsonify({
                 "ok": True,
-                "message": f"Removed {symbol} from exclusion list",
+                "message": f"Removed {symbol} from excluded list",
                 "excluded": sorted(list(excluded)),
                 "count": len(excluded)
             }), 200
@@ -1485,13 +1503,16 @@ def exclude_import_csv():
         if not symbols:
             return jsonify({"error": "no symbols found in CSV"}), 400
         
+        # Normalize & dedupe before saving
+        symbols = sorted(set(s.strip().upper() for s in symbols if str(s).strip()))
+
         # Save to exclusion list
         success = IBAPI.save_excluded_stocks(symbols)
         if success:
             excluded = IBAPI.get_excluded_stocks()
             return jsonify({
                 "ok": True,
-                "message": f"Imported {len(symbols)} stocks to exclusion list",
+                "message": f"Imported {len(symbols)} tickers to excluded list",
                 "excluded": sorted(list(excluded)),
                 "count": len(excluded)
             }), 200
@@ -1507,7 +1528,7 @@ def exclude_export_csv():
     """Export excluded stocks as a CSV file."""
     try:
         IBAPI = _get_excluded_api()
-        from io import StringIO
+        from io import StringIO, BytesIO
         from flask import send_file
         
         excluded = sorted(list(IBAPI.get_excluded_stocks()))
@@ -1519,10 +1540,11 @@ def exclude_export_csv():
         for symbol in excluded:
             writer.writerow([symbol])
         
-        # Send as download
-        output.seek(0)
+        # Flask send_file requires a binary stream for generated downloads.
+        csv_bytes = BytesIO(output.getvalue().encode("utf-8-sig"))
+        csv_bytes.seek(0)
         return send_file(
-            StringIO(output.getvalue()),
+            csv_bytes,
             mimetype="text/csv",
             as_attachment=True,
             download_name="excluded_stocks.csv"
@@ -1541,7 +1563,7 @@ def exclude_clear():
         if success:
             return jsonify({
                 "ok": True,
-                "message": "Cleared exclusion list",
+                "message": "Cleared excluded stocks",
                 "excluded": [],
                 "count": 0
             }), 200
@@ -1601,6 +1623,23 @@ def exclude_lists():
         return jsonify({"error": "failed to list exclusion lists"}), 500
 
 
+@app.route("/exclude/last", methods=["GET"])
+def exclude_last():
+    """Return metadata about the last-applied exclusion list."""
+    try:
+        last_file = cfg.watchlists_dir / "last_exclusion.json"
+        if not last_file.exists():
+            return jsonify({"ok": True, "last": None}), 200
+
+        with last_file.open("r", encoding="utf-8") as fh:
+            last = json.load(fh)
+
+        return jsonify({"ok": True, "last": last}), 200
+    except Exception as e:
+        logger.exception("Failed to read last exclusion metadata: %s", e)
+        return jsonify({"error": "failed to read last exclusion"}), 500
+
+
 @app.route("/exclude/save", methods=["POST"])
 def exclude_save():
     """
@@ -1639,12 +1678,15 @@ def exclude_save():
         if p.exists() and not overwrite:
             return jsonify({"error": "exclusion list already exists", "exists": True}), 409
 
+        # Normalize, trim, uppercase, remove duplicates
+        normalized = sorted(set(str(s).strip().upper() for s in symbols if str(s).strip()))
+
         doc = {
             "meta": {
                 "title": name,
                 "created_at": datetime.now(UTC).isoformat(),
             },
-            "symbols": sorted([str(s).upper() for s in symbols if str(s).strip()])
+            "symbols": normalized
         }
 
         with p.open("w", encoding="utf-8") as fh:
@@ -1716,6 +1758,19 @@ def exclude_apply(list_name: str):
         success = IBAPI.save_excluded_stocks(symbols)
         
         if success:
+            # Persist last-used exclusion list metadata
+            try:
+                last_file = cfg.watchlists_dir / "last_exclusion.json"
+                meta = {
+                    "name": p.stem[8:],
+                    "filename": p.name,
+                    "applied_at": datetime.now(UTC).isoformat()
+                }
+                with last_file.open("w", encoding="utf-8") as fh:
+                    json.dump(meta, fh, ensure_ascii=False, indent=2)
+            except Exception:
+                logger.exception("Failed to write last_exclusion metadata")
+
             return jsonify({
                 "ok": True,
                 "message": f"Applied exclusion list: {list_name}",
@@ -1746,6 +1801,16 @@ def exclude_delete(list_name: str):
 
         p.unlink()
         logger.info("Deleted exclusion list: %s", p)
+        # If this was the last-used list, remove last_exclusion metadata
+        try:
+            last_file = cfg.watchlists_dir / "last_exclusion.json"
+            if last_file.exists():
+                with last_file.open("r", encoding="utf-8") as fh:
+                    last = json.load(fh)
+                if last.get("filename") == p.name:
+                    last_file.unlink()
+        except Exception:
+            logger.exception("Failed to update last_exclusion after delete")
         
         return jsonify({
             "ok": True,
@@ -3606,5 +3671,28 @@ if __name__ == "__main__":
     logger.info("  Local : http://localhost:%s", run_port)
     logger.info("  Local : http://127.0.0.1:%s", run_port)
     logger.info("  LAN   : http://%s:%s", local_ip, run_port)
+
+    # Attempt to auto-load last-used exclusion list on startup
+    try:
+        last_file = cfg.watchlists_dir / "last_exclusion.json"
+        if last_file.exists():
+            with last_file.open("r", encoding="utf-8") as fh:
+                last = json.load(fh)
+            filename = last.get("filename")
+            if filename:
+                p = cfg.watchlists_dir / filename
+                if p.exists():
+                    with p.open("r", encoding="utf-8") as fh:
+                        doc = json.load(fh)
+                    symbols = doc.get("symbols", [])
+                    try:
+                        from ibkr_signal_engine import IBapi
+                        IBAPI = IBapi()
+                        IBAPI.save_excluded_stocks(symbols)
+                        logger.info("Auto-applied last exclusion list: %s", filename)
+                    except Exception:
+                        logger.exception("Failed to auto-apply exclusion list at startup")
+    except Exception:
+        logger.exception("Error while attempting to auto-load last exclusion list")
 
     serve(app, host="0.0.0.0", port=run_port)

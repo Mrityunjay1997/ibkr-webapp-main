@@ -11,13 +11,17 @@ Orders can be set for entry AND exit conditions, supporting both long and short 
 import json
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict, field
 import pandas as pd
 from enum import Enum
 
 logger = logging.getLogger("held_orders")
+
+
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 class OrderSide(Enum):
@@ -127,8 +131,8 @@ class HeldOrder:
     entry_executed_price: Optional[float] = None
     
     # Metadata
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
-    modified_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_at: str = field(default_factory=utc_now_iso)
+    modified_at: str = field(default_factory=utc_now_iso)
     notes: str = ""
     
     def to_dict(self) -> Dict:
@@ -169,8 +173,8 @@ class HeldOrder:
             entry_executed=data.get('entry_executed', False),
             entry_executed_at=data.get('entry_executed_at'),
             entry_executed_price=data.get('entry_executed_price'),
-            created_at=data.get('created_at', datetime.utcnow().isoformat()),
-            modified_at=data.get('modified_at', datetime.utcnow().isoformat()),
+            created_at=data.get('created_at', utc_now_iso()),
+            modified_at=data.get('modified_at', utc_now_iso()),
             notes=data.get('notes', ''),
         )
 
@@ -222,7 +226,7 @@ class HeldOrdersManager:
         if order_id in self.orders:
             order = self.orders[order_id]
             order.entry_executed = True
-            order.entry_executed_at = datetime.utcnow().isoformat()
+            order.entry_executed_at = utc_now_iso()
             order.entry_executed_price = price
             logger.info(f"Order {order_id} entry executed at {price}")
     
@@ -699,7 +703,7 @@ class HeldOrderLimitPriceCalculator:
                     if new_entry_limit and new_entry_limit != held_order.limit_price:
                         old_price = held_order.limit_price
                         held_order.limit_price = new_entry_limit
-                        held_order.modified_at = datetime.utcnow().isoformat()
+                        held_order.modified_at = utc_now_iso()
                         logger.info(
                             f"Updated {held_order.symbol} {held_order.side} limit price: "
                             f"{old_price} -> {new_entry_limit}"

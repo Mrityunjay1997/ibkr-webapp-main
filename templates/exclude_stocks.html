@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>Exclude Stocks from Scans</title>
+    <title>Excluded Stocks</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     
     <link href="https://fonts.googleapis.com/css?family=Open+Sans|Playfair+Display" rel="stylesheet">
@@ -215,8 +215,8 @@
 </head>
 <body>
     <div class="container-main">
-        <h1>Exclude Stocks from Scans</h1>
-        <p style="color: #666; margin-bottom: 20px;">Manage stocks to exclude from your scanner.</p>
+        <h1>Excluded Stocks</h1>
+        <p style="color: #666; margin-bottom: 20px;">Manage excluded stocks for the scanner.</p>
         
         <!-- Messages -->
         <div id="message" class="message"></div>
@@ -225,7 +225,7 @@
         <div class="section">
             <h3>Current Exclusion List</h3>
             <div class="form-group">
-                <label>Add Stocks (comma-separated)</label>
+                <label>Add Tickers (comma-separated)</label>
                 <div class="input-group-custom">
                     <input type="text" id="newStocks" placeholder="e.g. AAPL, MSFT, GOOGL" />
                     <button class="btn-success" onclick="addStocks()">Add Stocks</button>
@@ -233,9 +233,9 @@
             </div>
             
             <div class="form-group">
-                <label>Current Excluded Stocks (<span id="stockCount">0</span>)</label>
+                <label>Excluded Stocks (<span id="stockCount">0</span>)</label>
                 <div class="list-container" id="stockList">
-                    <div class="empty-message">No stocks excluded yet</div>
+                            <div class="empty-message">No excluded stocks yet</div>
                 </div>
             </div>
             
@@ -250,7 +250,7 @@
             <h3>Save & Load Exclusion Lists</h3>
             
             <div class="form-group">
-                <label>Save Current List</label>
+                    <label>Save Current List</label>
                 <div class="input-group-custom">
                     <input type="text" id="listName" placeholder="e.g. My Exclusions, Penny Stocks" />
                     <div style="display: flex; gap: 5px;">
@@ -259,6 +259,14 @@
                     </div>
                 </div>
             </div>
+                <div class="form-group">
+                    <label>Quick Load</label>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <select id="savedListSelect" style="flex:1; padding:6px; font-size:13px;"></select>
+                        <button class="btn-success" onclick="applySelected()">Apply</button>
+                        <div style="margin-left:10px; font-size:13px; color:#666;">Active: <span id="activeList">None</span></div>
+                    </div>
+                </div>
             
             <div class="form-group">
                 <label>Saved Lists</label>
@@ -328,8 +336,8 @@
             const input = document.getElementById('newStocks');
             const symbols = input.value.trim();
             
-            if (!symbols) {
-                showMessage('Please enter stock symbols', 'error');
+                if (!symbols) {
+                showMessage('Please enter ticker symbols', 'error');
                 return;
             }
             
@@ -340,8 +348,8 @@
             })
             .then(r => r.json())
             .then(data => {
-                if (data.ok) {
-                    showMessage(`Added ${data.excluded.length - document.getElementById('stockCount').textContent} stock(s)`, 'success');
+                    if (data.ok) {
+                    showMessage(`Added ${data.excluded.length - document.getElementById('stockCount').textContent} ticker(s)`, 'success');
                     input.value = '';
                     loadCurrentList();
                 } else {
@@ -375,20 +383,32 @@
                 showMessage('Please enter a list name', 'error');
                 return;
             }
-            
+            // Try saving without overwrite first; if exists, ask to confirm overwrite
             fetch('/exclude/save', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    name: name,
-                    overwrite: true
-                })
+                body: JSON.stringify({ name: name, overwrite: false })
             })
             .then(r => r.json())
-            .then(data => {
+            .then(async data => {
                 if (data.ok) {
-                    showMessage(`Saved exclusion list: ${name}`, 'success');
+                    showMessage(`Saved excluded list: ${name}`, 'success');
                     loadSavedLists();
+                } else if (data.exists) {
+                    if (confirm(`A list named '${name}' already exists. Overwrite?`)) {
+                        const r2 = await fetch('/exclude/save', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ name: name, overwrite: true })
+                        });
+                        const data2 = await r2.json();
+                        if (data2.ok) {
+                            showMessage(`Overwrote list: ${name}`, 'success');
+                            loadSavedLists();
+                        } else {
+                            showMessage(`Error: ${data2.error}`, 'error');
+                        }
+                    }
                 } else {
                     showMessage(`Error: ${data.error}`, 'error');
                 }
@@ -432,14 +452,23 @@
                     if (data.ok) {
                         const lists = data.lists;
                         const container = document.getElementById('savedLists');
+                        const select = document.getElementById('savedListSelect');
+                        select.innerHTML = '';
+
+                        // Load active list info
+                        fetch('/exclude/last').then(r => r.json()).then(lastResp => {
+                            let active = (lastResp && lastResp.ok && lastResp.last) ? (lastResp.last.name || 'None') : 'None';
+                            document.getElementById('activeList').textContent = active || 'None';
+                        }).catch(()=>{});
                         
                         if (lists.length === 0) {
                             container.innerHTML = '<div class="empty-message" style="grid-column: 1/-1;">No saved lists yet</div>';
+                            select.innerHTML = '<option value="">-- No saved lists --</option>';
                         } else {
                             container.innerHTML = lists.map(list => `
                                 <div class="list-card">
                                     <h5>${list.title}</h5>
-                                    <div class="count">${list.count} stocks</div>
+                                    <div class="count">${list.count} tickers</div>
                                     <div class="date">${new Date(list.created).toLocaleDateString()}</div>
                                     <div class="card-actions">
                                         <button class="btn-success btn-sm" onclick="applyList('${list.name}')">Apply</button>
@@ -448,10 +477,25 @@
                                     </div>
                                 </div>
                             `).join('');
+
+                            // populate select
+                            lists.forEach(list => {
+                                const opt = document.createElement('option');
+                                opt.value = list.name;
+                                opt.text = list.title + ' (' + list.count + ')';
+                                select.appendChild(opt);
+                            });
                         }
                     }
                 })
                 .catch(err => console.error('Error loading saved lists:', err));
+        }
+
+        function applySelected() {
+            const sel = document.getElementById('savedListSelect');
+            const name = sel.value;
+            if (!name) { showMessage('Please choose a saved list', 'error'); return; }
+            applyList(name);
         }
         
         function applyList(name) {

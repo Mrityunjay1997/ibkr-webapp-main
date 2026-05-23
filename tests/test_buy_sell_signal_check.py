@@ -285,3 +285,115 @@ def test_mixed_conditions_one_false():
 
     # price ok, rsi fails
     assert out["signal"] == "no"
+
+
+def test_fast_ema_value_mode_compares_ema_to_threshold():
+    d = Dummy()
+    data = minimal_data()
+    data.update({
+        "cusip": "X",
+        "close": 95,
+        "emaFast": 100,
+    })
+
+    form = minimal_form()
+    form.update({
+        "ComparisonFastEMA": "greaterEqual",
+        "FastEMABool": "value",
+        "PercentageFastEMA": "100",
+    })
+
+    out = d.buySellSignalCheck(data, form)
+
+    assert out["signal"] == "yes"
+    assert out["variableResults"]["emaFast"] is True
+
+
+def test_fast_ema_percentage_mode_compares_close_to_adjusted_ema():
+    d = Dummy()
+    data = minimal_data()
+    data.update({
+        "cusip": "X",
+        "close": 106,
+        "emaFast": 100,
+    })
+
+    form = minimal_form()
+    form.update({
+        "ComparisonFastEMA": "greater",
+        "FastEMABool": "percentage",
+        "PercentageFastEMA": "5",
+    })
+
+    out = d.buySellSignalCheck(data, form)
+
+    assert out["signal"] == "yes"
+    assert out["variableResults"]["emaFast"] is True
+
+
+def test_fast_ema_percentage_mode_boundary_respects_strict_greater():
+    d = Dummy()
+    data = minimal_data()
+    data.update({
+        "cusip": "X",
+        "close": 105,
+        "emaFast": 100,
+    })
+
+    form = minimal_form()
+    form.update({
+        "ComparisonFastEMA": "greater",
+        "FastEMABool": "percentage",
+        "PercentageFastEMA": "5",
+    })
+
+    out = d.buySellSignalCheck(data, form)
+
+    assert out["signal"] == "no"
+    assert out["variableResults"]["emaFast"] is False
+
+
+def test_slow_ema_percentage_lower_equal():
+    d = Dummy()
+    data = minimal_data()
+    data.update({
+        "cusip": "X",
+        "close": 95,
+        "emaSlow": 100,
+    })
+
+    form = minimal_form()
+    form.update({
+        "ComparisonSlowEMA": "lowerEqual",
+        "SlowEMABool": "percentage",
+        "PercentageSlowEMA": "-5",
+    })
+
+    out = d.buySellSignalCheck(data, form)
+
+    assert out["signal"] == "yes"
+    assert out["variableResults"]["emaSlow"] is True
+
+
+def test_fast_ema_between_percentage_uses_close_between_adjusted_emas():
+    d = Dummy()
+    data = minimal_data()
+    data.update({
+        "cusip": "X",
+        "close": 110,
+        "emaFast": 100,
+        "emaFast1": 120,
+    })
+
+    form = minimal_form()
+    form.update({
+        "ComparisonFastEMA": "between",
+        "FastEMABool": "percentage",
+        "PercentageFastEMA": "5",
+        "PercentageFastEMA1": "0",
+    })
+
+    out = d.buySellSignalCheck(data, form)
+
+    assert out["signal"] == "yes"
+    assert out["variableResults"]["emaFast"] is True

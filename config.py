@@ -41,7 +41,7 @@ class Config:
         self.muted_ibapi_errors = ["version does not support", "data farm connection", "EId with tickerId"]
 
         self.enable_contract_cache = ibkr_section.get(
-            "enable_contract_cache", "true"
+            "enable_contract_cache", "false"
         ).lower() in ("1", "true", "yes", "on")
 
         self.cache_path = Path(
@@ -86,7 +86,7 @@ class Config:
         )
 #change FALSE to true 3/9/2026 testing
         self.cache_garbage_collection = ibkr_section.getboolean(
-            "cache_garbage_collection", True
+            "cache_garbage_collection", False
         )
 
 

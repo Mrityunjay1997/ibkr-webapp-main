@@ -49,22 +49,22 @@ test_data = {
 }
 
 # Should detect with 1% proximity
-result = detect_nearby_key_levels(test_data, proximity_pct=1.0)
-print(f"   Near key level (1% proximity): {result}")
-assert result == True, "Should detect nearby key level"
+is_near, lvl_name, lvl_val = detect_nearby_key_levels(test_data, proximity_pct=1.0, level_type='pivot1')
+print(f"   Near key level (1% proximity): {(is_near, lvl_name, lvl_val)}")
+assert is_near == True, "Should detect nearby key level"
 print("   ✓ Passed")
 
 # Should NOT detect with very tight proximity
-result = detect_nearby_key_levels(test_data, proximity_pct=0.01)
-print(f"   Near key level (0.01% proximity): {result}")
-assert result == False, "Should NOT detect with very tight proximity"
+is_near, lvl_name, lvl_val = detect_nearby_key_levels(test_data, proximity_pct=0.01, level_type='pivot1')
+print(f"   Near key level (0.01% proximity): {(is_near, lvl_name, lvl_val)}")
+assert is_near == False, "Should NOT detect with very tight proximity"
 print("   ✓ Passed")
 
 # Test 4: Edge cases
 print("\n4. Testing Edge Cases")
 empty_data = {'close': 100.0}
-result = detect_nearby_key_levels(empty_data, proximity_pct=1.0)
-assert result == False, "Should return False for missing levels"
+is_near, lvl_name, lvl_val = detect_nearby_key_levels(empty_data, proximity_pct=1.0)
+assert is_near == False, "Should return False for missing levels"
 print("   ✓ Passed - handles missing levels")
 
 print("\n✅ All monitoring tests passed!")

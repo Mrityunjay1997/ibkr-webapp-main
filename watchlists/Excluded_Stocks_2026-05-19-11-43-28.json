@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "title": "Excluded Stocks 2026-05-19-11-43-28",
+    "created_at": "2026-05-19T11:43:30.545241+00:00"
+  },
+  "tickers": [
+    {
+      "ticker": "AS",
+      "cusip": "excluded0"
+    },
+    {
+      "ticker": "D",
+      "cusip": "excluded1"
+    },
+    {
+      "ticker": "F",
+      "cusip": "excluded2"
+    },
+    {
+      "ticker": "NOW",
+      "cusip": "excluded3"
+    },
+    {
+      "ticker": "TE",
+      "cusip": "excluded4"
+    },
+    {
+      "ticker": "ZETA",
+      "cusip": "excluded5"
+    }
+  ]
+}

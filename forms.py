@@ -450,19 +450,6 @@ class Parameters(FlaskForm):
     )
 
     # ------------------------------------------------------------------
-    # 2nd Pullback Retracement
-    # ------------------------------------------------------------------
-
-    PullbackPct2 = IntegerField("2nd Pullback Retracement")
-    PercentagePullbackPct2 = DecimalField("2nd Pullback Retracement %")
-    PercentagePullbackPct2_1 = DecimalField("2nd Pullback Retracement %1")
-
-    ComparisonPullbackPct2 = SelectField(
-        "2nd Pullback Retracement",
-        choices=_STANDARD_COMPARISON_CHOICES,
-    )
-
-    # ------------------------------------------------------------------
     # Fibonacci Pullback (retracement levels on intraday/session moves)
     # ------------------------------------------------------------------
     # Fibonacci pullback checks if price is near Fib retracement levels
@@ -497,58 +484,6 @@ class Parameters(FlaskForm):
     )
 
     # ------------------------------------------------------------------
-    # Gap Pullback (intraday pullback to overnight gap Fib levels)
-    # ------------------------------------------------------------------
-    # Gap Pullback checks if intraday price is near Fib retracement levels
-    # of the overnight gap (open - previous close)
-    # Can select specific Fib level (38.2%, 50%, 61.8%, 78.6%)
-    # and tolerance percentage
-    #
-    # Example: If a stock gaps up 10%, the 50% Fibonacci level would be at 5%
-    # A "50% pullback" means price has pulled back 50% of the gap size
-    # 
-    # Use this to find stocks that gapped and are now at key pullback levels:
-    # - 38.2%: Shallow pullback, strong momentum continuation likely
-    # - 50%: Mid-level pullback, balanced risk/reward
-    # - 61.8%: Deep pullback, potential reversal area or strong support
-    # - 78.6%: Near-complete pullback, major support/resistance
-
-    GapPullbackLevel = SelectField(
-        "Gap Level",
-        choices=[
-            ("38.2", "38.2% (Shallow)"),
-            ("50.0", "50.0% (Mid)"),
-            ("61.8", "61.8% (Deep)"),
-            ("78.6", "78.6% (Full)"),
-        ],
-        default="61.8",
-    )
-
-    GapPullback = DecimalField(
-        "Gap Pullback Tolerance %",
-        render_kw={
-            "title": "Tolerance percentage above/below the target Fib level",
-            "placeholder": "e.g., 0.5 for ±0.5% tolerance"
-        }
-    )
-    PercentageGapPullback = DecimalField("Gap Pullback Within %")
-    PercentageGapPullback1 = DecimalField("Gap Pullback Within %1")
-
-    ComparisonGapPullback = SelectField(
-        "Gap Pullback",
-        choices=_STANDARD_COMPARISON_CHOICES,
-    )
-
-    GapPullback_tf = SelectField(
-        "Gap Pullback TF",
-        choices=TIMEFRAME_CHOICES,
-        default="1 min",
-    )
-
-    # ------------------------------------------------------------------
-    # Advanced Fibonacci Gap Pullback (v2 - Intelligent Level Selection)
-    # ------------------------------------------------------------------
-    # Enhanced gap pullback analysis with:
     # - Smart Fib level selection based on risk/reward
     # - Recent peak/valley context (configurable lookback)
     # - Multiple level analysis with confidence scoring
@@ -563,10 +498,10 @@ class Parameters(FlaskForm):
 
     # Lookback period for recent peaks/valleys
     FibGapLookbackDays = IntegerField(
-        "Lookback Days",
+        "Lookback Bars",
         render_kw={
-            "title": "Number of days to look back for recent peaks/valleys",
-            "placeholder": "e.g., 20 for 20-day lookback"
+            "title": "Number of bars to look back for recent peaks/valleys",
+            "placeholder": "e.g., 20 for 20-bar lookback"
         }
     )
 
@@ -644,119 +579,6 @@ class Parameters(FlaskForm):
             "title": "Target profit as % of gap move (e.g., 2.0)",
             "placeholder": "e.g., 2.0"
         }
-    )
-
-    # Gap direction preference
-    FibGapDirection = SelectField(
-        "Gap Direction",
-        choices=[
-            ("long", "Long (Gap Up)"),
-            ("short", "Short (Gap Down)"),
-            ("both", "Both"),
-        ],
-        default="long",
-    )
-
-    # Use recent peak/valley context
-    FibGapUseRecentContext = BooleanField(
-        "Use Recent Context",
-        render_kw={
-            "title": "Consider recent peaks/valleys in level selection"
-        }
-    )
-
-    # Time frame for gap analysis
-    FibGap_tf = SelectField(
-        "Gap Analysis TF",
-        choices=TIMEFRAME_CHOICES,
-        default="1 day",
-    )
-
-    # ------------------------------------------------------------------
-    # ------------------------------------------------------------------
-    # WHAT IS A GAP UP?
-    # A gap up occurs when today's opening price is HIGHER than yesterday's
-    # closing price. This happens when significant news/events occur after 
-    # hours, causing the stock to open at a higher price.
-    #
-    # WHAT THE "GAP %" SHOWS:
-    # The percentage increase from yesterday's close to today's open.
-    # Example: If yesterday closed at $100 and today opened at $103, 
-    #          that's a 3% gap up.
-    #
-    # IS THE GAP CLOSED?
-    # A gap is considered CLOSED when price returns to yesterday's close level.
-    # If stock gapped up to $103 but then drops back below $100 (yesterday's close),
-    # the gap has been filled/closed.
-    #
-    # USE THIS TO FIND:
-    # - Bullish stocks with strong overnight demand (gap-up plays)
-    # - Stocks showing strength that may continue upward
-    # - Potential pullback entry points (when gap closes)
-
-    UpGap = IntegerField(
-        "Up Gap %",
-        render_kw={
-            "title": "Minimum gap up percentage to find (e.g., 3 for 3% gap up)",
-            "placeholder": "Enter minimum % gap"
-        }
-    )
-    PercentageUpGap = DecimalField("Up Gap %")
-    PercentageUpGap1 = DecimalField("Up Gap %1")
-
-    ComparisonUpGap = SelectField(
-        "Up Gap",
-        choices=_STANDARD_COMPARISON_CHOICES,
-    )
-
-    # ------------------------------------------------------------------
-    # Down Gap (daily gap down from previous close 9:30 AM - 4 PM EST)
-    # ------------------------------------------------------------------
-    # WHAT IS A GAP DOWN?
-    # A gap down occurs when today's opening price is LOWER than yesterday's
-    # closing price. This happens when negative news/events occur after hours,
-    # causing the stock to open at a lower price.
-    #
-    # WHAT THE "GAP %" SHOWS:
-    # The percentage decrease from yesterday's close to today's open.
-    # Example: If yesterday closed at $100 and today opened at $97,
-    #          that's a 3% gap down.
-    #
-    # IS THE GAP CLOSED?
-    # A gap is considered CLOSED when price returns to yesterday's close level.
-    # If stock gapped down to $97 but then rises back above $100 (yesterday's close),
-    # the gap has been filled/closed.
-    #
-    # USE THIS TO FIND:
-    # - Bearish stocks with weakness from overnight news (gap-down plays)
-    # - Short opportunities or potential reversal trades
-    # - Support levels at yesterday's close (where gap would fill)
-
-    DownGap = IntegerField(
-        "Down Gap %",
-        render_kw={
-            "title": "Minimum gap down percentage to find (e.g., 3 for 3% gap down)",
-            "placeholder": "Enter minimum % gap"
-        }
-    )
-    PercentageDownGap = DecimalField("Down Gap %")
-    PercentageDownGap1 = DecimalField("Down Gap %1")
-
-    ComparisonDownGap = SelectField(
-        "Down Gap",
-        choices=_STANDARD_COMPARISON_CHOICES,
-    )
-
-    # Fibonacci Gap (daily gap vs Fib retracement levels)
-    # ------------------------------------------------------------------
-
-    FibGap = IntegerField("Fibonacci Gap")
-    PercentageFibGap = DecimalField("Fibonacci Gap %")
-    PercentageFibGap1 = DecimalField("Fibonacci Gap %1")
-
-    ComparisonFibGap = SelectField(
-        "Fibonacci Gap",
-        choices=_STANDARD_COMPARISON_CHOICES,
     )
 
     ComparisonPivotPoint = SelectField(
@@ -869,10 +691,7 @@ class Parameters(FlaskForm):
 
     BreakHigh_tf = SelectField("Break High Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     PullbackPct_tf = SelectField("Pullback Retracement Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
-    PullbackPct2_tf = SelectField("2nd Pullback Retracement Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
-    UpGap_tf = SelectField("Up Gap Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
-    DownGap_tf = SelectField("Down Gap Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
-    FibGap_tf = SelectField("Fibonacci Gap Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
+    relativeVolume_tf = SelectField("Relative Volume Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     Pivot_tf = SelectField("Pivot Point Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     Pivot_tf2 = SelectField("Pivot 2 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
     Pivot_tf3 = SelectField("Pivot 3 Time Frame", choices=TIMEFRAME_CHOICES, default="1 day")
@@ -1203,9 +1022,9 @@ class Parameters(FlaskForm):
     )
     
     GapLookbackDays = IntegerField(
-        "Gap Lookback Period (days)",
+        "Gap Lookback Period (bars)",
         default=60,
-        render_kw={"title": "Number of days to look back for gaps", "min": 5, "max": 252}
+        render_kw={"title": "Number of bars to look back for gaps", "min": 5, "max": 252}
     )
     
     GapMinimumPercent = FloatField(
@@ -1231,11 +1050,11 @@ class Parameters(FlaskForm):
     # ------------------------------------------------------------------
     
     ExcludeStocksList = StringField(
-        "Exclude Stocks (comma-separated)",
+        "Excluded Stocks (comma-separated)",
         default="",
         render_kw={
             "placeholder": "e.g. XYZ, ABC, DEF (leave blank for none)",
-            "title": "Comma-separated list of stock symbols to exclude from scans"
+            "title": "Comma-separated list of stock tickers to exclude from scans"
         }
     )
     
@@ -1273,61 +1092,6 @@ class Parameters(FlaskForm):
         render_kw={"title": "Read stock name when price change exceeds threshold"}
     )
     
-    EnableRVOLMonitor = BooleanField(
-        "Enable RVOL (Relative Volume) Monitoring",
-        default=False,
-        render_kw={"title": "Monitor stocks by relative volume (per-stock basis)"}
-    )
-    
-    RVOLLookbackDays = IntegerField(
-        "RVOL Lookback (days)",
-        default=5,
-        render_kw={"title": "Calculate RVOL based on average volume over past X days", "min": 1, "max": 60}
-    )
-    
-    RVOLThreshold = FloatField(
-        "RVOL Threshold (multiplier)",
-        default=1.5,
-        render_kw={"title": "Alert when RVOL exceeds this multiplier (e.g., 1.5 = 150% of average)", "min": 0.5, "max": 10.0, "step": 0.1}
-    )
-    
-    EnableRVOLTTS = BooleanField(
-        "Read Alert on RVOL Spike",
-        default=True,
-        render_kw={"title": "Read stock name and RVOL value when RVOL exceeds threshold"}
-    )
-    
-    EnableKeyLevelDetection = BooleanField(
-        "Enable Key Level Detection",
-        default=False,
-        render_kw={"title": "Highlight stocks near selected key level (VWAP, Gap Close, or Pivot)"}
-    )
-    
-    KeyLevelType = SelectField(
-        "Key Level Type",
-        default="vwap",
-        choices=[
-            ("vwap", "VWAP (Volume Weighted Average Price)"),
-            ("gapclose", "Gap Close Level"),
-            ("pivot1", "Pivot Point (Primary)"),
-            ("pivot2", "Pivot Point 2 (Secondary)"),
-            ("pivot3", "Pivot Point 3 (Tertiary)")
-        ],
-        render_kw={"title": "Select the key level type to monitor"}
-    )
-    
-    KeyLevelProximityPercent = FloatField(
-        "Key Level Proximity %",
-        default=1.0,
-        render_kw={"title": "Highlight when within X% of selected key level", "min": 0.1, "max": 5.0, "step": 0.1}
-    )
-    
-    EnableKeyLevelTTS = BooleanField(
-        "Read Alert on Key Level Hit",
-        default=True,
-        render_kw={"title": "Read stock name and which key level was hit"}
-    )
-
     # ------------------------------------------------------------------
     # 200 SMA BULLISH CROSSOVER DETECTION
     # ------------------------------------------------------------------
@@ -1342,40 +1106,6 @@ class Parameters(FlaskForm):
         "Read Alert on 200 SMA Bullish Crossover",
         default=True,
         render_kw={"title": "Read stock name and indicator name when bullish 200 SMA crossover detected"}
-    )
-
-    # ------------------------------------------------------------------
-    # ON BALANCE VOLUME (OBV) ANALYSIS
-    # ------------------------------------------------------------------
-    
-    EnableOBVAnalysis = BooleanField(
-        "Enable OBV Analysis",
-        default=False,
-        render_kw={"title": "Analyze On Balance Volume strength and trend"}
-    )
-    
-    OBVTrendPeriod = IntegerField(
-        "OBV Trend Period (bars)",
-        default=20,
-        render_kw={"title": "Lookback period for OBV trend analysis", "min": 5, "max": 200, "step": 5}
-    )
-    
-    OBVMovingAveragePeriod = IntegerField(
-        "OBV Moving Average Period",
-        default=10,
-        render_kw={"title": "Period for OBV moving average comparison", "min": 3, "max": 50, "step": 1}
-    )
-    
-    OBVStrengthThreshold = FloatField(
-        "OBV Strength Threshold (%)",
-        default=15.0,
-        render_kw={"title": "Minimum % change in OBV to consider 'strong'", "min": 1.0, "max": 100.0, "step": 1.0}
-    )
-    
-    EnableOBVTTS = BooleanField(
-        "Read Alert on Strong OBV Changes",
-        default=True,
-        render_kw={"title": "Read stock name when OBV shows strong rising/declining momentum"}
     )
 
     # ------------------------------------------------------------------
@@ -1484,12 +1214,9 @@ class Parameters(FlaskForm):
     filterCross200SMA = BooleanField("Filter by Cross 200 SMA", default=False)
     filterBreakHigh = BooleanField("Filter by Break High", default=False)
     filterPullbackPct = BooleanField("Filter by Pullback %", default=False)
-    filterPullbackPct2 = BooleanField("Filter by Pullback % 2", default=False)
     filterFibPullback = BooleanField("Filter by Fib Pullback", default=False)
     filterGapPullback = BooleanField("Filter by Gap Pullback", default=False)
     filterPivotPoint = BooleanField("Filter by Pivot Point", default=False)
-    filterUpGap = BooleanField("Filter by Up Gap", default=False)
-    filterDownGap = BooleanField("Filter by Down Gap", default=False)
     filterNewsKeyword = BooleanField("Filter by News Keywords", default=False)
     filterMarketCap = BooleanField("Filter by Market Cap", default=False)
     filterVolume = BooleanField("Filter by Volume", default=False)

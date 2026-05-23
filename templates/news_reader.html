@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>News Reader</title>
+  <link rel="stylesheet" href="{{ url_for('static',filename='css/bootstrap.css') }}">
+  <style>
+    body { background:#f6f8fa; color:#24292f; font-family: Arial, sans-serif; }
+    .page-shell { max-width:1180px; margin:0 auto; padding:24px 18px 42px; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:14px; margin-bottom:18px; }
+    .topbar h1 { margin:0; font-size:28px; font-weight:700; }
+    .topbar a { color:#0969da; font-weight:600; }
+    .toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:end; padding:14px 0 18px; border-top:1px solid #d0d7de; border-bottom:1px solid #d0d7de; }
+    .field { display:flex; flex-direction:column; gap:5px; }
+    .field label { font-size:12px; color:#57606a; margin:0; }
+    select, input { border:1px solid #d0d7de; border-radius:6px; padding:7px 9px; background:white; min-height:34px; }
+    button { border:1px solid #0969da; background:#0969da; color:white; border-radius:6px; min-height:34px; padding:7px 12px; font-weight:600; }
+    button.secondary { background:white; color:#0969da; }
+    .status { color:#57606a; font-size:13px; margin:14px 0; }
+    .feed { display:grid; grid-template-columns:1fr; gap:8px; }
+    .news-row { background:white; border:1px solid #d0d7de; border-radius:8px; padding:10px 12px; display:grid; grid-template-columns:90px 150px 1fr; gap:10px; align-items:center; }
+    .symbol { font-weight:700; color:#0969da; }
+    .time { color:#57606a; font-size:12px; }
+    .headline { font-size:14px; }
+    @media (max-width: 720px) {
+      .news-row { grid-template-columns:1fr; gap:4px; }
+      .topbar { align-items:flex-start; flex-direction:column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page-shell">
+    <div class="topbar">
+      <h1>News Reader</h1>
+      <a href="/morfeo">Back to Scanner</a>
+    </div>
+
+    <div class="toolbar">
+      <div class="field">
+        <label for="source">Source</label>
+        <select id="source">
+          <option value="scanner-loop">Scanner Loop</option>
+          <option value="background">Background Scan</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="withinValue">Read Within</label>
+        <input id="withinValue" type="number" min="0" step="1" value="0">
+      </div>
+      <div class="field">
+        <label for="withinUnit">Unit</label>
+        <select id="withinUnit">
+          <option value="minutes">Minutes</option>
+          <option value="hours">Hours</option>
+          <option value="days">Days</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="volume">Volume</label>
+        <input id="volume" type="range" min="0" max="1" step="0.05" value="0.7">
+      </div>
+      <button type="button" id="refreshBtn">Refresh</button>
+      <button type="button" id="readBtn">Read New</button>
+      <button type="button" id="stopBtn" class="secondary">Stop</button>
+    </div>
+
+    <div id="status" class="status">Waiting for scanner results.</div>
+    <section id="feed" class="feed"></section>
+  </main>
+
+  <script>
+    const seen = new Set();
+    let latestItems = [];
+
+    function sourceConfig() {
+      const source = document.getElementById("source").value;
+      if (source === "background") {
+        return {
+          endpoint: "/background/results",
+          tabId: localStorage.getItem("ibkrBackgroundTabId") || ""
+        };
+      }
+      return {
+        endpoint: "/scanner-loop/results",
+        tabId: localStorage.getItem("ibkrScannerLoopTabId") || ""
+      };
+    }
+
+    function withinMinutes() {
+      const value = parseInt(document.getElementById("withinValue").value || "0", 10);
+      const unit = document.getElementById("withinUnit").value;
+      if (!value || value < 1) return 0;
+      if (unit === "hours") return value * 60;
+      if (unit === "days") return value * 1440;
+      return value;
+    }
+
+    function parseTime(value) {
+      if (!value) return null;
+      const direct = new Date(value);
+      if (!Number.isNaN(direct.getTime())) return direct;
+      const text = String(value).replace(".", " ").trim();
+      const compact = text.match(/^(\d{4})(\d{2})(\d{2})[ -](\d{2}):(\d{2}):(\d{2})/);
+      if (compact) {
+        return new Date(Date.UTC(+compact[1], +compact[2] - 1, +compact[3], +compact[4], +compact[5], +compact[6]));
+      }
+      return null;
+    }
+
+    function collectNews(payload) {
+      const root = payload && (payload.result || payload.results || payload);
+      const items = [];
+      function walk(node) {
+        if (!node || typeof node !== "object") return;
+        if (Array.isArray(node)) {
+          node.forEach(walk);
+          return;
+        }
+        if (Array.isArray(node.newsHeadlines)) {
+          const symbol = node.symbol || node.cusip || "???";
+          node.newsHeadlines.forEach((h) => {
+            const key = [symbol, h.provider || "", h.articleId || "", h.headline || ""].join("|");
+            items.push({
+              key,
+              symbol,
+              headline: h.headline || "",
+              time: h.parsedTime || h.time || "",
+              provider: h.provider || ""
+            });
+          });
+        }
+        Object.keys(node).forEach((k) => walk(node[k]));
+      }
+      walk(root);
+      const cutoff = withinMinutes() ? Date.now() - withinMinutes() * 60000 : 0;
+      return items.filter((item) => {
+        if (!cutoff) return true;
+        const dt = parseTime(item.time);
+        return dt && dt.getTime() >= cutoff;
+      }).sort((a, b) => {
+        const at = parseTime(a.time);
+        const bt = parseTime(b.time);
+        return (bt ? bt.getTime() : 0) - (at ? at.getTime() : 0);
+      });
+    }
+
+    function render(items) {
+      const feed = document.getElementById("feed");
+      feed.innerHTML = "";
+      items.forEach((item) => {
+        const row = document.createElement("article");
+        row.className = "news-row";
+        row.innerHTML = "<div class='symbol'></div><div class='time'></div><div class='headline'></div>";
+        row.children[0].textContent = item.symbol;
+        row.children[1].textContent = item.time || item.provider;
+        row.children[2].textContent = item.headline;
+        feed.appendChild(row);
+      });
+      document.getElementById("status").textContent = items.length
+        ? "Loaded " + items.length + " headlines."
+        : "No headlines found for this source and time window.";
+    }
+
+    async function refresh() {
+      const cfg = sourceConfig();
+      if (!cfg.tabId) {
+        document.getElementById("status").textContent = "Open the scanner page and start that loop once so this page can attach to its tab id.";
+        return;
+      }
+      const response = await fetch(cfg.endpoint + "?tab_unique_id=" + encodeURIComponent(cfg.tabId));
+      const payload = await response.json();
+      latestItems = collectNews(payload);
+      render(latestItems);
+    }
+
+    function speak(text) {
+      if (!window.speechSynthesis || !text) return;
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.volume = parseFloat(document.getElementById("volume").value || "0.7");
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function readNew() {
+      latestItems.forEach((item) => {
+        if (seen.has(item.key)) return;
+        seen.add(item.key);
+        speak(item.symbol + ": " + item.headline);
+      });
+    }
+
+    document.getElementById("refreshBtn").addEventListener("click", refresh);
+    document.getElementById("readBtn").addEventListener("click", readNew);
+    document.getElementById("stopBtn").addEventListener("click", () => {
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+    });
+    document.getElementById("source").addEventListener("change", refresh);
+    setInterval(refresh, 10000);
+    refresh();
+  </script>
+</body>
+</html>
