@@ -71,6 +71,8 @@ def _safe_compare(value, op, threshold):
         return value < threshold
     if op == "<=":
         return value <= threshold
+    if op == "=":
+        return value == threshold
 
     raise ValueError(f"Unsupported operator: {op}")
 
@@ -129,6 +131,8 @@ def _compare_indicator_value(value, comparison, threshold):
         return _safe_compare(value, "<", threshold)
     if comparison == "lowerEqual":
         return _safe_compare(value, "<=", threshold)
+    if comparison == "equal":
+        return _safe_compare(value, "=", threshold)
     return None
 
 
@@ -177,6 +181,88 @@ def _compare_indicator_condition(data, form, *, data_key, comparison_key, thresh
         )
 
     return None
+
+
+_PIVOT_LEVEL_KEY_MAP = {
+    "PP": "pivot_point",
+    "Pivot": "pivot_point",
+    "Pivot Point": "pivot_point",
+    "R1": "resistance_1",
+    "Resistance 1": "resistance_1",
+    "R2": "resistance_2",
+    "Resistance 2": "resistance_2",
+    "S1": "support_1",
+    "Support 1": "support_1",
+    "S2": "support_2",
+    "Support 2": "support_2",
+}
+
+
+_PIVOT_RESULT_LABELS = {
+    "pivot_point": "Pivot Point",
+    "resistance_1": "Resistance 1",
+    "resistance_2": "Resistance 2",
+    "support_1": "Support 1",
+    "support_2": "Support 2",
+}
+
+
+def _normalize_pivot_selection(selection):
+    return _PIVOT_LEVEL_KEY_MAP.get(selection, "pivot_point")
+
+
+def _build_pivot_level_map(prev_h, prev_l, prev_c):
+    pivot = (prev_h + prev_l + prev_c) / 3.0
+    resistance_1 = (2 * pivot) - prev_l
+    support_1 = (2 * pivot) - prev_h
+    resistance_2 = pivot + (prev_h - prev_l)
+    support_2 = pivot - (prev_h - prev_l)
+    return {
+        "pivot_point": pivot,
+        "resistance_1": resistance_1,
+        "resistance_2": resistance_2,
+        "support_1": support_1,
+        "support_2": support_2,
+    }
+
+
+def _legacy_pivot_payload(pivot_levels):
+    return {
+        "Pivot": pivot_levels.get("pivot_point"),
+        "R1": pivot_levels.get("resistance_1"),
+        "R2": pivot_levels.get("resistance_2"),
+        "S1": pivot_levels.get("support_1"),
+        "S2": pivot_levels.get("support_2"),
+    }
+
+
+def _get_pivot_level_value(data, selection):
+    pivot_levels = data.get("pivotLevels") or {}
+    return pivot_levels.get(_normalize_pivot_selection(selection))
+
+
+def _store_indicator_evaluation(variable_results, evaluation_debug, key, condition, **details):
+    if condition is None:
+        return
+    bool_condition = bool(condition)
+    evaluation_debug[key] = {
+        "passed": bool_condition,
+        **details,
+    }
+
+
+def _calculate_single_moving_average(result_full, *, indicator_cls, window_value, default_window):
+    try:
+        window = int(window_value or default_window)
+    except Exception:
+        window = default_window
+    try:
+        indicator = indicator_cls(close=result_full["close"], window=window)
+        series = indicator.sma_indicator() if indicator_cls is SMAIndicator else None
+    except Exception:
+        indicator = None
+        series = None
+    return window, indicator, series
 
 
 # Modes that are NOT simple > >= < <= comparisons
@@ -571,161 +657,60 @@ def apply_result_filters(stock_data: dict, form: dict) -> bool:
         If no filters are enabled, returns True (include all).
     """
     
-    # Track if any filters are enabled
     any_filter_enabled = False
-    
-    # Helper to evaluate if an indicator meets its configured condition
-    def check_indicator_condition(indicator_value, indicator_key, comparison_key, value_key, value_key1=None):
-        """Check if indicator meets the configured comparison condition."""
-        # Safely convert indicator value to float
-        indicator_value = _safe_to_float(indicator_value)
-        if indicator_value is None:
-            return False
-        
-        comparison = form.get(comparison_key, "Not used")
-        if comparison == "Not used":
-            # Filter was enabled, but no comparison operator was selected.
-            # Do not treat this as a pass, otherwise invalid filter config can show false positives.
-            logger.debug("Filter %s enabled but comparison %s is Not used", indicator_key, comparison_key)
-            return False
-        
-        # Get comparison thresholds
-        threshold = form.get(value_key)
-        threshold1 = form.get(value_key1) if value_key1 else None
-        
-        if threshold in (None, ""):
-            logger.debug("Filter %s enabled but threshold %s is missing", indicator_key, value_key)
-            return False
-        
-        # Safely convert thresholds to float
-        threshold = _safe_to_float(threshold)
-        threshold1 = _safe_to_float(threshold1) if threshold1 else None
-        
-        if threshold is None:
-            logger.debug("Filter %s enabled but threshold %s could not be parsed", indicator_key, value_key)
-            return False
-        
-        # If threshold1 was provided but conversion failed, use threshold as fallback
-        if threshold1 is None and value_key1:
-            threshold1 = threshold
-        
-        # Evaluate based on comparison operator
-        try:
-            if comparison == "greater":
-                return indicator_value > threshold
-            elif comparison == "greaterEqual":
-                return indicator_value >= threshold
-            elif comparison == "lower":
-                return indicator_value < threshold
-            elif comparison == "lowerEqual":
-                return indicator_value <= threshold
-            elif comparison == "between":
-                # Both thresholds required for 'between'
-                if threshold1 is None:
-                    logger.debug("Filter %s enabled with 'between' but second threshold %s is missing", indicator_key, value_key1)
-                    return False
-                # Ensure threshold <= threshold1
-                min_val, max_val = min(threshold, threshold1), max(threshold, threshold1)
-                return min_val <= indicator_value <= max_val
-            elif comparison == "withinPercentAbove":
-                # Note: indicator_value is the current close, threshold is the reference level
-                pct_diff = abs(threshold1 - threshold) if threshold1 else 0
-                return _within_percent_check(threshold, indicator_value, "withinPercentAbove", pct_diff)
-            elif comparison == "withinPercentBelow":
-                pct_diff = abs(threshold1 - threshold) if threshold1 else 0
-                return _within_percent_check(threshold, indicator_value, "withinPercentBelow", pct_diff)
-            elif comparison == "withinPercentEither":
-                pct_diff = abs(threshold1 - threshold) if threshold1 else 0
-                return _within_percent_check(threshold, indicator_value, "withinPercentEither", pct_diff)
-            else:
-                logger.debug("Unknown comparison operator %s for filter %s", comparison, indicator_key)
-                return False
-        except Exception as e:
-            logger.debug("Error evaluating condition %s: %s", comparison_key, e)
-            return False
-    
-    # Define all numeric filters as a list of tuples:
-    # (filter_key, stock_data_key, comparison_key, value_key, value_key1)
-    numeric_filters = [
-        # Top group indicators (VWAP & SMAs)
-        ("filterVWAP", "vwap", "ComparisonVWAP", "VWAP", "PercentageVWAP"),
-        ("filterFastSMA", "smaFast", "ComparisonFastSMA", "FastSMA", "PercentageFastSMA"),
-        ("filterMediumSMA", "smaMedium", "ComparisonMediumSMA", "MediumSMA", "PercentageMediumSMA"),
-        ("filterSlowSMA", "smaSlow", "ComparisonSlowSMA", "SlowSMA", "PercentageSlowSMA"),
-        
-        # Momentum indicators
-        ("filterRSI", "rsi", "ComparisonRSI", "RSI", "PercentageRSI"),
-        ("filterFastEMA", "emaFast", "ComparisonFastEMA", "FastEMA", "PercentageFastEMA"),
-        ("filterSlowEMA", "emaSlow", "ComparisonSlowEMA", "SlowEMA", "PercentageSlowEMA"),
-        ("filterOBV", "obv", "ComparisonOBV", "OBV", "PercentageOBV"),
-        ("filterFastOBV", "fast_obv", "ComparisonFastOBV", "FastOBV", "PercentageFastOBV"),
-        ("filterMediumOBV", "medium_obv", "ComparisonMediumOBV", "MediumOBV", "PercentageMediumOBV"),
-        ("filterSlowOBV", "slow_obv", "ComparisonSlowOBV", "SlowOBV", "PercentageSlowOBV"),
-        ("filterATR", "atr", "ComparisonATR", "ATR", "PercentageATR"),
-        
-        # Volume indicators
-        ("filterAverageVolume", "averageVolume", "ComparisonAverageVolume", "AverageVolume", None),
-        ("filterRelativeVolume", "relativeVolume", "ComparisonRelativeVolume", "RelativeVolume", None),
-        ("filterVolume", "volumeIndicator", "ComparisonVolume", "Volume", None),
-        
-        # Price-based indicators
-        ("filterPrevClose", "prevClose", "ComparisonPrevClose", "PrevClose", "PercentagePrevClose"),
-        ("filterPctChange", "pctChange", "ComparisonPctChange", "PctChange", "PercentagePctChange"),
-        ("filterLowOfDay", "lowOfDay", "ComparisonLowOfDay", "LowOfDay", "PercentageLowOfDay"),
-        ("filterHighOfDay", "highOfDay", "ComparisonHighOfDay", "HighOfDay", "PercentageHighOfDay"),
-        ("filterBreakHigh", "breakHigh", "ComparisonBreakHigh", "BreakHigh", "PercentageBreakHigh"),
-        
-        # Pullback and Gap indicators
-        ("filterPullbackPct", "pullbackPct", "ComparisonPullbackPct", "PullbackPct", "PercentagePullbackPct"),
-        ("filterPullbackPct2", "pullbackPct2", "ComparisonPullbackPct2", "PullbackPct2", "PercentagePullbackPct2"),
-        ("filterFibPullback", "fibPullback", "ComparisonFibPullback", "FibPullback", "PercentageFibPullback"),
-        ("filterGapPullback", "gapPullback", "ComparisonGapPullback", "GapPullback", "PercentageGapPullback"),
-        ("filterUpGap", "upGap", "ComparisonUpGap", "UpGap", "PercentageUpGap"),
-        ("filterDownGap", "downGap", "ComparisonDownGap", "DownGap", "PercentageDownGap"),
-        
-        # Market indicators
-        ("filterMarketCap", "marketCap", "ComparisonMarketCap", "MarketCap", "PercentageMarketCap"),
-    ]
-    
-    # Check all numeric filters
-    for filter_key, stock_key, comp_key, val_key, val_key1 in numeric_filters:
+    variable_results = stock_data.get("variableResults", {}) or {}
+    filter_to_result_key = {
+        "filterVWAP": "vwap",
+        "filterFastSMA": "smaFast",
+        "filterMediumSMA": "smaMedium",
+        "filterSlowSMA": "smaSlow",
+        "filterSMA1": "sma1",
+        "filterSMA2": "sma2",
+        "filterSMA3": "sma3",
+        "filterRSI": "rsi",
+        "filterFastEMA": "emaFast",
+        "filterSlowEMA": "emaSlow",
+        "filterEMA1": "ema1",
+        "filterEMA2": "ema2",
+        "filterOBV": "obv",
+        "filterFastOBV": "fast_obv",
+        "filterMediumOBV": "medium_obv",
+        "filterSlowOBV": "slow_obv",
+        "filterATR": "atr",
+        "filterAverageVolume": "averageVolume",
+        "filterRelativeVolume": "relativeVolume",
+        "filterVolume": "volumeIndicator",
+        "filterPrevClose": "prevClose",
+        "filterPctChange": "pctChange",
+        "filterLowOfDay": "lowOfDay",
+        "filterHighOfDay": "highOfDay",
+        "filterBreakHigh": "breakHigh",
+        "filterPullbackPct": "pullbackPct",
+        "filterPullbackPct2": "pullbackPct2",
+        "filterFibPullback": "fibPullback",
+        "filterGapPullback": "gapPullback",
+        "filterPivotPoint": "Pivot",
+        "filterUpGap": "upGap",
+        "filterDownGap": "downGap",
+        "filterNewsKeyword": "newsKeyword",
+        "filterMarketCap": "marketCap",
+        "filterCross50SMA": "cross50SMA",
+        "filterCross200SMA": "cross200SMA",
+    }
+
+    for filter_key, result_key in filter_to_result_key.items():
         if form.get(filter_key, False):
             any_filter_enabled = True
-            if not check_indicator_condition(stock_data.get(stock_key), stock_key, comp_key, val_key, val_key1):
+            if not variable_results.get(result_key, False):
+                logger.debug(
+                    "Rejected result row: filter=%s result_key=%s symbol=%s evaluation=%s",
+                    filter_key,
+                    result_key,
+                    stock_data.get("symbol"),
+                    variable_results.get(result_key),
+                )
                 return False
-    
-    # Cross SMA filters - check variableResults (boolean checks, not numeric comparisons)
-    if form.get("filterCross50SMA", False):
-        any_filter_enabled = True
-        variable_results = stock_data.get("variableResults", {})
-        if not (variable_results.get("cross50SMA_either") or stock_data.get("cross50SMA_either")):
-            return False
-    
-    if form.get("filterCross200SMA", False):
-        any_filter_enabled = True
-        variable_results = stock_data.get("variableResults", {})
-        if not (variable_results.get("cross200SMA_either") or stock_data.get("cross200SMA_either")):
-            return False
-    
-    # Pivot Point filter (boolean check)
-    if form.get("filterPivotPoint", False):
-        any_filter_enabled = True
-        variable_results = stock_data.get("variableResults", {})
-        if not variable_results.get("Pivot", False):
-            return False
-    
-    # News Keywords filter (boolean check)
-    if form.get("filterNewsKeyword", False):
-        any_filter_enabled = True
-        variable_results = stock_data.get("variableResults", {})
-        if not variable_results.get("newsKeyword", False):
-            return False
-    
-    # If no filters were enabled, return True (include all results)
-    if not any_filter_enabled:
-        return True
-    
-    # Stock passed all enabled filters
+
     return True
 
 
@@ -3019,6 +3004,54 @@ class IBapi(EWrapper, EClient):
                 except Exception:
                     indicators["emaSlow1"] = None
 
+        # --- Additional SMA indicators ---
+        additional_sma_definitions = [
+            ("SMA1", "ComparisonSMA1", "sma1", 30),
+            ("SMA2", "ComparisonSMA2", "sma2", 50),
+            ("SMA3", "ComparisonSMA3", "sma3", 200),
+        ]
+        for field_name, comparison_name, output_key, default_window in additional_sma_definitions:
+            if form.get(comparison_name, "Not used") == "Not used":
+                continue
+            try:
+                window = int(form.get(field_name, default_window))
+            except Exception:
+                window = default_window
+            try:
+                num_bars = len(result_full)
+                if num_bars >= window:
+                    indicator = SMAIndicator(close=result_full["close"], window=window)
+                    indicators[output_key] = last_value(indicator.sma_indicator())
+                    indicators[f"{output_key}_sufficient_data"] = True
+                else:
+                    indicators[output_key] = None
+                    indicators[f"{output_key}_sufficient_data"] = False
+            except Exception:
+                indicators[output_key] = None
+                indicators[f"{output_key}_sufficient_data"] = False
+
+        # --- Additional EMA indicators ---
+        additional_ema_definitions = [
+            ("EMA1", "ComparisonEMA1", "ema1", 9),
+            ("EMA2", "ComparisonEMA2", "ema2", 21),
+        ]
+        for field_name, comparison_name, output_key, default_window in additional_ema_definitions:
+            if form.get(comparison_name, "Not used") == "Not used":
+                continue
+            try:
+                window = int(form.get(field_name, default_window))
+            except Exception:
+                window = default_window
+            try:
+                indicator = EMAIndicator(close=result_full["close"], window=window)
+                try:
+                    indicator_series = indicator.ema_indicator()
+                except Exception:
+                    indicator_series = indicator.ema()
+                indicators[output_key] = last_value(indicator_series)
+            except Exception:
+                indicators[output_key] = None
+
         # --- OBV ---
         if form.get("ComparisonOBV", "Not used") != "Not used":
             try:
@@ -3329,50 +3362,34 @@ class IBapi(EWrapper, EClient):
                     prev_c = float(result_full["close"].iloc[-2]) if len(result_full) >= 2 else float(
                         result_full["close"].iloc[-1])
 
-                P = (prev_h + prev_l + prev_c) / 3.0
-                R1 = (2 * P) - prev_l
-                S1 = (2 * P) - prev_h
-                R2 = P + (prev_h - prev_l)
-                S2 = P - (prev_h - prev_l)
-
-                pivots = {
-                    "Pivot": P,
-                    "R1": R1,
-                    "S1": S1,
-                    "R2": R2,
-                    "S2": S2,
-                }
-
-                # user selects which pivot to use via form["PivotPoint"]; map common names
-                pp_name = form.get("PivotPoint", "Pivot")
-                # try to return requested pivot value, otherwise return the main pivot
-                val = pivots.get(pp_name, P)
-                
-                # Store all pivot levels so all display in results (PP, R1, S1, R2, S2)
-                # This allows the user to see all pivot points and exclude any they don't want
-                indicators["Pivot"] = pivots.copy()
-
-                # Also store full pivot dictionary for backward compatibility
-                indicators["PivotLevels"] = pivots.copy()
+                pivot_levels = _build_pivot_level_map(prev_h, prev_l, prev_c)
+                indicators["pivotLevels"] = pivot_levels.copy()
+                indicators["Pivot"] = _legacy_pivot_payload(pivot_levels)
+                indicators["PivotLevels"] = indicators["Pivot"].copy()
 
                 if form.get("ComparisonPivotPoint") == "between":
-                    pp_name1 = form.get("PivotPoint1", pp_name)
-                    val1 = pivots.get(pp_name1, P)
-                    indicators["Pivot1"] = {pp_name1: val1}
-                
-                # Store second pivot point
+                    pp_name1 = form.get("PivotPoint1", form.get("PivotPoint", "PP"))
+                    pivot_key1 = _normalize_pivot_selection(pp_name1)
+                    indicators["Pivot1"] = {
+                        _PIVOT_RESULT_LABELS[pivot_key1]: pivot_levels.get(pivot_key1)
+                    }
+
                 if form.get("PivotPoint2") and form.get("PivotPoint2") != "Not used":
-                    pp_name2 = form.get("PivotPoint2", pp_name)
-                    val2 = pivots.get(pp_name2, P)
-                    indicators["Pivot2"] = {pp_name2: val2}
-                
-                # Store third pivot point
+                    pp_name2 = form.get("PivotPoint2", form.get("PivotPoint", "PP"))
+                    pivot_key2 = _normalize_pivot_selection(pp_name2)
+                    indicators["Pivot2"] = {
+                        _PIVOT_RESULT_LABELS[pivot_key2]: pivot_levels.get(pivot_key2)
+                    }
+
                 if form.get("PivotPoint3") and form.get("PivotPoint3") != "Not used":
-                    pp_name3 = form.get("PivotPoint3", pp_name)
-                    val3 = pivots.get(pp_name3, P)
-                    indicators["Pivot3"] = {pp_name3: val3}
+                    pp_name3 = form.get("PivotPoint3", form.get("PivotPoint", "PP"))
+                    pivot_key3 = _normalize_pivot_selection(pp_name3)
+                    indicators["Pivot3"] = {
+                        _PIVOT_RESULT_LABELS[pivot_key3]: pivot_levels.get(pivot_key3)
+                    }
             except Exception:
                 indicators["Pivot"] = {}
+                indicators["pivotLevels"] = {}
                 indicators["Pivot1"] = {}
                 indicators["Pivot2"] = {}
                 indicators["Pivot3"] = {}
@@ -3909,6 +3926,7 @@ class IBapi(EWrapper, EClient):
         condition = True
         counting_ = 0
         variable_results = {}  # track pass/fail per variable
+        evaluation_debug = {}
 
         # -------------------------
         # AVERAGE VOLUME
@@ -4583,6 +4601,16 @@ class IBapi(EWrapper, EClient):
             condition = condition and emaFast_condition
             counting_ += 1
             variable_results["emaFast"] = bool(emaFast_condition)
+            _store_indicator_evaluation(
+                variable_results,
+                evaluation_debug,
+                "emaFast",
+                emaFast_condition,
+                data_key="emaFast",
+                operator=form.get("ComparisonFastEMA"),
+                threshold=form.get("PercentageFastEMA"),
+                parsed_value=data.get("emaFast"),
+            )
 
         # -------------------------
         # SLOW EMA
@@ -4602,6 +4630,80 @@ class IBapi(EWrapper, EClient):
             condition = condition and emaSlow_condition
             counting_ += 1
             variable_results["emaSlow"] = bool(emaSlow_condition)
+            _store_indicator_evaluation(
+                variable_results,
+                evaluation_debug,
+                "emaSlow",
+                emaSlow_condition,
+                data_key="emaSlow",
+                operator=form.get("ComparisonSlowEMA"),
+                threshold=form.get("PercentageSlowEMA"),
+                parsed_value=data.get("emaSlow"),
+            )
+
+        # -------------------------
+        # ADDITIONAL SMA / EMA
+        # -------------------------
+        additional_indicator_evaluations = [
+            {
+                "data_key": "sma1",
+                "comparison_key": "ComparisonSMA1",
+                "threshold_key": "PercentageSMA1",
+                "mode_key": "SMA1Bool",
+                "result_key": "sma1",
+            },
+            {
+                "data_key": "sma2",
+                "comparison_key": "ComparisonSMA2",
+                "threshold_key": "PercentageSMA2",
+                "mode_key": "SMA2Bool",
+                "result_key": "sma2",
+            },
+            {
+                "data_key": "sma3",
+                "comparison_key": "ComparisonSMA3",
+                "threshold_key": "PercentageSMA3",
+                "mode_key": "SMA3Bool",
+                "result_key": "sma3",
+            },
+            {
+                "data_key": "ema1",
+                "comparison_key": "ComparisonEMA1",
+                "threshold_key": "PercentageEMA1",
+                "mode_key": "EMA1Bool",
+                "result_key": "ema1",
+            },
+            {
+                "data_key": "ema2",
+                "comparison_key": "ComparisonEMA2",
+                "threshold_key": "PercentageEMA2",
+                "mode_key": "EMA2Bool",
+                "result_key": "ema2",
+            },
+        ]
+
+        for definition in additional_indicator_evaluations:
+            compare_kwargs = {
+                "data_key": definition["data_key"],
+                "comparison_key": definition["comparison_key"],
+                "threshold_key": definition["threshold_key"],
+                "mode_key": definition["mode_key"],
+            }
+            indicator_condition = _compare_indicator_condition(data, form, **compare_kwargs)
+            if indicator_condition is not None:
+                condition = condition and indicator_condition
+                counting_ += 1
+                variable_results[definition["result_key"]] = bool(indicator_condition)
+                _store_indicator_evaluation(
+                    variable_results,
+                    evaluation_debug,
+                    definition["result_key"],
+                    indicator_condition,
+                    data_key=definition["data_key"],
+                    operator=form.get(definition["comparison_key"]),
+                    threshold=form.get(definition["threshold_key"]),
+                    parsed_value=data.get(definition["data_key"]),
+                )
 
         # -------------------------
         # OBV
@@ -4977,14 +5079,13 @@ class IBapi(EWrapper, EClient):
         # PIVOT POINT
         # -------------------------
         pivot_condition = None
+        pp_name = form.get("PivotPoint", "PP")
+        pivot = _get_pivot_level_value(data, pp_name)
 
         if (
                 form["ComparisonPivotPoint"] not in _NON_SIMPLE_MODES
                 and form["pivotPointBool"] == "percentage"
         ):
-            pp_name = form.get("PivotPoint", "Pivot")
-            pivot = data["Pivot"].get(pp_name) if isinstance(data["Pivot"], dict) else None
-
             if pivot is None:
                 pivot_condition = False
             else:
@@ -5005,10 +5106,8 @@ class IBapi(EWrapper, EClient):
                 form["ComparisonPivotPoint"] == "between"
                 and form["pivotPointBool"] == "percentage"
         ):
-            pp_name = form.get("PivotPoint", "Pivot")
-            pp_name1 = form.get("PivotPoint1", "Pivot")
-            pivot = data["Pivot"].get(pp_name) if isinstance(data["Pivot"], dict) else None
-            pivot1 = data["Pivot1"].get(pp_name1) if isinstance(data["Pivot1"], dict) else None
+            pp_name1 = form.get("PivotPoint1", "PP")
+            pivot1 = _get_pivot_level_value(data, pp_name1)
 
             close_val = data.get("close")
 
@@ -5027,39 +5126,30 @@ class IBapi(EWrapper, EClient):
                 form["ComparisonPivotPoint"] not in _NON_SIMPLE_MODES
                 and form["pivotPointBool"] == "value"
         ):
-            pp_name = form.get("PivotPoint", "Pivot")
-            pivot = data["Pivot"].get(pp_name) if isinstance(data["Pivot"], dict) else None
-
             if pivot is None:
                 pivot_condition = False
             else:
-                if form["ComparisonPivotPoint"] == "greater":
-                    pivot_condition = _safe_compare(pivot, ">", float(form["PercentagePivotPoint"]))
-                elif form["ComparisonPivotPoint"] == "greaterEqual":
-                    pivot_condition = _safe_compare(pivot, ">=", float(form["PercentagePivotPoint"]))
-                elif form["ComparisonPivotPoint"] == "lower":
-                    pivot_condition = _safe_compare(float(form["PercentagePivotPoint"]), "<", pivot)
-                elif form["ComparisonPivotPoint"] == "lowerEqual":
-                    pivot_condition = _safe_compare(float(form["PercentagePivotPoint"]), "<=", pivot)
+                pivot_condition = _compare_indicator_value(
+                    pivot,
+                    form["ComparisonPivotPoint"],
+                    form["PercentagePivotPoint"],
+                )
 
         elif (
                 form["ComparisonPivotPoint"] == "between"
                 and form["pivotPointBool"] == "value"
         ):
-            pp_name = form.get("PivotPoint", "Pivot")
-            pp_name1 = form.get("PivotPoint1", "Pivot")
-            pivot = data["Pivot"].get(pp_name) if isinstance(data["Pivot"], dict) else None
-            pivot1 = data["Pivot1"].get(pp_name1) if isinstance(data["Pivot1"], dict) else None
+            pp_name1 = form.get("PivotPoint1", "PP")
+            pivot1 = _get_pivot_level_value(data, pp_name1)
 
             pivot_condition = (
                     _safe_compare(pivot, ">=", float(form["PercentagePivotPoint"]))
-                    and _safe_compare(float(form["PercentagePivotPoint1"]), ">=", pivot1)
+                    and _safe_compare(pivot1, "<=", float(form["PercentagePivotPoint1"]))
             )
 
         elif form["ComparisonPivotPoint"] in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
             try:
-                pp_name = form.get("PivotPoint", "Pivot")
-                pivot = data["Pivot"].get(pp_name) if isinstance(data["Pivot"], dict) else None
+                pivot = _get_pivot_level_value(data, pp_name)
             except Exception:
                 pivot = None
             try:
@@ -5075,6 +5165,17 @@ class IBapi(EWrapper, EClient):
             condition = condition and pivot_condition
             counting_ += 1
             variable_results["Pivot"] = bool(pivot_condition)
+            variable_results[_normalize_pivot_selection(pp_name)] = bool(pivot_condition)
+            _store_indicator_evaluation(
+                variable_results,
+                evaluation_debug,
+                f"pivot::{_normalize_pivot_selection(pp_name)}",
+                pivot_condition,
+                operator=form.get("ComparisonPivotPoint"),
+                threshold=form.get("PercentagePivotPoint"),
+                selection=pp_name,
+                parsed_value=pivot,
+            )
 
         # -------------------------
         # PIVOT POINT 2 (Second Pivot)
@@ -5082,8 +5183,8 @@ class IBapi(EWrapper, EClient):
         pivot2_condition = None
         
         if form.get("ComparisonPivotPoint2") and form.get("ComparisonPivotPoint2") != "Not used" and "Pivot2" in data:
-            pp_name2 = list(data.get("Pivot2", {}).keys())[0] if data.get("Pivot2") else None
-            pivot2 = data.get("Pivot2", {}).get(pp_name2) if pp_name2 else None
+            pp_name2 = form.get("PivotPoint2", "PP")
+            pivot2 = _get_pivot_level_value(data, pp_name2)
             
             if pivot2 is not None:
                 if (
@@ -5104,14 +5205,11 @@ class IBapi(EWrapper, EClient):
                     form.get("ComparisonPivotPoint2") not in _NON_SIMPLE_MODES
                     and form.get("pivotPointBool", "value") == "value"
                 ):
-                    if form["ComparisonPivotPoint2"] == "greater":
-                        pivot2_condition = _safe_compare(pivot2, ">", float(form.get("PercentagePivotPoint2", 0)))
-                    elif form["ComparisonPivotPoint2"] == "greaterEqual":
-                        pivot2_condition = _safe_compare(pivot2, ">=", float(form.get("PercentagePivotPoint2", 0)))
-                    elif form["ComparisonPivotPoint2"] == "lower":
-                        pivot2_condition = _safe_compare(float(form.get("PercentagePivotPoint2", 0)), "<", pivot2)
-                    elif form["ComparisonPivotPoint2"] == "lowerEqual":
-                        pivot2_condition = _safe_compare(float(form.get("PercentagePivotPoint2", 0)), "<=", pivot2)
+                    pivot2_condition = _compare_indicator_value(
+                        pivot2,
+                        form["ComparisonPivotPoint2"],
+                        form.get("PercentagePivotPoint2", 0),
+                    )
                 
                 elif form.get("ComparisonPivotPoint2") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
                     threshold = float(form.get("PercentagePivotPoint2", 5.0))
@@ -5124,6 +5222,17 @@ class IBapi(EWrapper, EClient):
                 condition = condition and pivot2_condition
                 counting_ += 1
                 variable_results["Pivot2"] = bool(pivot2_condition)
+                variable_results[_normalize_pivot_selection(pp_name2)] = bool(pivot2_condition)
+                _store_indicator_evaluation(
+                    variable_results,
+                    evaluation_debug,
+                    f"pivot2::{_normalize_pivot_selection(pp_name2)}",
+                    pivot2_condition,
+                    operator=form.get("ComparisonPivotPoint2"),
+                    threshold=form.get("PercentagePivotPoint2"),
+                    selection=pp_name2,
+                    parsed_value=pivot2,
+                )
 
         # -------------------------
         # PIVOT POINT 3 (Third Pivot)
@@ -5131,8 +5240,8 @@ class IBapi(EWrapper, EClient):
         pivot3_condition = None
         
         if form.get("ComparisonPivotPoint3") and form.get("ComparisonPivotPoint3") != "Not used" and "Pivot3" in data:
-            pp_name3 = list(data.get("Pivot3", {}).keys())[0] if data.get("Pivot3") else None
-            pivot3 = data.get("Pivot3", {}).get(pp_name3) if pp_name3 else None
+            pp_name3 = form.get("PivotPoint3", "PP")
+            pivot3 = _get_pivot_level_value(data, pp_name3)
             
             if pivot3 is not None:
                 if (
@@ -5153,14 +5262,11 @@ class IBapi(EWrapper, EClient):
                     form.get("ComparisonPivotPoint3") not in _NON_SIMPLE_MODES
                     and form.get("pivotPointBool", "value") == "value"
                 ):
-                    if form["ComparisonPivotPoint3"] == "greater":
-                        pivot3_condition = _safe_compare(pivot3, ">", float(form.get("PercentagePivotPoint3", 0)))
-                    elif form["ComparisonPivotPoint3"] == "greaterEqual":
-                        pivot3_condition = _safe_compare(pivot3, ">=", float(form.get("PercentagePivotPoint3", 0)))
-                    elif form["ComparisonPivotPoint3"] == "lower":
-                        pivot3_condition = _safe_compare(float(form.get("PercentagePivotPoint3", 0)), "<", pivot3)
-                    elif form["ComparisonPivotPoint3"] == "lowerEqual":
-                        pivot3_condition = _safe_compare(float(form.get("PercentagePivotPoint3", 0)), "<=", pivot3)
+                    pivot3_condition = _compare_indicator_value(
+                        pivot3,
+                        form["ComparisonPivotPoint3"],
+                        form.get("PercentagePivotPoint3", 0),
+                    )
                 
                 elif form.get("ComparisonPivotPoint3") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
                     threshold = float(form.get("PercentagePivotPoint3", 5.0))
@@ -5173,6 +5279,17 @@ class IBapi(EWrapper, EClient):
                 condition = condition and pivot3_condition
                 counting_ += 1
                 variable_results["Pivot3"] = bool(pivot3_condition)
+                variable_results[_normalize_pivot_selection(pp_name3)] = bool(pivot3_condition)
+                _store_indicator_evaluation(
+                    variable_results,
+                    evaluation_debug,
+                    f"pivot3::{_normalize_pivot_selection(pp_name3)}",
+                    pivot3_condition,
+                    operator=form.get("ComparisonPivotPoint3"),
+                    threshold=form.get("PercentagePivotPoint3"),
+                    selection=pp_name3,
+                    parsed_value=pivot3,
+                )
 
         # -------------------------
         # RELATIVE VOLUME
@@ -5819,6 +5936,7 @@ class IBapi(EWrapper, EClient):
 
         data["signal"] = "yes" if condition else "no"
         data["variableResults"] = variable_results
+        data["evaluationDebug"] = evaluation_debug
         data["passCount"] = sum(1 for v in variable_results.values() if v)
         data["totalCount"] = counting_
 

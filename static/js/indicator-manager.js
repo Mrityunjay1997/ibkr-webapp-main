@@ -37,6 +37,7 @@ const COMPARISON_OPERATORS = [
     { value: 'greaterEqual', label: '>=' },
     { value: 'lower', label: '<' },
     { value: 'lowerEqual', label: '<=' },
+    { value: 'equal', label: '=' },
     { value: 'between', label: 'between' },
     { value: 'withinPercentAbove', label: 'Within % Above' },
     { value: 'withinPercentBelow', label: 'Within % Below' },
@@ -152,10 +153,10 @@ class IndicatorManager {
                     <tr style="background-color:#f5f5f5;">
                         <th>Indicator</th>
                         <th>Timeframe</th>
-                        <th>Window/Period</th>
-                        <th>Comparison</th>
-                        <th>Threshold Value</th>
-                        <th>Use %</th>
+                        <th>Number of Bars</th>
+                        <th>Sign Indicator</th>
+                        <th>Amount</th>
+                        <th>Filter</th>
                         <th style="text-align:center; width:80px;">Actions</th>
                     </tr>
                 </thead>
@@ -190,7 +191,7 @@ class IndicatorManager {
                         <input type="number" step="0.01" class="form-control form-control-sm percentage-input" value="${indicator.percentage}" 
                             onchange="indicatorManager.updateIndicator(${indicator.id}, {percentage: parseFloat(this.value) || 0}); indicatorManager.renderIndicators('indicatorsContainer');">
                     </td>
-                    <td style="text-align:center;">
+                    <td style="text-align:center;" title="Dynamic indicators are submitted as active filters when enabled.">
                         <input type="checkbox" class="use-percentage-checkbox" ${indicator.usePercentage ? 'checked' : ''} 
                             onchange="indicatorManager.updateIndicator(${indicator.id}, {usePercentage: this.checked}); indicatorManager.renderIndicators('indicatorsContainer');">
                     </td>

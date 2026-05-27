@@ -180,7 +180,9 @@ def apply_result_filters(results_list: list, form: dict) -> list:
     # Check if any filter is enabled
     filter_keys = [
         'filterVWAP', 'filterFastSMA', 'filterMediumSMA', 'filterSlowSMA',
-        'filterRSI', 'filterFastEMA', 'filterSlowEMA', 'filterOBV', 'filterFastOBV', 'filterMediumOBV', 'filterSlowOBV', 'filterATR',
+        'filterSMA1', 'filterSMA2', 'filterSMA3',
+        'filterRSI', 'filterFastEMA', 'filterSlowEMA', 'filterEMA1', 'filterEMA2',
+        'filterOBV', 'filterFastOBV', 'filterMediumOBV', 'filterSlowOBV', 'filterATR',
         'filterAverageVolume', 'filterRelativeVolume', 'filterPrevClose',
         'filterLowOfDay', 'filterHighOfDay', 'filterCross50SMA', 'filterCross200SMA',
         'filterBreakHigh', 'filterPullbackPct', 'filterPullbackPct2',
@@ -398,6 +400,7 @@ def something():
     starttime = time.time()
     from micelanias import ComparePdf, dataProcessing
     from ibkr_signal_engine import IBapi
+    from indicator_form_helpers import merge_dynamic_with_legacy_form, validate_indicator_config
 
     IBAPI = IBapi()
     IBAPI.connect("127.0.0.1", cfg.ibkr_api_port, random.randint(1, 99))
@@ -418,6 +421,13 @@ def something():
     # Branch A: form (no file / no JSON)
     if len(request.files.to_dict()) == 0 and request.json is None:
         myform = request.form.to_dict()
+        indicator_config_json = myform.get("indicatorConfig")
+        if indicator_config_json:
+            is_valid, error_msg = validate_indicator_config(indicator_config_json)
+            if is_valid:
+                myform = merge_dynamic_with_legacy_form(myform, indicator_config_json)
+            else:
+                logger.warning("Ignoring invalid indicatorConfig payload: %s", error_msg)
         if myform.get("Procesetf") == "processonebyone":
             rootdir = "dates"
             if not os.path.exists(rootdir):
@@ -450,6 +460,13 @@ def something():
     # Branch B: CSV file posted
     elif len(request.files) == 1:
         myform = convertDict(request.form)
+        indicator_config_json = myform.get("indicatorConfig")
+        if indicator_config_json:
+            is_valid, error_msg = validate_indicator_config(indicator_config_json)
+            if is_valid:
+                myform = merge_dynamic_with_legacy_form(myform, indicator_config_json)
+            else:
+                logger.warning("Ignoring invalid indicatorConfig payload: %s", error_msg)
         IBAPI.addFrequency = myform.get("addFrequency")
 
         uploaded_file = request.files.get("csvfile")
@@ -472,6 +489,13 @@ def something():
     elif request.json is not None:
         processingData = convertCustomForm(request.json)
         myform = processingData["form"]
+        indicator_config_json = myform.get("indicatorConfig")
+        if indicator_config_json:
+            is_valid, error_msg = validate_indicator_config(indicator_config_json)
+            if is_valid:
+                myform = merge_dynamic_with_legacy_form(myform, indicator_config_json)
+            else:
+                logger.warning("Ignoring invalid indicatorConfig payload: %s", error_msg)
         IBAPI.addFrequency = myform.get("addFrequency")
         myresult = processingData["securities"]
         IBAPI.getFinalResult(myresult, myform)

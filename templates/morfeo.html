@@ -389,7 +389,7 @@
                                 <!-- ========== DYNAMIC INDICATOR MANAGEMENT SECTION ========== -->
                                 <div style="margin-top: 15px; padding: 15px; background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 6px;">
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                                        <h4 style="margin: 0;">Indicators Management</h4>
+                                        <h4 style="margin: 0;">Add Indicator</h4>
                                         <div>
                                             <button type="button" class="btn btn-sm btn-success" onclick="indicatorManager.showAddIndicatorForm('addIndicatorModalContainer');" title="Add a new indicator">
                                                 <span class="glyphicon glyphicon-plus"></span> Add Indicator
@@ -591,7 +591,9 @@
 											</td>
 											<td>
 												<div class="formatingyesno">
-													<div class="yesno"> {{ Param.booleanEMA1() }} </div><div class="yesno"> {{ Param.booleanEMA1.label }} </div>
+													{% for subfield in Param.EMA1Bool %}
+														<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} </div>
+													{% endfor %}
 												</div>
 											</td>
 											<td style="text-align:center; padding:6px;">{{ Param.filterEMA1(style="cursor:pointer;") }}</td>
@@ -611,7 +613,9 @@
 											</td>
 											<td>
 												<div class="formatingyesno">
-													<div class="yesno"> {{ Param.booleanEMA2() }} </div><div class="yesno"> {{ Param.booleanEMA2.label }} </div>
+													{% for subfield in Param.EMA2Bool %}
+														<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} </div>
+													{% endfor %}
 												</div>
 											</td>
 											<td style="text-align:center; padding:6px;">{{ Param.filterEMA2(style="cursor:pointer;") }}</td>
@@ -750,7 +754,9 @@
                                             </td>
                                             <td>
                                                 <div class="formatingyesno">
-                                                    <div class="yesno"> {{ Param.booleanSMA1() }} </div><div class="yesno"> {{ Param.booleanSMA1.label }} </div>
+													{% for subfield in Param.SMA1Bool %}
+														<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} </div>
+													{% endfor %}
                                                 </div>
                                             </td>
                                             <td style="text-align:center; padding:6px;">{{ Param.filterSMA1(style="cursor:pointer;") }}</td>
@@ -770,7 +776,9 @@
                                             </td>
                                             <td>
                                                 <div class="formatingyesno">
-                                                    <div class="yesno"> {{ Param.booleanSMA2() }} </div><div class="yesno"> {{ Param.booleanSMA2.label }} </div>
+													{% for subfield in Param.SMA2Bool %}
+														<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} </div>
+													{% endfor %}
                                                 </div>
                                             </td>
                                             <td style="text-align:center; padding:6px;">{{ Param.filterSMA2(style="cursor:pointer;") }}</td>
@@ -790,7 +798,9 @@
                                             </td>
                                             <td>
                                                 <div class="formatingyesno">
-                                                    <div class="yesno"> {{ Param.booleanSMA3() }} </div><div class="yesno"> {{ Param.booleanSMA3.label }} </div>
+													{% for subfield in Param.SMA3Bool %}
+														<div class="yesno"> {{ subfield }} </div><div class="yesno"> {{ subfield.label }} </div>
+													{% endfor %}
                                                 </div>
                                             </td>
                                             <td style="text-align:center; padding:6px;">{{ Param.filterSMA3(style="cursor:pointer;") }}</td>
@@ -3219,7 +3229,14 @@ function renderResultsFromBackend(response) {
         return;
     }
 
-    var pivotPointVariables = ["PP", "R1", "R2", "R3", "S1", "S2", "S3"];
+    var pivotPointVariables = ["Pivot", "R1", "R2", "S1", "S2"];
+    var pivotColumnDefs = [
+        { key: "Pivot", label: "Pivot Point" },
+        { key: "R1", label: "Resistance 1" },
+        { key: "R2", label: "Resistance 2" },
+        { key: "S1", label: "Support 1" },
+        { key: "S2", label: "Support 2" }
+    ];
     var buttonOrderId = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"];
     var tableId = 0;
     var idPlaceOrder = 0;
@@ -3243,7 +3260,7 @@ function renderResultsFromBackend(response) {
                 if (tA && tB) return tB.localeCompare(tA);
                 if (tA) return -1;
                 if (tB) return 1;
-                return 0;
+                return (a.symbol || a.cusip || "").toString().localeCompare((b.symbol || b.cusip || "").toString());
             });
 
             // check if any row has news
@@ -3269,6 +3286,9 @@ function renderResultsFromBackend(response) {
                     if ("smaMedium1" in dta) headerCols.push({ key: "smaMedium1", label: "Medium SMA1" });
                     headerCols.push({ key: "smaSlow", label: "Slow SMA" });
                     if ("smaSlow1" in dta) headerCols.push({ key: "smaSlow1", label: "Slow SMA1" });
+                    if ("sma1" in dta) headerCols.push({ key: "sma1", label: "SMA 1", vrKey: "sma1" });
+                    if ("sma2" in dta) headerCols.push({ key: "sma2", label: "SMA 2", vrKey: "sma2" });
+                    if ("sma3" in dta) headerCols.push({ key: "sma3", label: "SMA 3", vrKey: "sma3" });
                     headerCols.push({ key: "vwap", label: "VWAP" });
                     if ("vwap1" in dta) headerCols.push({ key: "vwap1", label: "VWAP1" });
                     headerCols.push({ key: "rsi", label: "RSI" });
@@ -3277,6 +3297,8 @@ function renderResultsFromBackend(response) {
                     if ("emaFast1" in dta) headerCols.push({ key: "emaFast1", label: "FastEMA1" });
                     headerCols.push({ key: "emaSlow", label: "Slow EMA" });
                     if ("emaSlow1" in dta) headerCols.push({ key: "emaSlow1", label: "SlowEMA1" });
+                    if ("ema1" in dta) headerCols.push({ key: "ema1", label: "EMA 1", vrKey: "ema1" });
+                    if ("ema2" in dta) headerCols.push({ key: "ema2", label: "EMA 2", vrKey: "ema2" });
                     headerCols.push({ key: "obv", label: "OBV" });
                     if ("obv1" in dta) headerCols.push({ key: "obv1", label: "OBV1" });
                     headerCols.push({ key: "fast_obv", label: "Fast OBV" });
@@ -3329,34 +3351,30 @@ function renderResultsFromBackend(response) {
                     if ("obvSignal" in dta) headerCols.push({ key: "obvSignal", label: "OBV Signal" });
 
                     // pivot primary
-                    const pivotPrimary = [];
-                    if (dta.Pivot && typeof dta.Pivot === "object") {
-                        for (const pp of pivotPointVariables) if (pp in dta.Pivot) pivotPrimary.push(pp);
-                    }
-                    if (pivotPrimary.length === 0) pivotPrimary.push("Pivot Point");
+                    const pivotPrimary = pivotColumnDefs.slice();
 
                     // pivot secondary
                     const pivotSecondary = [];
                     if (dta.Pivot1 && typeof dta.Pivot1 === "object") {
-                        for (const pp of pivotPointVariables) if (pp in dta.Pivot1) pivotSecondary.push(pp);
+                        for (const pp of Object.keys(dta.Pivot1)) pivotSecondary.push(pp);
                     }
 
                     // pivot tertiary
                     const pivotTertiary = [];
                     if (dta.Pivot2 && typeof dta.Pivot2 === "object") {
-                        for (const pp of pivotPointVariables) if (pp in dta.Pivot2) pivotTertiary.push(pp);
+                        for (const pp of Object.keys(dta.Pivot2)) pivotTertiary.push(pp);
                     }
 
                     // pivot quaternary
                     const pivotQuaternary = [];
                     if (dta.Pivot3 && typeof dta.Pivot3 === "object") {
-                        for (const pp of pivotPointVariables) if (pp in dta.Pivot3) pivotQuaternary.push(pp);
+                        for (const pp of Object.keys(dta.Pivot3)) pivotQuaternary.push(pp);
                     }
 
                     // Build the ordered list of ALL columns (for control bar & reorder)
                     const allColDefs = [];
                     headerCols.forEach(c => allColDefs.push({ key: c.key, label: c.label, group: 'indicators' }));
-                    pivotPrimary.forEach(p => allColDefs.push({ key: 'pivot_' + p, label: p, group: 'pivot' }));
+                    pivotPrimary.forEach(p => allColDefs.push({ key: 'pivot_' + p.key, label: p.label, group: 'pivot' }));
                     allColDefs.push({ key: 'netPosition', label: 'Net Position', group: 'position' });
                     if (pivotSecondary.length > 0) pivotSecondary.forEach(p => allColDefs.push({ key: 'pivot1_' + p, label: p, group: 'pivot' }));
                     if (pivotTertiary.length > 0) pivotTertiary.forEach(p => allColDefs.push({ key: 'pivot2_' + p, label: p, group: 'pivot' }));
@@ -3668,19 +3686,23 @@ function renderResultsFromBackend(response) {
                 }
 
                 // --- Primary pivots ---
-                let pivotStyle = "";
-                if ("Pivot" in vr) {
-                    pivotStyle = vr["Pivot"] ? " style='background:#28a745;color:#fff;font-weight:800;padding:6px;font-size:13px'" : " style='background:#dc3545;color:#fff;font-weight:800;padding:6px;font-size:13px'";
-                }
                 for (const pp of pivotPrimary) {
-                    const pKey = 'pivot_' + pp;
-                    if (pp === "Pivot Point") {
-                        cellMap[pKey] = `<td data-col='${pKey}'${pivotStyle}>n.d</td>`;
-                    } else if (dta.Pivot && typeof dta.Pivot === "object") {
-                        cellMap[pKey] = `<td data-col='${pKey}'${pivotStyle}>${fmt(dta.Pivot[pp])}</td>`;
-                    } else {
-                        cellMap[pKey] = `<td data-col='${pKey}'>n.d</td>`;
-                    }
+                    const pKey = 'pivot_' + pp.key;
+                    const pivotValue = dta.Pivot && typeof dta.Pivot === "object" ? dta.Pivot[pp.key] : null;
+                    const pivotVrMap = {
+                        "Pivot": "pivot_point",
+                        "R1": "resistance_1",
+                        "R2": "resistance_2",
+                        "S1": "support_1",
+                        "S2": "support_2"
+                    };
+                    const pivotVrKey = pivotVrMap[pp.key];
+                    const pivotStyle = pivotVrKey && (pivotVrKey in vr)
+                        ? (vr[pivotVrKey]
+                            ? " style='background:#28a745;color:#fff;font-weight:800;padding:6px;font-size:13px'"
+                            : " style='background:#dc3545;color:#fff;font-weight:800;padding:6px;font-size:13px'")
+                        : "";
+                    cellMap[pKey] = `<td data-col='${pKey}'${pivotStyle}>${fmt(pivotValue)}</td>`;
                 }
 
                 // --- netPosition ---

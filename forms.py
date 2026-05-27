@@ -137,6 +137,7 @@ class Parameters(FlaskForm):
         ("greaterEqual", ">="),
         ("lower", "<"),
         ("lowerEqual", "<="),
+        ("equal", "="),
         ("between", "between"),
         ("withinPercentAbove", "Within % Above"),
         ("withinPercentBelow", "Within % Below"),
@@ -153,6 +154,15 @@ class Parameters(FlaskForm):
         ("1 day", "1 day"),
         ("1 week", "1 week"),
         ("1 month", "1 month"),
+    ]
+
+    _PIVOT_LEVEL_CHOICES = [
+        ("PP", "Pivot Point"),
+        ("R1", "Resistance 1"),
+        ("R2", "Resistance 2"),
+        ("S1", "Support 1"),
+        ("S2", "Support 2"),
+        ("Not used", "disabled"),
     ]
 
     ComparisonFastSMA = SelectField(
@@ -326,58 +336,22 @@ class Parameters(FlaskForm):
 
     PivotPoint = SelectField(
         "Programming Language",
-        choices=[
-            ("PP", "Pivot Point"),
-            ("R1", "Resistance 1"),
-            ("R2", "Resistance 2"),
-            ("R3", "Resistance 3"),
-            ("S1", "Support 1"),
-            ("S2", "Support 2"),
-            ("S3", "Support 3"),
-            ("Not used", "disabled"),
-        ],
+        choices=_PIVOT_LEVEL_CHOICES,
     )
 
     PivotPoint1 = SelectField(
         "Programming Language",
-        choices=[
-            ("PP", "Pivot Point"),
-            ("R1", "Resistance 1"),
-            ("R2", "Resistance 2"),
-            ("R3", "Resistance 3"),
-            ("S1", "Support 1"),
-            ("S2", "Support 2"),
-            ("S3", "Support 3"),
-            ("Not used", "disabled"),
-        ],
+        choices=_PIVOT_LEVEL_CHOICES,
     )
 
     PivotPoint2 = SelectField(
         "Programming Language",
-        choices=[
-            ("PP", "Pivot Point"),
-            ("R1", "Resistance 1"),
-            ("R2", "Resistance 2"),
-            ("R3", "Resistance 3"),
-            ("S1", "Support 1"),
-            ("S2", "Support 2"),
-            ("S3", "Support 3"),
-            ("Not used", "disabled"),
-        ],
+        choices=_PIVOT_LEVEL_CHOICES,
     )
 
     PivotPoint3 = SelectField(
         "Programming Language",
-        choices=[
-            ("PP", "Pivot Point"),
-            ("R1", "Resistance 1"),
-            ("R2", "Resistance 2"),
-            ("R3", "Resistance 3"),
-            ("S1", "Support 1"),
-            ("S2", "Support 2"),
-            ("S3", "Support 3"),
-            ("Not used", "disabled"),
-        ],
+        choices=_PIVOT_LEVEL_CHOICES,
     )
 
     _CROSS_SMA_COMPARISON_CHOICES = [

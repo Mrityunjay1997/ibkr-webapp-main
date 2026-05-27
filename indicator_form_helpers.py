@@ -143,7 +143,7 @@ def validate_indicator_config(config_json: str) -> tuple[bool, str]:
         }
         
         valid_comparisons = {
-            'greater', 'greaterEqual', 'lower', 'lowerEqual', 'between',
+            'greater', 'greaterEqual', 'lower', 'lowerEqual', 'equal', 'between',
             'withinPercentAbove', 'withinPercentBelow', 'withinPercentEither', 'disabled'
         }
         
