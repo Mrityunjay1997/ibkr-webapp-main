@@ -4,7 +4,7 @@
 import sys
 sys.path.insert(0, '.')
 
-from ibkr_signal_engine import analyze_multi_obv
+from scanner.ibkr_signal_engine import analyze_multi_obv
 import json
 
 print("=" * 80)

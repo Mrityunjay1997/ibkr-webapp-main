@@ -1,7 +1,6 @@
-import re
+﻿import re
 import os
 import gc
-import sys
 import csv
 import time
 import json
@@ -16,6 +15,9 @@ from config import Config
 from waitress import serve
 from io import TextIOWrapper
 from datetime import datetime, UTC
+from news.routes import register_news_routes
+from orders.routes import register_order_routes
+from scanner.routes import filter_results, ibkr_port_ready
 from forms import Parameters, SecondSubmit
 from flask import Flask, render_template, request, jsonify
 
@@ -35,6 +37,10 @@ cfg = Config()
 cfg.setups_dir.mkdir(exist_ok=True)
 cfg.watchlists_dir.mkdir(exist_ok=True)
 cfg.order_presets_dir.mkdir(exist_ok=True)
+
+_SKIP_IBKR_PORT_CHECK = os.environ.get("IBKR_SKIP_PORT_CHECK", "0") == "1"
+if _SKIP_IBKR_PORT_CHECK:
+    logger.info("Skipping IBKR port auto-detection because IBKR_SKIP_PORT_CHECK is set")
 
 
 # -----------------------------------------------------------------------------
@@ -104,19 +110,27 @@ def detect_ibkr_port_from_config(host="127.0.0.1", timeout=1.0):
 
 
 # Perform initial port check at startup
-_detected_port = detect_ibkr_port_from_config()
+if _SKIP_IBKR_PORT_CHECK:
+    _detected_port = None
+else:
+    _detected_port = detect_ibkr_port_from_config()
 
 if _detected_port is None:
-    logger.error(
-        "IBKR API is not reachable on either configured environment "
-        "(preferred=%s). Exiting.",
-        cfg.ibkr_preferred_env,
-    )
-    sys.exit(1)
-
-# Override configured runtime port with detected one
-cfg.ibkr_api_port = _detected_port
-logger.info("Using IBKR API port: %s", cfg.ibkr_api_port)
+    cfg.ibkr_api_port = None
+    if _SKIP_IBKR_PORT_CHECK:
+        logger.warning(
+            "IBKR API port detection skipped during import because IBKR_SKIP_PORT_CHECK is set."
+        )
+    else:
+        logger.warning(
+            "IBKR API is not reachable on either configured environment "
+            "(preferred=%s). Continuing with IBKR-dependent routes unavailable.",
+            cfg.ibkr_preferred_env,
+        )
+else:
+    # Override configured runtime port with detected one
+    cfg.ibkr_api_port = _detected_port
+    logger.info("Using IBKR API port: %s", cfg.ibkr_api_port)
 
 
 # -----------------------------------------------------------------------------
@@ -131,10 +145,15 @@ def create_app(config_object=Config) -> Flask:
 
 app = create_app()
 
-# Register held orders API routes
+# Register feature modules
 try:
-    from held_orders_api import register_held_orders_routes
-    register_held_orders_routes(app)
+    register_news_routes(app)
+    logger.info("News routes registered")
+except Exception as e:
+    logger.warning(f"Failed to register news routes: {e}")
+
+try:
+    register_order_routes(app)
     logger.info("Held orders API routes registered")
 except Exception as e:
     logger.warning(f"Failed to register held orders routes: {e}")
@@ -171,39 +190,21 @@ def apply_result_filters(results_list: list, form: dict) -> list:
     Returns:
         Filtered list of stock results
     """
-    from ibkr_signal_engine import apply_result_filters as backend_filter
-    
-    # If no results, return empty
-    if not results_list:
-        return []
-    
-    # Check if any filter is enabled
-    filter_keys = [
-        'filterVWAP', 'filterFastSMA', 'filterMediumSMA', 'filterSlowSMA',
-        'filterSMA1', 'filterSMA2', 'filterSMA3',
-        'filterRSI', 'filterFastEMA', 'filterSlowEMA', 'filterEMA1', 'filterEMA2',
-        'filterOBV', 'filterFastOBV', 'filterMediumOBV', 'filterSlowOBV', 'filterATR',
-        'filterAverageVolume', 'filterRelativeVolume', 'filterPrevClose',
-        'filterLowOfDay', 'filterHighOfDay', 'filterCross50SMA', 'filterCross200SMA',
-        'filterBreakHigh', 'filterPullbackPct', 'filterPullbackPct2',
-        'filterFibPullback', 'filterGapPullback', 'filterPivotPoint',
-        'filterUpGap', 'filterDownGap', 'filterNewsKeyword', 'filterMarketCap',
-        'filterVolume'
-    ]
-    
-    any_enabled = any(form.get(k, False) for k in filter_keys)
-    
-    # If no filters enabled, return all results
-    if not any_enabled:
-        return results_list
-    
-    # Filter results: keep only stocks that pass all enabled filters
-    filtered = []
-    for stock_data in results_list:
-        if backend_filter(stock_data, form):
-            filtered.append(stock_data)
-    
-    return filtered
+    return filter_results(results_list, form)
+
+
+def ibkr_api_ready() -> bool:
+    return ibkr_port_ready(cfg.ibkr_api_port)
+
+
+def ibkr_unavailable_response(feature: str = "IBKR"):
+    return jsonify({
+        "error": f"{feature} is unavailable because the IBKR API port is not connected.",
+        "warning": {
+            "ibkr_api_port": "unavailable",
+            "preferred_environment": cfg.ibkr_preferred_env,
+        },
+    }), 503
 
 
 def run_gc():
@@ -239,12 +240,6 @@ def micelania():
 def exclude_stocks_page():
     """Render the exclude stocks management page."""
     return render_template("exclude_stocks.html")
-
-
-@app.route("/news-reader", methods=["GET"])
-def news_reader_page():
-    """Render a dedicated page for monitoring and reading scan news aloud."""
-    return render_template("news_reader.html")
 
 
 @app.route("/updatepdf", methods=["GET", "POST"])
@@ -399,8 +394,12 @@ def something():
     """
     starttime = time.time()
     from micelanias import ComparePdf, dataProcessing
-    from ibkr_signal_engine import IBapi
-    from indicator_form_helpers import merge_dynamic_with_legacy_form, validate_indicator_config
+    from scanner.ibkr_signal_engine import IBapi
+    from scanner.indicator_form_helpers import merge_dynamic_with_legacy_form, validate_indicator_config
+
+    if not ibkr_api_ready():
+        logger.warning("Scanner endpoint requested while IBKR API port is unavailable")
+        return ibkr_unavailable_response("Scanner")
 
     IBAPI = IBapi()
     IBAPI.connect("127.0.0.1", cfg.ibkr_api_port, random.randint(1, 99))
@@ -518,7 +517,7 @@ def something():
 
 @app.route("/sendorders", methods=["POST", "GET"])
 def sendorders():
-    from ibkr_signal_engine import IBapi
+    from scanner.ibkr_signal_engine import IBapi
     import json
 
     IBAPI = None
@@ -532,6 +531,11 @@ def sendorders():
     }
 
     try:
+        if not ibkr_api_ready():
+            response["Connection"] = "Interactive Brokers API is not connected. Start TWS/Gateway and try again."
+            response["message"] = response["Connection"]
+            return response, 503
+
         asset = request.form.to_dict()
 
         logger.info(
@@ -619,7 +623,7 @@ def sendorders():
         # ===== MULTI-LEVEL ORDER HANDLING =====
         if is_multi_level:
             try:
-                from order_manager import PriceReferenceResolver, PriceReference
+                from orders.order_manager import PriceReferenceResolver, PriceReference
                 
                 # Parse multi-level order configuration
                 multi_level_json = asset.get("multiLevelConfig", "{}")
@@ -738,7 +742,7 @@ def sendorders():
                     
                     levels_for_ib.append(level_for_ib)
                     
-                    logger.info(f"Level {level_idx+1}: Entry @{level_for_ib['entry_price']} ({level_qty} shares) → "
+                    logger.info(f"Level {level_idx+1}: Entry @{level_for_ib['entry_price']} ({level_qty} shares) â†’ "
                               f"{len(resolved_targets)} exit targets, Stop @{level_for_ib['stop_price']}")
                 
                 # Build order specification
@@ -781,7 +785,7 @@ def sendorders():
                 trailing_amt = round(float(trailing_amount), 2)
 
             if entry_type == "market":
-                # Market order — no limit price, optional bracket legs
+                # Market order â€” no limit price, optional bracket legs
                 from ibapi.order import Order as IBOrder
                 orders = []
                 parent = IBOrder()
@@ -879,7 +883,7 @@ def sendorders():
 @app.route("/order-presets/save", methods=["POST"])
 def save_order_preset():
     """Save a multi-level order preset."""
-    from order_manager import MultiLevelOrder, OrderPresetManager
+    from orders.order_manager import MultiLevelOrder, OrderPresetManager
     
     try:
         data = request.get_json()
@@ -913,7 +917,7 @@ def save_order_preset():
 @app.route("/order-presets/list", methods=["GET"])
 def list_order_presets():
     """List all available order presets, optionally filtered by symbol."""
-    from order_manager import OrderPresetManager
+    from orders.order_manager import OrderPresetManager
     
     try:
         symbol = request.args.get('symbol', None)
@@ -934,7 +938,7 @@ def list_order_presets():
 @app.route("/order-presets/load/<filename>", methods=["GET"])
 def load_order_preset(filename):
     """Load a specific order preset."""
-    from order_manager import OrderPresetManager
+    from orders.order_manager import OrderPresetManager
     
     try:
         filepath = cfg.order_presets_dir / filename
@@ -958,7 +962,7 @@ def load_order_preset(filename):
 @app.route("/order-presets/delete/<filename>", methods=["DELETE"])
 def delete_order_preset(filename):
     """Delete an order preset."""
-    from order_manager import OrderPresetManager
+    from orders.order_manager import OrderPresetManager
     
     try:
         manager = OrderPresetManager(cfg.order_presets_dir)
@@ -1395,7 +1399,7 @@ def watchlists_delete():
 
 def _get_excluded_api():
     try:
-        from ibkr_signal_engine import IBapi
+        from scanner.ibkr_signal_engine import IBapi
         return IBapi()
     except Exception:
         logger.exception("Failed to import IBapi for exclusion list")
@@ -1994,7 +1998,7 @@ def order_presets_delete():
 def positions_list():
     """Get all open positions, summary, and account data"""
     try:
-        from ibkr_signal_engine import IBapi
+        from scanner.ibkr_signal_engine import IBapi
         # Create temporary IBAPI instance to access position manager and account data
         api = IBapi()
         summary = api.position_manager.get_all_positions()
@@ -2013,7 +2017,7 @@ def positions_list():
 def account_summary():
     """Get current account summary data"""
     try:
-        from ibkr_signal_engine import IBapi
+        from scanner.ibkr_signal_engine import IBapi
         api = IBapi()
         account_data = api.get_account_data()
         return jsonify(account_data), 200
@@ -2030,8 +2034,8 @@ def positions_add():
         if not payload:
             return jsonify({"error": "JSON payload required"}), 400
         
-        from position_manager import Position
-        from ibkr_signal_engine import IBapi
+        from orders.position_manager import Position
+        from scanner.ibkr_signal_engine import IBapi
         
         api = IBapi()
         pos = Position(
@@ -2059,7 +2063,7 @@ def positions_update_price():
         if not payload:
             return jsonify({"error": "JSON payload required"}), 400
         
-        from ibkr_signal_engine import IBapi
+        from scanner.ibkr_signal_engine import IBapi
         api = IBapi()
         
         symbol = payload.get('symbol')
@@ -2081,7 +2085,7 @@ def positions_evaluate_exits():
         if not payload:
             return jsonify({"error": "JSON payload required"}), 400
         
-        from ibkr_signal_engine import IBapi
+        from scanner.ibkr_signal_engine import IBapi
         api = IBapi()
         
         symbol = payload.get('symbol')
@@ -2103,7 +2107,7 @@ def positions_exit():
         if not payload:
             return jsonify({"error": "JSON payload required"}), 400
         
-        from ibkr_signal_engine import IBapi
+        from scanner.ibkr_signal_engine import IBapi
         api = IBapi()
         
         symbol = payload['symbol']
@@ -2137,12 +2141,12 @@ def news_article():
     Fetch a full IBKR news article via the TWS API and return as JSON.
 
     Query params:
-      provider  – IBKR provider code (e.g. "BZ", "DJ-N")
-      articleId – IBKR article identifier (e.g. "BZ$12345")
+      provider  â€“ IBKR provider code (e.g. "BZ", "DJ-N")
+      articleId â€“ IBKR article identifier (e.g. "BZ$12345")
 
     Returns JSON: {"articleType": 0|1, "articleText": "...", "provider": "...", "articleId": "..."}
     """
-    from ibkr_signal_engine import IBapi
+    from scanner.ibkr_signal_engine import IBapi
     import re as _re
 
     provider = request.args.get("provider", "").strip()
@@ -2154,6 +2158,9 @@ def news_article():
     # Basic input validation
     if len(provider) > 20 or len(article_id) > 200:
         return jsonify({"error": "Invalid parameters."}), 400
+
+    if not ibkr_api_ready():
+        return ibkr_unavailable_response("News article")
 
     ib = None
     try:
@@ -2183,7 +2190,7 @@ def news_article():
             article_text = result["articleText"]
 
             if article_type == 1:
-                # HTML article — sanitize script tags
+                # HTML article â€” sanitize script tags
                 article_text = _re.sub(
                     r"<script[^>]*>.*?</script>",
                     "",
@@ -2366,9 +2373,14 @@ class BackgroundScanner:
 
         Returns True on success, False on failure. Sets self.latest_warning on error.
         """
-        from ibkr_signal_engine import IBapi  # local import to avoid cycles
+        from scanner.ibkr_signal_engine import IBapi  # local import to avoid cycles
         # NOTE: cfg must be available globally in your app (as in your original code)
         global cfg
+
+        if not ibkr_api_ready():
+            with self.lock:
+                self.latest_warning = {"background_connect": "IBKR API port unavailable"}
+            return False
 
         with self._ib_lock:
             # If already connected and thread alive, assume it's usable
@@ -2839,6 +2851,9 @@ def background_start():
     if not payload:
         return jsonify({"error": "JSON payload required"}), 400
 
+    if not ibkr_api_ready():
+        return ibkr_unavailable_response("Background scanner")
+
     tab_unique_id = payload.get("tab_unique_id")
     if not tab_unique_id:
         return jsonify({"error": "tab_unique_id is required"}), 400
@@ -3047,8 +3062,13 @@ class BackgroundTop50Scanner:
         return sec
 
     def _ensure_ib_connected(self):
-        from ibkr_signal_engine import IBapi
+        from scanner.ibkr_signal_engine import IBapi
         global cfg
+
+        if not ibkr_api_ready():
+            with self.lock:
+                self.latest_warning = {"scanner_loop_connect": "IBKR API port unavailable"}
+            return False
 
         with self._ib_lock:
             if self._ib is not None and self._ib_thread is not None and self._ib_thread.is_alive():
@@ -3278,7 +3298,7 @@ class BackgroundTop50Scanner:
                 self._run_count += 1
 
             except _SkipIteration:
-                # No movers returned — skip screening, move to wait
+                # No movers returned â€” skip screening, move to wait
                 pass
 
             except Exception as e:
@@ -3320,7 +3340,7 @@ class BackgroundTop50Scanner:
             if self.enabled:
                 thread_alive = self.thread and self.thread.is_alive()
                 if not thread_alive:
-                    logger.warning("Top 50 scanner: enabled flag stuck but thread is dead — resetting")
+                    logger.warning("Top 50 scanner: enabled flag stuck but thread is dead â€” resetting")
                     self.enabled = False
                     self._stop_event.set()
                 else:
@@ -3456,6 +3476,9 @@ def scanner_loop_start():
     payload = request.get_json(silent=True)
     if not payload:
         return jsonify({"error": "JSON payload required"}), 400
+
+    if not ibkr_api_ready():
+        return ibkr_unavailable_response("Scanner loop")
 
     tab_unique_id = payload.get("tab_unique_id")
     if not tab_unique_id:
@@ -3607,9 +3630,12 @@ def scanner_universe():
     # ---- read request payload ----
     payload = request.get_json(silent=True) or {}
 
+    if not ibkr_api_ready():
+        return ibkr_unavailable_response("Scanner")
+
     # ---- import IBapi ----
     try:
-        from ibkr_signal_engine import IBapi
+        from scanner.ibkr_signal_engine import IBapi
     except Exception:
         logger.exception("Failed to import IBapi")
         return jsonify({"error": "IBKR backend unavailable"}), 503
@@ -3710,7 +3736,7 @@ if __name__ == "__main__":
                         doc = json.load(fh)
                     symbols = doc.get("symbols", [])
                     try:
-                        from ibkr_signal_engine import IBapi
+                        from scanner.ibkr_signal_engine import IBapi
                         IBAPI = IBapi()
                         IBAPI.save_excluded_stocks(symbols)
                         logger.info("Auto-applied last exclusion list: %s", filename)
@@ -3720,3 +3746,4 @@ if __name__ == "__main__":
         logger.exception("Error while attempting to auto-load last exclusion list")
 
     serve(app, host="0.0.0.0", port=run_port)
+

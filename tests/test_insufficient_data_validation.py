@@ -11,7 +11,7 @@ import sys
 import json
 sys.path.insert(0, '.')
 
-from ibkr_signal_engine import detect_200sma_bullish_crossover
+from scanner.ibkr_signal_engine import detect_200sma_bullish_crossover
 
 
 def test_insufficient_data_for_200sma():

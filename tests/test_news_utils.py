@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from news_utils import (
+from news.utils import (
     is_within_news_window,
     news_within_minutes,
     parse_news_datetime,
@@ -31,6 +31,7 @@ def test_news_window_minutes_supports_minutes_hours_days_and_legacy_hours():
     assert news_within_minutes({"NewsWithinValue": "2", "NewsTimeUnit": "hours"}) == 120
     assert news_within_minutes({"NewsWithinValue": "1", "NewsTimeUnit": "days"}) == 1440
     assert news_within_minutes({"NewsWithinValue": "0", "NewsWithinHours": "3"}) == 180
+    assert news_within_minutes({"NewsWithinValue": "60", "NewsTimeUnit": ""}) == 60
 
 
 def test_news_window_minutes_supports_day_variations():
@@ -50,6 +51,16 @@ def test_read_aloud_window_is_separate_from_news_window():
 
     assert news_within_minutes(form) == 0
     assert read_aloud_within_minutes(form) == 15
+
+
+def test_news_window_minutes_ignores_invalid_new_value_and_uses_legacy_hours():
+    form = {
+        "NewsWithinValue": "not-a-number",
+        "NewsTimeUnit": "hours",
+        "NewsWithinHours": "2",
+    }
+
+    assert news_within_minutes(form) == 120
 
 
 def test_is_within_news_window_uses_compact_ibkr_time():

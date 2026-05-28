@@ -4,7 +4,7 @@
 import sys
 sys.path.insert(0, '.')
 
-from ibkr_signal_engine import detect_200sma_bullish_crossover
+from scanner.ibkr_signal_engine import detect_200sma_bullish_crossover
 
 print("Testing 200 SMA bullish crossover detection...")
 

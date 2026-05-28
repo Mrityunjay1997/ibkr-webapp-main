@@ -4,7 +4,7 @@
 import sys
 sys.path.insert(0, '.')
 
-from ibkr_signal_engine import (
+from scanner.ibkr_signal_engine import (
     calculate_pct_change,
     calculate_volume_sum, 
     detect_nearby_key_levels

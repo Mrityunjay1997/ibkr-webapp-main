@@ -10,7 +10,7 @@ This script demonstrates:
 
 import json
 from datetime import datetime, timedelta
-from indicators import (
+from scanner.indicators import (
     FibonacciCalculator,
     GapHistoryAnalyzer,
     IntelligentFibonacciLevelSelector,

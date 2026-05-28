@@ -10,10 +10,16 @@ import pandas as pd
 from config import Config
 from typing import Any, Dict, Optional
 from datetime import time as datetime_time
-from news_utils import (
+from news.utils import (
     is_within_news_window,
     news_within_minutes,
     parse_news_datetime,
+)
+from news.routes import (
+    filter_headlines_by_keywords,
+    news_enabled,
+    news_signal_enabled,
+    should_fetch_news,
 )
 
 import pytz
@@ -26,7 +32,7 @@ from ibapi.contract import Contract, ComboLeg
 from ibapi.order_state import OrderState
 from ibapi.scanner import ScannerSubscription
 
-from indicators import (
+from scanner.indicators import (
     VolumeWeightedAveragePrice,
     SMAIndicator,
     RSIIndicator,
@@ -1149,7 +1155,7 @@ class IBapi(EWrapper, EClient):
         self._load_contract_cache_from_disk()
 
         # Position management
-        from position_manager import PositionManager
+        from orders.position_manager import PositionManager
         self.position_manager = PositionManager()
 
         # ---------------------------
@@ -2512,8 +2518,7 @@ class IBapi(EWrapper, EClient):
             # no usable timestamps: fallback to original behaviour using raw array
             result = result_full.set_index("date")
             indicators = {"volume": last_value(result.volume), "symbol": getattr(contract, "symbol", symbol),
-                          "cusip": cusip, "close": last_value(result.close) if not result.close.empty else None,
-                          "netPosition": int(net_position) if net_position is not None else 0}
+                          "cusip": cusip, "close": last_value(result.close) if not result.close.empty else None}
             return indicators
 
         latest_date = unique_dates[-1]
@@ -2612,8 +2617,7 @@ class IBapi(EWrapper, EClient):
         last_bar_volume = float(result_session["volume"].iloc[-1]) if not result_session.empty else float(np.nan)
 
         # --- build indicators dict (start with some safe defaults) ---
-        indicators: Dict[str, Any] = {"symbol": getattr(contract, "symbol", symbol), "cusip": cusip,
-                                      "netPosition": int(net_position) if net_position is not None else 0}
+        indicators: Dict[str, Any] = {"symbol": getattr(contract, "symbol", symbol), "cusip": cusip}
 
         # store last close reference (if form asks for previous bar or last closed bar)
         try:
@@ -4708,32 +4712,16 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         # OBV
         # -------------------------
-        obv_condition = None
-
-        if form.get("ComparisonOBV", "Not used") not in _NON_SIMPLE_MODES:
-            if form.get("ComparisonOBV") == "greater":
-                obv_condition = _safe_compare(data.get("obv"), ">", float(form.get("PercentageOBV")))
-            elif form.get("ComparisonOBV") == "greaterEqual":
-                obv_condition = _safe_compare(data.get("obv"), ">=", float(form.get("PercentageOBV")))
-            elif form.get("ComparisonOBV") == "lower":
-                obv_condition = _safe_compare(data.get("obv"), "<", float(form.get("PercentageOBV")))
-            elif form.get("ComparisonOBV") == "lowerEqual":
-                obv_condition = _safe_compare(data.get("obv"), "<=", float(form.get("PercentageOBV")))
-        elif form.get("ComparisonOBV") == "between":
-            obv_condition = (
-                    _safe_compare(data.get("obv"), ">=", float(form.get("PercentageOBV")))
-                    and _safe_compare(data.get("obv1"), "<=", float(form.get("PercentageOBV1")))
-            )
-
-        elif form.get("ComparisonOBV") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
-            try:
-                threshold = float(form.get("PercentageOBV", 5))
-            except Exception:
-                threshold = 5.0
-            obv_condition = _within_percent_check(
-                data.get("obv"), data.get("close"),
-                form.get("ComparisonOBV"), threshold
-            )
+        obv_condition = _compare_indicator_condition(
+            data,
+            form,
+            data_key="obv",
+            comparison_key="ComparisonOBV",
+            threshold_key="PercentageOBV",
+            mode_key="OBVBool",
+            upper_data_key="obv1",
+            upper_threshold_key="PercentageOBV1",
+        )
 
         if obv_condition is not None:
             condition = condition and obv_condition
@@ -4743,32 +4731,16 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         # FAST OBV
         # -------------------------
-        fast_obv_condition = None
-
-        if form.get("ComparisonFastOBV", "Not used") not in _NON_SIMPLE_MODES:
-            if form.get("ComparisonFastOBV") == "greater":
-                fast_obv_condition = _safe_compare(data.get("fast_obv"), ">", float(form.get("PercentageFastOBV")))
-            elif form.get("ComparisonFastOBV") == "greaterEqual":
-                fast_obv_condition = _safe_compare(data.get("fast_obv"), ">=", float(form.get("PercentageFastOBV")))
-            elif form.get("ComparisonFastOBV") == "lower":
-                fast_obv_condition = _safe_compare(data.get("fast_obv"), "<", float(form.get("PercentageFastOBV")))
-            elif form.get("ComparisonFastOBV") == "lowerEqual":
-                fast_obv_condition = _safe_compare(data.get("fast_obv"), "<=", float(form.get("PercentageFastOBV")))
-        elif form.get("ComparisonFastOBV") == "between":
-            fast_obv_condition = (
-                    _safe_compare(data.get("fast_obv"), ">=", float(form.get("PercentageFastOBV")))
-                    and _safe_compare(data.get("fast_obv1"), "<=", float(form.get("PercentageFastOBV1")))
-            )
-
-        elif form.get("ComparisonFastOBV") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
-            try:
-                threshold = float(form.get("PercentageFastOBV", 5))
-            except Exception:
-                threshold = 5.0
-            fast_obv_condition = _within_percent_check(
-                data.get("fast_obv"), data.get("close"),
-                form.get("ComparisonFastOBV"), threshold
-            )
+        fast_obv_condition = _compare_indicator_condition(
+            data,
+            form,
+            data_key="fast_obv",
+            comparison_key="ComparisonFastOBV",
+            threshold_key="PercentageFastOBV",
+            mode_key="FastOBVBool",
+            upper_data_key="fast_obv1",
+            upper_threshold_key="PercentageFastOBV1",
+        )
 
         if fast_obv_condition is not None:
             condition = condition and fast_obv_condition
@@ -4778,32 +4750,16 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         # MEDIUM OBV
         # -------------------------
-        medium_obv_condition = None
-
-        if form.get("ComparisonMediumOBV", "Not used") not in _NON_SIMPLE_MODES:
-            if form.get("ComparisonMediumOBV") == "greater":
-                medium_obv_condition = _safe_compare(data.get("medium_obv"), ">", float(form.get("PercentageMediumOBV")))
-            elif form.get("ComparisonMediumOBV") == "greaterEqual":
-                medium_obv_condition = _safe_compare(data.get("medium_obv"), ">=", float(form.get("PercentageMediumOBV")))
-            elif form.get("ComparisonMediumOBV") == "lower":
-                medium_obv_condition = _safe_compare(data.get("medium_obv"), "<", float(form.get("PercentageMediumOBV")))
-            elif form.get("ComparisonMediumOBV") == "lowerEqual":
-                medium_obv_condition = _safe_compare(data.get("medium_obv"), "<=", float(form.get("PercentageMediumOBV")))
-        elif form.get("ComparisonMediumOBV") == "between":
-            medium_obv_condition = (
-                    _safe_compare(data.get("medium_obv"), ">=", float(form.get("PercentageMediumOBV")))
-                    and _safe_compare(data.get("medium_obv1"), "<=", float(form.get("PercentageMediumOBV1")))
-            )
-
-        elif form.get("ComparisonMediumOBV") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
-            try:
-                threshold = float(form.get("PercentageMediumOBV", 5))
-            except Exception:
-                threshold = 5.0
-            medium_obv_condition = _within_percent_check(
-                data.get("medium_obv"), data.get("close"),
-                form.get("ComparisonMediumOBV"), threshold
-            )
+        medium_obv_condition = _compare_indicator_condition(
+            data,
+            form,
+            data_key="medium_obv",
+            comparison_key="ComparisonMediumOBV",
+            threshold_key="PercentageMediumOBV",
+            mode_key="MediumOBVBool",
+            upper_data_key="medium_obv1",
+            upper_threshold_key="PercentageMediumOBV1",
+        )
 
         if medium_obv_condition is not None:
             condition = condition and medium_obv_condition
@@ -4813,32 +4769,16 @@ class IBapi(EWrapper, EClient):
         # -------------------------
         # SLOW OBV
         # -------------------------
-        slow_obv_condition = None
-
-        if form.get("ComparisonSlowOBV", "Not used") not in _NON_SIMPLE_MODES:
-            if form.get("ComparisonSlowOBV") == "greater":
-                slow_obv_condition = _safe_compare(data.get("slow_obv"), ">", float(form.get("PercentageSlowOBV")))
-            elif form.get("ComparisonSlowOBV") == "greaterEqual":
-                slow_obv_condition = _safe_compare(data.get("slow_obv"), ">=", float(form.get("PercentageSlowOBV")))
-            elif form.get("ComparisonSlowOBV") == "lower":
-                slow_obv_condition = _safe_compare(data.get("slow_obv"), "<", float(form.get("PercentageSlowOBV")))
-            elif form.get("ComparisonSlowOBV") == "lowerEqual":
-                slow_obv_condition = _safe_compare(data.get("slow_obv"), "<=", float(form.get("PercentageSlowOBV")))
-        elif form.get("ComparisonSlowOBV") == "between":
-            slow_obv_condition = (
-                    _safe_compare(data.get("slow_obv"), ">=", float(form.get("PercentageSlowOBV")))
-                    and _safe_compare(data.get("slow_obv1"), "<=", float(form.get("PercentageSlowOBV1")))
-            )
-
-        elif form.get("ComparisonSlowOBV") in ("withinPercentAbove", "withinPercentBelow", "withinPercentEither"):
-            try:
-                threshold = float(form.get("PercentageSlowOBV", 5))
-            except Exception:
-                threshold = 5.0
-            slow_obv_condition = _within_percent_check(
-                data.get("slow_obv"), data.get("close"),
-                form.get("ComparisonSlowOBV"), threshold
-            )
+        slow_obv_condition = _compare_indicator_condition(
+            data,
+            form,
+            data_key="slow_obv",
+            comparison_key="ComparisonSlowOBV",
+            threshold_key="PercentageSlowOBV",
+            mode_key="SlowOBVBool",
+            upper_data_key="slow_obv1",
+            upper_threshold_key="PercentageSlowOBV1",
+        )
 
         if slow_obv_condition is not None:
             condition = condition and slow_obv_condition
@@ -5857,7 +5797,7 @@ class IBapi(EWrapper, EClient):
         news_condition = None
 
         # ComparisonNews form value: "enabled" or "disabled" (not "Not used" which is display text)
-        if form.get("ComparisonNews") == "enabled":
+        if news_signal_enabled(form):
             # Support both the new NewsWithinValue+NewsTimeUnit fields
             # and the legacy NewsWithinHours field for backward compat.
             news_window_minutes = news_within_minutes(form)
@@ -5885,37 +5825,23 @@ class IBapi(EWrapper, EClient):
         matched_keyword_headlines = []
 
         # Apply keyword filtering REGARDLESS of whether News signal is enabled
-        keywords_raw = form.get("NewsKeywords", "").strip()
+        keywords_raw = str(form.get("NewsKeywords") or "").strip()
         logger.debug(f"[KEYWORDS DEBUG] form keys: {list(form.keys()) if isinstance(form, dict) else 'not dict'}")
         logger.debug(f"[KEYWORDS DEBUG] NewsKeywords value: '{keywords_raw}'")
         logger.debug(f"[KEYWORDS DEBUG] Available headlines: {len(data.get('newsHeadlines', []) or [])} headlines")
         if keywords_raw:
-            keywords = [k.strip().lower() for k in keywords_raw.split(",") if k.strip()]
-            logger.debug(f"[KEYWORDS DEBUG] Parsed keywords: {keywords}")
-            if keywords:
-                headlines = data.get("newsHeadlines", [])
-                # Handle case where headlines might be None instead of list
-                if headlines is None:
-                    headlines = []
-                    logger.debug("[KEYWORDS DEBUG] newsHeadlines was None, using empty list")
-                    
-                # Use whole-word matching to avoid unintended partial matches
-                import re as _re_kw
-                filtered_headlines = []
-                # compile patterns once for performance
-                patterns = [_re_kw.compile(r"\b" + _re_kw.escape(k) + r"\b", _re_kw.IGNORECASE) for k in keywords]
-                for h in headlines:
-                    headline_text = (h.get("headline") or "")
-                    for pat in patterns:
-                        if pat.search(headline_text):
-                            filtered_headlines.append(h)
-                            matched_keyword_headlines.append(h.get("headline", ""))
-                            break
-
-                # Replace newsHeadlines with only those containing keywords
-                data["newsHeadlines"] = filtered_headlines
-                news_keyword_match = len(filtered_headlines) > 0
-                logger.debug(f"[KEYWORDS DEBUG] Matched {len(filtered_headlines)} out of {len(headlines)} headlines")
+            headlines = data.get("newsHeadlines", [])
+            filtered_headlines, matched_keyword_headlines, news_keyword_match = filter_headlines_by_keywords(
+                headlines,
+                keywords_raw,
+            )
+            # Replace newsHeadlines with only those containing keywords
+            data["newsHeadlines"] = filtered_headlines
+            logger.debug(
+                "[KEYWORDS DEBUG] Matched %s out of %s headlines",
+                len(filtered_headlines),
+                len(headlines or []),
+            )
         else:
             logger.debug("[KEYWORDS DEBUG] No keywords entered")
 
@@ -5953,7 +5879,7 @@ class IBapi(EWrapper, EClient):
                 high_of_day = float(high_of_day)
                 
                 if high_of_day > prev_close:  # Only calculate if there's an uptrend
-                    from indicators import FibonacciCalculator
+                    from scanner.indicators import FibonacciCalculator
                     
                     fib_calc = FibonacciCalculator(prev_close, high_of_day)
                     fib_levels = fib_calc.calculate_levels()
@@ -7151,17 +7077,14 @@ class IBapi(EWrapper, EClient):
                 # Fetch news headlines only if news is ENABLED or keyword filtering is enabled
                 # ComparisonNews form value: "enabled" or "disabled" (default: "enabled")
                 # -------------------------
-                news_setting = form.get("ComparisonNews", "enabled")
-                # More robust check: treat as enabled unless explicitly set to "disabled" or "false"
-                is_news_enabled = str(news_setting).lower() not in ("disabled", "false", "0", "")
-                has_keywords = bool(form.get("NewsKeywords", "").strip())
-                should_fetch_news = is_news_enabled or has_keywords
+                is_news_enabled = news_enabled(form)
+                should_fetch = should_fetch_news(form)
                 
                 con_id = getattr(contract, "conId", None)
                 logger.debug("News fetch check for %s: enabled=%s keywords=%s conId=%s should_fetch=%s", 
-                            m, is_news_enabled, has_keywords, con_id, should_fetch_news)
+                            m, is_news_enabled, bool(str(form.get("NewsKeywords") or "").strip()), con_id, should_fetch)
                 
-                if con_id and should_fetch_news:
+                if con_id and should_fetch:
                     try:
                         with self.Locking:
                             self.idInc += 1

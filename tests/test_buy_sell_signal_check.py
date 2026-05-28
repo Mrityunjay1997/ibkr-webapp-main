@@ -1,5 +1,5 @@
 # test_buy_sell_signal_check.py
-from ibkr_signal_engine import IBapi
+from scanner.ibkr_signal_engine import IBapi
 
 
 def _safe_compare(a, op, b):

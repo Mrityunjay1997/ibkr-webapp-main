@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping, Optional, Sequence
+
+logger = logging.getLogger(__name__)
 
 
 def parse_news_datetime(value: Any) -> Optional[datetime]:
@@ -59,7 +62,7 @@ def parse_news_datetime(value: Any) -> Optional[datetime]:
 
 def time_window_minutes(value: Any, unit: Any) -> int:
     try:
-        amount = int(value or 0)
+        amount = int(float(str(value or 0).strip()))
     except (TypeError, ValueError):
         return 0
 
@@ -70,23 +73,12 @@ def time_window_minutes(value: Any, unit: Any) -> int:
     
     if unit_text in ("", "m", "min", "mins", "minute", "minutes"):
         # Default to minutes when the unit is explicitly minutes or missing.
-        if not unit_text and amount > 24:
-            # If the unit is completely missing and the amount is large, assume days.
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(
-                f"Empty unit with amount={amount}, assuming user meant 'days' instead of 'minutes'"
-            )
-            return amount * 1440
         return amount
     if unit_text in ("h", "hr", "hrs", "hour", "hours"):
         return amount * 60
     if unit_text in ("d", "day", "days"):
         return amount * 1440
 
-    # Debug: Log unexpected unit values
-    import logging
-    logger = logging.getLogger(__name__)
     logger.warning(f"Unexpected time unit: '{unit}' (normalized to '{unit_text}')")
 
     # Fall back to minutes for any unknown unit.
@@ -100,17 +92,13 @@ def news_within_minutes(form: Mapping[str, Any]) -> int:
     
     Returns minutes, or 0 if no time window is specified (show all headlines).
     """
-    import logging
-    logger = logging.getLogger(__name__)
-    
     # Try new format first: NewsWithinValue + NewsTimeUnit
     news_within_value = form.get("NewsWithinValue", 0)
     news_time_unit = form.get("NewsTimeUnit", "")
+    news_within_amount = time_window_minutes(news_within_value, "minutes")
     
     # If we have a value, calculate minutes
-    if news_within_value and int(news_within_value or 0) > 0:
-        # DON'T default to "minutes" - pass the actual unit value (even if empty)
-        # so time_window_minutes can detect and handle the missing unit
+    if news_within_amount > 0:
         minutes = time_window_minutes(news_within_value, news_time_unit)
         if minutes > 0:
             logger.debug(f"news_within_minutes: Using new format - value={news_within_value}, unit={news_time_unit or 'empty'}, calculated={minutes} minutes")
@@ -120,7 +108,8 @@ def news_within_minutes(form: Mapping[str, Any]) -> int:
     
     # Fall back to legacy NewsWithinHours field
     news_within_hours = form.get("NewsWithinHours", 0)
-    if news_within_hours and int(news_within_hours or 0) > 0:
+    news_within_hours_amount = time_window_minutes(news_within_hours, "minutes")
+    if news_within_hours_amount > 0:
         minutes = time_window_minutes(news_within_hours, "hours")
         logger.debug(f"news_within_minutes: Using legacy format - NewsWithinHours={news_within_hours}, calculated={minutes} minutes")
         return minutes

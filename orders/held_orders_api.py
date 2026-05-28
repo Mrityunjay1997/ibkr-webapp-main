@@ -14,11 +14,11 @@ import logging
 import time
 from datetime import datetime
 from flask import request, jsonify
-from held_orders_manager import (
+from orders.held_orders_manager import (
     HeldOrdersManager, HeldOrder, HeldOrderCondition,
     CandleBreakoutCondition, MovingAverageCondition, ConditionChecker
 )
-from ibkr_signal_engine import IBapi
+from scanner.ibkr_signal_engine import IBapi
 
 logger = logging.getLogger("held_orders_api")
 

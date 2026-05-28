@@ -10,7 +10,7 @@ import logging
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Any, Optional
-from indicators import (
+from scanner.indicators import (
     SMAIndicator, EMAIndicator, RSIIndicator, OBVIndicator,
     FastOBVIndicator, MediumOBVIndicator, SlowOBVIndicator,
     ATRIndicator, VolumeWeightedAveragePrice, last_value

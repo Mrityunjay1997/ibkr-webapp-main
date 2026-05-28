@@ -103,7 +103,7 @@ class EMAIndicator:
 
     def __init__(self, close: pd.Series, window: int):
         self.close = close
-        self.window = int(window)
+        self.window = _positive_window(window)
 
     def ema_indicator(self) -> pd.Series:
         return self.close.ewm(span=self.window, adjust=False, min_periods=1).mean()
@@ -111,6 +111,38 @@ class EMAIndicator:
     # aliases for compatibility
     def ema(self) -> pd.Series:
         return self.ema_indicator()
+
+
+def _positive_window(window: int, default: int = 1) -> int:
+    try:
+        parsed = int(window)
+    except (TypeError, ValueError):
+        parsed = default
+    return max(1, parsed)
+
+
+def _numeric_series(series: pd.Series, index: Optional[pd.Index] = None) -> pd.Series:
+    numeric = pd.to_numeric(series if isinstance(series, pd.Series) else pd.Series(series), errors="coerce")
+    if index is not None and not numeric.index.equals(index):
+        if len(numeric) == len(index):
+            numeric = pd.Series(numeric.to_numpy(), index=index)
+        else:
+            numeric = numeric.reindex(index)
+    return numeric
+
+
+def _obv_series(close: pd.Series, volume: pd.Series) -> pd.Series:
+    close_numeric = _numeric_series(close)
+    volume_numeric = _numeric_series(volume, close_numeric.index).fillna(0.0)
+    direction = close_numeric.diff()
+
+    signed_volume = pd.Series(0.0, index=close_numeric.index)
+    signed_volume[direction > 0] = volume_numeric[direction > 0]
+    signed_volume[direction < 0] = -volume_numeric[direction < 0]
+    if not signed_volume.empty:
+        signed_volume.iloc[0] = 0.0
+
+    return signed_volume.cumsum()
 
 
 class OBVIndicator:
@@ -121,15 +153,7 @@ class OBVIndicator:
         self.volume = volume
 
     def on_balance_volume(self) -> pd.Series:
-        direction = self.close.diff()
-
-        signed_volume = self.volume.copy()
-        signed_volume[direction > 0] = self.volume[direction > 0]
-        signed_volume[direction < 0] = -self.volume[direction < 0]
-        signed_volume[direction == 0] = 0.0
-
-        obv = signed_volume.cumsum()
-        return obv
+        return _obv_series(self.close, self.volume)
 
     # aliases for compatibility
     def obv(self) -> pd.Series:
@@ -145,18 +169,11 @@ class FastOBVIndicator:
     def __init__(self, close: pd.Series, volume: pd.Series, window: int = 5):
         self.close = close
         self.volume = volume
-        self.window = int(window)
+        self.window = _positive_window(window, 5)
 
     def fast_obv(self) -> pd.Series:
         """Calculate OBV and apply fast MA smoothing."""
-        direction = self.close.diff()
-        
-        signed_volume = self.volume.copy()
-        signed_volume[direction > 0] = self.volume[direction > 0]
-        signed_volume[direction < 0] = -self.volume[direction < 0]
-        signed_volume[direction == 0] = 0.0
-        
-        obv = signed_volume.cumsum()
+        obv = _obv_series(self.close, self.volume)
         # Apply fast moving average
         fast_obv = obv.rolling(self.window, min_periods=1).mean()
         return fast_obv
@@ -172,18 +189,11 @@ class MediumOBVIndicator:
     def __init__(self, close: pd.Series, volume: pd.Series, window: int = 10):
         self.close = close
         self.volume = volume
-        self.window = int(window)
+        self.window = _positive_window(window, 10)
 
     def medium_obv(self) -> pd.Series:
         """Calculate OBV and apply medium MA smoothing."""
-        direction = self.close.diff()
-        
-        signed_volume = self.volume.copy()
-        signed_volume[direction > 0] = self.volume[direction > 0]
-        signed_volume[direction < 0] = -self.volume[direction < 0]
-        signed_volume[direction == 0] = 0.0
-        
-        obv = signed_volume.cumsum()
+        obv = _obv_series(self.close, self.volume)
         # Apply medium moving average
         medium_obv = obv.rolling(self.window, min_periods=1).mean()
         return medium_obv
@@ -199,18 +209,11 @@ class SlowOBVIndicator:
     def __init__(self, close: pd.Series, volume: pd.Series, window: int = 20):
         self.close = close
         self.volume = volume
-        self.window = int(window)
+        self.window = _positive_window(window, 20)
 
     def slow_obv(self) -> pd.Series:
         """Calculate OBV and apply slow MA smoothing."""
-        direction = self.close.diff()
-        
-        signed_volume = self.volume.copy()
-        signed_volume[direction > 0] = self.volume[direction > 0]
-        signed_volume[direction < 0] = -self.volume[direction < 0]
-        signed_volume[direction == 0] = 0.0
-        
-        obv = signed_volume.cumsum()
+        obv = _obv_series(self.close, self.volume)
         # Apply slow moving average
         slow_obv = obv.rolling(self.window, min_periods=1).mean()
         return slow_obv
@@ -227,16 +230,20 @@ class ATRIndicator:
         self.high = high
         self.low = low
         self.close = close
-        self.window = int(window)
+        self.window = _positive_window(window)
 
     def average_true_range(self) -> pd.Series:
-        high_low = self.high - self.low
-        high_close = (self.high - self.close.shift()).abs()
-        low_close = (self.low - self.close.shift()).abs()
+        high = _numeric_series(self.high)
+        low = _numeric_series(self.low, high.index)
+        close = _numeric_series(self.close, high.index)
+
+        high_low = high - low
+        high_close = (high - close.shift()).abs()
+        low_close = (low - close.shift()).abs()
 
         tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
 
-        atr = tr.ewm(alpha=1.0 / self.window, adjust=False, min_periods=self.window).mean()
+        atr = tr.ewm(alpha=1.0 / self.window, adjust=False, min_periods=1).mean()
         return atr
 
     # aliases for compatibility

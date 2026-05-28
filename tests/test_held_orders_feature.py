@@ -8,7 +8,7 @@ conditions and market data scenarios.
 import sys
 import json
 from datetime import datetime
-from held_orders_manager import (
+from orders.held_orders_manager import (
     HeldOrder, HeldOrdersManager, ConditionChecker,
     OrderSide, OrderType, ConditionType, ConditionPhase,
     CandleBreakoutCondition, MovingAverageCondition, HeldOrderCondition

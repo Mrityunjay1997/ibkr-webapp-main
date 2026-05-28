@@ -16,6 +16,7 @@ from enum import Enum
 from datetime import datetime
 import json
 import uuid
+from orders.unified_order_constants import OrderTIF, ORDER_STATUSES, ORDER_MODES
 
 
 class OrderMode(Enum):
@@ -381,7 +382,7 @@ class UnifiedOrderConfig:
         
         # Validate stop loss if present
         if self.stop_loss:
-            from unified_order_constants import validate_stop_loss_config
+            from orders.unified_order_constants import validate_stop_loss_config
             is_valid, msg = validate_stop_loss_config(self.stop_loss.stop_type, asdict(self.stop_loss))
             if not is_valid:
                 return False, f"Invalid stop loss: {msg}"

@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from indicators import (
+from scanner.indicators import (
     VolumeWeightedAveragePrice,
     SMAIndicator,
     RSIIndicator,

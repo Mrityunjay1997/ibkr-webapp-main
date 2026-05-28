@@ -45,13 +45,18 @@ def merge_dynamic_with_legacy_form(form_data: Dict[str, Any], indicator_config_j
                     
                     # Set comparison (legacy field name)
                     comp_key = f'Comparison{ind_type}'
-                    if comp_key not in merged:
+                    if comp_key not in merged or merged.get(comp_key) == "":
                         merged[comp_key] = ind.get('comparison', 'disabled')
                     
                     # Set percentage (legacy field name)
                     pct_key = f'Percentage{ind_type}'
-                    if pct_key not in merged:
+                    if pct_key not in merged or merged.get(pct_key) == "":
                         merged[pct_key] = ind.get('percentage', 0)
+
+                    # Set percentage/value mode for legacy boolean fields
+                    bool_key = f'{ind_type}Bool'
+                    if bool_key not in merged or merged.get(bool_key) == "":
+                        merged[bool_key] = 'percentage' if ind.get('usePercentage') else 'value'
         
         except (json.JSONDecodeError, TypeError) as e:
             logger.warning(f"Error merging dynamic indicators: {e}")
@@ -114,6 +119,7 @@ def build_legacy_form_from_dynamic(indicators: List[Dict[str, Any]]) -> Dict[str
             form_fields[f'{ind_type}{suffix}'] = window
             form_fields[f'Comparison{ind_type}{suffix}'] = comparison
             form_fields[f'Percentage{ind_type}{suffix}'] = percentage
+            form_fields[f'{ind_type}Bool{suffix}'] = 'percentage' if indicator.get('usePercentage') else 'value'
     
     return form_fields
 
@@ -276,6 +282,7 @@ def convert_form_to_indicator_config(
         except (ValueError, TypeError):
             continue
         
+        use_percentage_mode = form_data.get(f'{ind_type}Bool', 'value') == 'percentage'
         indicator = {
             'id': indicator_id,
             'type': ind_type,
@@ -283,7 +290,7 @@ def convert_form_to_indicator_config(
             'comparison': comparison,
             'percentage': percentage,
             'timeframe': timeframe,
-            'usePercentage': False,
+            'usePercentage': use_percentage_mode,
             'enabled': True
         }
         

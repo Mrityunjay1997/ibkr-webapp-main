@@ -1,4 +1,4 @@
-from ibkr_signal_engine import _round_obv_value
+from scanner.ibkr_signal_engine import _round_obv_value
 
 
 def test_round_obv_value_returns_integer_for_smoothed_obv():

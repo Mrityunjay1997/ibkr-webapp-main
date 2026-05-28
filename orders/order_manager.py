@@ -15,7 +15,7 @@ from datetime import datetime
 
 # Import Fibonacci calculator from indicators
 try:
-    from indicators import FibonacciCalculator
+    from scanner.indicators import FibonacciCalculator
 except ImportError:
     FibonacciCalculator = None
 

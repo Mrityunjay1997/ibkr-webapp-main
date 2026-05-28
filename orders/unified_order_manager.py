@@ -19,17 +19,17 @@ from datetime import datetime
 from pathlib import Path
 import uuid
 
-from unified_order_model import (
+from orders.unified_order_model import (
     UnifiedOrderConfig, OrderMode, OrderStatus,
     EntryConditionConfig, StopLossConfig, TargetConfig, SessionConfig
 )
-from unified_order_constants import (
+from orders.unified_order_constants import (
     PRICE_REFERENCE_TYPES, ENTRY_CONDITION_TYPES, STOP_LOSS_TYPES, TARGET_TYPES,
     validate_stop_loss_config, validate_target_config
 )
-from price_resolver import PriceResolver, PriceResolutionContext
-from share_calculator import ShareCalculator
-from session_handler import SessionHandler, TradingSession
+from orders.price_resolver import PriceResolver, PriceResolutionContext
+from orders.share_calculator import ShareCalculator
+from orders.session_handler import SessionHandler, TradingSession
 
 logger = logging.getLogger("unified_order_manager")
 

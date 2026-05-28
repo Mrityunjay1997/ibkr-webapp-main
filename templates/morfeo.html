@@ -2872,10 +2872,13 @@ function cleanNewsArticleText(rawText) {
     _processHeadlineQueue();
   }
   
-  // Clear the cache at the start of each new scan (called from renderResultsFromBackend)
+  // Clear the cache and pending queue at the start of each new scan
+  // This avoids stale headline entries from previous scan cycles being replayed
+  // while still allowing the currently speaking headline to finish.
   function _clearHeadlineCache() {
     _readHeadlinesCache.clear();
     _queuedHeadlines.clear();
+    _headlineQueue = [];
   }
 
   // Set TTS volume (0.0 to 1.0)
@@ -3353,29 +3356,45 @@ function renderResultsFromBackend(response) {
                     // pivot primary
                     const pivotPrimary = pivotColumnDefs.slice();
 
+                    const displayedPivotLabels = new Set(pivotColumnDefs.map(p => p.label));
+
                     // pivot secondary
                     const pivotSecondary = [];
                     if (dta.Pivot1 && typeof dta.Pivot1 === "object") {
-                        for (const pp of Object.keys(dta.Pivot1)) pivotSecondary.push(pp);
+                        for (const pp of Object.keys(dta.Pivot1)) {
+                            if (!displayedPivotLabels.has(pp)) {
+                                pivotSecondary.push(pp);
+                                displayedPivotLabels.add(pp);
+                            }
+                        }
                     }
 
                     // pivot tertiary
                     const pivotTertiary = [];
                     if (dta.Pivot2 && typeof dta.Pivot2 === "object") {
-                        for (const pp of Object.keys(dta.Pivot2)) pivotTertiary.push(pp);
+                        for (const pp of Object.keys(dta.Pivot2)) {
+                            if (!displayedPivotLabels.has(pp)) {
+                                pivotTertiary.push(pp);
+                                displayedPivotLabels.add(pp);
+                            }
+                        }
                     }
 
                     // pivot quaternary
                     const pivotQuaternary = [];
                     if (dta.Pivot3 && typeof dta.Pivot3 === "object") {
-                        for (const pp of Object.keys(dta.Pivot3)) pivotQuaternary.push(pp);
+                        for (const pp of Object.keys(dta.Pivot3)) {
+                            if (!displayedPivotLabels.has(pp)) {
+                                pivotQuaternary.push(pp);
+                                displayedPivotLabels.add(pp);
+                            }
+                        }
                     }
 
                     // Build the ordered list of ALL columns (for control bar & reorder)
                     const allColDefs = [];
                     headerCols.forEach(c => allColDefs.push({ key: c.key, label: c.label, group: 'indicators' }));
                     pivotPrimary.forEach(p => allColDefs.push({ key: 'pivot_' + p.key, label: p.label, group: 'pivot' }));
-                    allColDefs.push({ key: 'netPosition', label: 'Net Position', group: 'position' });
                     if (pivotSecondary.length > 0) pivotSecondary.forEach(p => allColDefs.push({ key: 'pivot1_' + p, label: p, group: 'pivot' }));
                     if (pivotTertiary.length > 0) pivotTertiary.forEach(p => allColDefs.push({ key: 'pivot2_' + p, label: p, group: 'pivot' }));
                     if (pivotQuaternary.length > 0) pivotQuaternary.forEach(p => allColDefs.push({ key: 'pivot3_' + p, label: p, group: 'pivot' }));
@@ -3507,9 +3526,6 @@ function renderResultsFromBackend(response) {
                 };
                 // ===== END COLOR SCHEME DEFINITION =====
 
-                // net position decision
-                const np = Number(dta.netPosition);
-                const decision = Number.isFinite(np) ? (np > 0 ? "UP" : np < 0 ? "DOWN" : "UNCHANGE") : "UNCHANGE";
                 const rowClass = dta.signal === "yes" ? `content${tableId} yescondition` : `content${tableId}`;
                 const _keywordRowStyle = dta.newsKeywordMatch ? " style='background:#fef9e7'" : "";
                 
@@ -3685,10 +3701,7 @@ function renderResultsFromBackend(response) {
                     }
                 }
 
-                // --- Primary pivots ---
-                for (const pp of pivotPrimary) {
-                    const pKey = 'pivot_' + pp.key;
-                    const pivotValue = dta.Pivot && typeof dta.Pivot === "object" ? dta.Pivot[pp.key] : null;
+                function getPivotCellStyle(pivotKey, pivotValue, vr, closeValue) {
                     const pivotVrMap = {
                         "Pivot": "pivot_point",
                         "R1": "resistance_1",
@@ -3696,23 +3709,49 @@ function renderResultsFromBackend(response) {
                         "S1": "support_1",
                         "S2": "support_2"
                     };
-                    const pivotVrKey = pivotVrMap[pp.key];
-                    const pivotStyle = pivotVrKey && (pivotVrKey in vr)
-                        ? (vr[pivotVrKey]
-                            ? " style='background:#28a745;color:#fff;font-weight:800;padding:6px;font-size:13px'"
-                            : " style='background:#dc3545;color:#fff;font-weight:800;padding:6px;font-size:13px'")
-                        : "";
-                    cellMap[pKey] = `<td data-col='${pKey}'${pivotStyle}>${fmt(pivotValue)}</td>`;
+                    const pivotVrKey = pivotVrMap[pivotKey];
+                    const activeStyle = " style='background:#28a745;color:#fff;font-weight:800;padding:6px;font-size:13px'";
+                    const inactiveStyle = " style='background:#dc3545;color:#fff;font-weight:800;padding:6px;font-size:13px'";
+
+                    if (pivotVrKey && pivotVrKey in vr) {
+                        return vr[pivotVrKey] ? activeStyle : inactiveStyle;
+                    }
+
+                    const closeNum = Number(closeValue);
+                    const pivotNum = Number(pivotValue);
+                    if (
+                        pivotValue === null || pivotValue === undefined || !Number.isFinite(pivotNum)
+                        || closeValue === null || closeValue === undefined || !Number.isFinite(closeNum)
+                    ) {
+                        return "";
+                    }
+
+                    let isBullish = false;
+                    if (pivotKey === "Pivot") {
+                        isBullish = closeNum >= pivotNum;
+                    } else if (pivotKey === "R1" || pivotKey === "R2") {
+                        isBullish = closeNum >= pivotNum;
+                    } else if (pivotKey === "S1" || pivotKey === "S2") {
+                        isBullish = closeNum >= pivotNum;
+                    }
+                    return isBullish ? activeStyle : inactiveStyle;
                 }
 
-                // --- netPosition ---
-                cellMap['netPosition'] = `<td data-col='netPosition'>${(dta.netPosition === null || dta.netPosition === undefined || dta.netPosition === "") ? "n.d" : dta.netPosition}</td>`;
+                // --- Primary pivots ---
+                for (const pp of pivotPrimary) {
+                    const pKey = 'pivot_' + pp.key;
+                    const pivotValue = dta.Pivot && typeof dta.Pivot === "object" ? dta.Pivot[pp.key] : null;
+                    const pivotStyle = getPivotCellStyle(pp.key, pivotValue, vr, dta.close);
+                    cellMap[pKey] = `<td data-col='${pKey}'${pivotStyle}>${fmt(pivotValue)}</td>`;
+                }
 
                 // --- Secondary pivots ---
                 for (const pp of pivotSecondary) {
                     const pKey = 'pivot1_' + pp;
                     if (dta.Pivot1 && typeof dta.Pivot1 === "object") {
-                        cellMap[pKey] = `<td data-col='${pKey}'>${fmt(dta.Pivot1[pp])}</td>`;
+                        const pivotValue = dta.Pivot1[pp];
+                        const pivotStyle = getPivotCellStyle(pp, pivotValue, vr, dta.close);
+                        cellMap[pKey] = `<td data-col='${pKey}'${pivotStyle}>${fmt(pivotValue)}</td>`;
                     } else {
                         cellMap[pKey] = `<td data-col='${pKey}'>n.d</td>`;
                     }
@@ -3722,7 +3761,9 @@ function renderResultsFromBackend(response) {
                 for (const pp of pivotTertiary) {
                     const pKey = 'pivot2_' + pp;
                     if (dta.Pivot2 && typeof dta.Pivot2 === "object") {
-                        cellMap[pKey] = `<td data-col='${pKey}'>${fmt(dta.Pivot2[pp])}</td>`;
+                        const pivotValue = dta.Pivot2[pp];
+                        const pivotStyle = getPivotCellStyle(pp, pivotValue, vr, dta.close);
+                        cellMap[pKey] = `<td data-col='${pKey}'${pivotStyle}>${fmt(pivotValue)}</td>`;
                     } else {
                         cellMap[pKey] = `<td data-col='${pKey}'>n.d</td>`;
                     }
@@ -3732,7 +3773,9 @@ function renderResultsFromBackend(response) {
                 for (const pp of pivotQuaternary) {
                     const pKey = 'pivot3_' + pp;
                     if (dta.Pivot3 && typeof dta.Pivot3 === "object") {
-                        cellMap[pKey] = `<td data-col='${pKey}'>${fmt(dta.Pivot3[pp])}</td>`;
+                        const pivotValue = dta.Pivot3[pp];
+                        const pivotStyle = getPivotCellStyle(pp, pivotValue, vr, dta.close);
+                        cellMap[pKey] = `<td data-col='${pKey}'${pivotStyle}>${fmt(pivotValue)}</td>`;
                     } else {
                         cellMap[pKey] = `<td data-col='${pKey}'>n.d</td>`;
                     }
@@ -3779,14 +3822,7 @@ function renderResultsFromBackend(response) {
 
                 // expandable news sub-row (always present)
                 {
-                    const totalCols = (groupHeaderCols || []).length
-                        + (groupPivotPrimary || []).length
-                        + 1 /* netPosition */
-                        + (groupPivotSecondary || []).length
-                        + (groupPivotTertiary || []).length
-                        + (groupPivotQuaternary || []).length
-                        + 2 /* change + place order */
-                        + 1 /* news col */;
+                    const totalCols = (groupAllColDefs || []).length;
                     txt1 += `<tr id='${newsRowId}' style='display:none;background:#f6f8fa'>`;
                     txt1 += `<td colspan='${totalCols}' style='padding:10px 18px'>`;
                     const stockSymbol = (dta.symbol || dta.cusip || 'UNKNOWN').replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
@@ -3942,6 +3978,36 @@ function renderResultsFromBackend(response) {
             return value === 'enabled' || value === 'used' || value === 'true';
         }
 
+        function _getNewsReadAloudWindowMinutes() {
+            const withinValueInput = document.querySelector('.NewsReadAloudWithinValue');
+            const timeUnitSelect = document.querySelector('.NewsReadAloudTimeUnit');
+            let withinMinutes = 0;
+            if (!withinValueInput || !timeUnitSelect) {
+                return withinMinutes;
+            }
+
+            try {
+                const withinValue = parseInt(withinValueInput.value) || 0;
+                let timeUnit = (timeUnitSelect.value || 'minutes').toLowerCase().trim();
+
+                if (withinValue > 0) {
+                    if (timeUnit === '' && withinValue > 24) {
+                        timeUnit = 'days';
+                    }
+                    if (['hours', 'hour', 'h', 'hr', 'hrs'].includes(timeUnit)) {
+                        withinMinutes = withinValue * 60;
+                    } else if (['days', 'day', 'd'].includes(timeUnit)) {
+                        withinMinutes = withinValue * 1440;
+                    } else {
+                        withinMinutes = withinValue;
+                    }
+                }
+            } catch (e) {
+                console.warn('Error parsing read aloud time window:', e);
+            }
+            return withinMinutes;
+        }
+
         // TTS: read matched keyword headlines aloud if enabled AND within time window
         {
             // FIRST: Check if news is ENABLED in the ComparisonNews dropdown (required for news processing)
@@ -3955,30 +4021,7 @@ function renderResultsFromBackend(response) {
                 const autoReadAllNews = document.querySelector('.NewsAutoReadAll');
                 const autoReadAllEnabled = autoReadAllNews && (autoReadAllNews.value === 'on' || autoReadAllNews.value === 'True');
                 if (readAloud && readAloud.value === 'on') {
-                    // Get time window settings
-                    const withinValueInput = document.querySelector('.NewsReadAloudWithinValue');
-                    const timeUnitSelect = document.querySelector('.NewsReadAloudTimeUnit');
-                    let withinMinutes = 0;
-                    
-                    if (withinValueInput && timeUnitSelect) {
-                        try {
-                            const withinValue = parseInt(withinValueInput.value) || 0;
-                            const timeUnit = (timeUnitSelect.value || 'minutes').toLowerCase();
-                            
-                            if (withinValue > 0) {
-                                if (timeUnit === 'hours') {
-                                    withinMinutes = withinValue * 60;
-                                } else if (timeUnit === 'days') {
-                                    withinMinutes = withinValue * 1440;
-                                } else {
-                                    withinMinutes = withinValue;
-                                }
-                            }
-                        } catch (e) {
-                            console.warn("Error parsing read aloud time window:", e);
-                        }
-                    }
-                    
+                    const withinMinutes = _getNewsReadAloudWindowMinutes();
                     const now = Date.now();
                     const cutoffTime = withinMinutes > 0 ? now - (withinMinutes * 60 * 1000) : 0;
                     
@@ -4000,6 +4043,8 @@ function renderResultsFromBackend(response) {
                                     if (fullHeadline) {
                                         const headlineTime = fullHeadline.parsedTime ? new Date(fullHeadline.parsedTime).getTime() : now;
                                         shouldRead = headlineTime >= cutoffTime;
+                                    } else {
+                                        shouldRead = false;
                                     }
                                 }
                                 
@@ -4030,30 +4075,7 @@ function renderResultsFromBackend(response) {
                 
                 if (autoReadAllNews && (autoReadAllNews.value === 'on' || autoReadAllNews.value === 'True')) {
                     console.log("Auto-read all news is enabled, processing headlines...");
-                    // Get time window settings (same as Read Headlines Aloud)
-                    const withinValueInput = document.querySelector('.NewsReadAloudWithinValue');
-                    const timeUnitSelect = document.querySelector('.NewsReadAloudTimeUnit');
-                    let withinMinutes = 0;
-                    
-                    if (withinValueInput && timeUnitSelect) {
-                        try {
-                            const withinValue = parseInt(withinValueInput.value) || 0;
-                            const timeUnit = (timeUnitSelect.value || 'minutes').toLowerCase();
-                            
-                            if (withinValue > 0) {
-                                if (timeUnit === 'hours') {
-                                    withinMinutes = withinValue * 60;
-                                } else if (timeUnit === 'days') {
-                                    withinMinutes = withinValue * 1440;
-                                } else {
-                                    withinMinutes = withinValue;
-                                }
-                            }
-                        } catch (e) {
-                            console.warn("Error parsing read aloud time window:", e);
-                        }
-                    }
-                    
+                    const withinMinutes = _getNewsReadAloudWindowMinutes();
                     const now = Date.now();
                     const cutoffTime = withinMinutes > 0 ? now - (withinMinutes * 60 * 1000) : 0;
                     console.log("News auto-read time window: withinMinutes=" + withinMinutes + " cutoffTime=" + cutoffTime);
@@ -4311,7 +4333,6 @@ function _buildControlBar() {
     var groups = {
         'indicators': 'Indicators',
         'pivot': 'Pivots',
-        'position': 'Position',
         'actions': 'Actions'
     };
 
@@ -4543,8 +4564,8 @@ function _initTableSorting(tableId, groupData) {
         const th = ths[i];
         const colKey = th.getAttribute('data-col');
         
-        // Skip non-sortable columns (place order, news, position, and ticker/cusip columns)
-        if (colKey === '_placeOrder' || colKey === '_news' || colKey === 'netPosition' || 
+        // Skip non-sortable columns (place order, news, and ticker/cusip columns)
+        if (colKey === '_placeOrder' || colKey === '_news' || 
             colKey === 'symbol' || colKey === 'cusip') continue;
         
         // Add pointer cursor to indicate it's clickable

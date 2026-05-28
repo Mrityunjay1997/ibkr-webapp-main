@@ -1,4 +1,4 @@
-from ibkr_signal_engine import IBapi
+from scanner.ibkr_signal_engine import IBapi
 
 
 def test_select_best_contract_symbol_match():

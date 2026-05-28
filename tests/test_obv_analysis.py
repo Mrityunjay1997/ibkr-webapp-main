@@ -4,7 +4,7 @@
 import sys
 sys.path.insert(0, '.')
 
-from ibkr_signal_engine import (
+from scanner.ibkr_signal_engine import (
     calculate_obv_momentum,
     calculate_obv_vs_moving_average,
     detect_obv_strength

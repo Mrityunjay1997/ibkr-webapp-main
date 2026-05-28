@@ -1,6 +1,7 @@
-from ibkr_signal_engine import (
+from scanner.ibkr_signal_engine import (
     _build_pivot_level_map,
     _compare_indicator_value,
+    _normalize_pivot_selection,
     apply_result_filters,
 )
 
@@ -42,3 +43,12 @@ def test_pivot_levels_are_normalized_for_results():
         "support_2",
     }
     assert levels["pivot_point"] == 105.0
+    assert levels["resistance_1"] == 110.0
+    assert levels["support_2"] == 95.0
+
+
+def test_normalize_pivot_selection_handles_labels():
+    assert _normalize_pivot_selection("PP") == "pivot_point"
+    assert _normalize_pivot_selection("Resistance 2") == "resistance_2"
+    assert _normalize_pivot_selection("Support 1") == "support_1"
+    assert _normalize_pivot_selection("Unknown") == "pivot_point"

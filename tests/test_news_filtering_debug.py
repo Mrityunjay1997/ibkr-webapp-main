@@ -2,7 +2,7 @@
 """Debug test to verify news filtering logic."""
 
 from datetime import datetime, timezone, timedelta
-from news_utils import news_within_minutes, is_within_news_window, parse_news_datetime
+from news.utils import news_within_minutes, is_within_news_window, parse_news_datetime
 
 def test_scenario_1():
     """Test: User sets 5 days in NewsWithinValue, 'days' in NewsTimeUnit"""

@@ -6,8 +6,8 @@ sys.path.insert(0, '.')
 
 import pandas as pd
 import numpy as np
-from indicators import FastOBVIndicator, MediumOBVIndicator, SlowOBVIndicator
-from ibkr_signal_engine import analyze_multi_obv
+from scanner.indicators import FastOBVIndicator, MediumOBVIndicator, SlowOBVIndicator
+from scanner.ibkr_signal_engine import analyze_multi_obv
 
 print("=" * 80)
 print("TESTING FAST OBV, MEDIUM OBV, SLOW OBV INDICATORS + ANALYSIS INTEGRATION")

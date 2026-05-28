@@ -2,7 +2,7 @@ import time
 import threading
 
 # Import your real class
-from ibkr_signal_engine import IBapi
+from scanner.ibkr_signal_engine import IBapi
 
 
 class FakeIBapi(IBapi):

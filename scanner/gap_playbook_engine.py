@@ -22,7 +22,7 @@ from dataclasses import dataclass, asdict, field
 from datetime import datetime
 from decimal import Decimal
 
-from indicators import FibonacciGapPullbackAnalyzer, RiskRewardEvaluator
+from scanner.indicators import FibonacciGapPullbackAnalyzer, RiskRewardEvaluator
 
 logger = logging.getLogger("gap_playbook_engine")
 
