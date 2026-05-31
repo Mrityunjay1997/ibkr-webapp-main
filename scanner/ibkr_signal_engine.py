@@ -6654,7 +6654,7 @@ class IBapi(EWrapper, EClient):
         self._article_done.pop(req_id, None)
         return result
 
-    def getDataResult(self, i, m, net_position, form, theid, contract_id=None):
+    def getDataResult(self, i, m, net_position, form, theid, contract_id=None, rank=None):
         """
         Worker method executed in a separate thread.
 
@@ -7038,6 +7038,8 @@ class IBapi(EWrapper, EClient):
                         net_position.get(i, 0), m,
                         market_cap=_mktcap_value,
                     )
+                    if rank is not None:
+                        indic["rank"] = rank
                 else:
                     # Multiple timeframes: compute indicators per TF, then merge
                     tf_indicators = {}
@@ -7049,6 +7051,8 @@ class IBapi(EWrapper, EClient):
                                     net_position.get(i, 0), m,
                                     market_cap=_mktcap_value,
                                 )
+                                if rank is not None:
+                                    tf_indicators[tf_str]["rank"] = rank
                             except Exception:
                                 pass
 
@@ -7172,6 +7176,11 @@ class IBapi(EWrapper, EClient):
             i: j["change"]
             for i, j in zip(data[headers[1]], data[headers[0]])
         }
+        rank_by_cusip = {
+            str(item.get("cusip")): item.get("rank")
+            for item in data.get("CSV", [])
+            if isinstance(item, dict) and item.get("cusip") is not None and item.get("rank") is not None
+        }
 
         threads = []
 
@@ -7222,7 +7231,7 @@ class IBapi(EWrapper, EClient):
             t = threading.Thread(
                 target=self.getDataResult,
                 args=(cusip, m, netPosition, form, theidd),
-                kwargs={"contract_id": conId},
+                kwargs={"contract_id": conId, "rank": rank_by_cusip.get(str(cusip))},
             )
 
             threads.append(t)

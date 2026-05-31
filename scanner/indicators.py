@@ -145,6 +145,22 @@ def _obv_series(close: pd.Series, volume: pd.Series) -> pd.Series:
     return signed_volume.cumsum()
 
 
+def _windowed_raw_obv_series(close: pd.Series, volume: pd.Series, window: int) -> pd.Series:
+    close_numeric = _numeric_series(close)
+    volume_numeric = _numeric_series(volume, close_numeric.index).fillna(0.0)
+    window = _positive_window(window)
+
+    values = []
+    for end_pos in range(len(close_numeric)):
+        start_pos = max(0, end_pos - window + 1)
+        close_window = close_numeric.iloc[start_pos:end_pos + 1]
+        volume_window = volume_numeric.iloc[start_pos:end_pos + 1]
+        obv_window = _obv_series(close_window, volume_window)
+        values.append(float(obv_window.iloc[-1]) if not obv_window.empty else 0.0)
+
+    return pd.Series(values, index=close_numeric.index)
+
+
 class OBVIndicator:
     """On-Balance Volume."""
 
@@ -164,7 +180,7 @@ class OBVIndicator:
 
 
 class FastOBVIndicator:
-    """Fast OBV - OBV with 5-bar moving average smoothing."""
+    """Fast raw OBV over the configured trailing bar window."""
 
     def __init__(self, close: pd.Series, volume: pd.Series, window: int = 5):
         self.close = close
@@ -172,11 +188,7 @@ class FastOBVIndicator:
         self.window = _positive_window(window, 5)
 
     def fast_obv(self) -> pd.Series:
-        """Calculate OBV and apply fast MA smoothing."""
-        obv = _obv_series(self.close, self.volume)
-        # Apply fast moving average
-        fast_obv = obv.rolling(self.window, min_periods=1).mean()
-        return fast_obv
+        return _windowed_raw_obv_series(self.close, self.volume, self.window)
 
     # aliases for compatibility
     def obv(self) -> pd.Series:
@@ -184,7 +196,7 @@ class FastOBVIndicator:
 
 
 class MediumOBVIndicator:
-    """Medium OBV - OBV with 10-bar moving average smoothing."""
+    """Medium raw OBV over the configured trailing bar window."""
 
     def __init__(self, close: pd.Series, volume: pd.Series, window: int = 10):
         self.close = close
@@ -192,11 +204,7 @@ class MediumOBVIndicator:
         self.window = _positive_window(window, 10)
 
     def medium_obv(self) -> pd.Series:
-        """Calculate OBV and apply medium MA smoothing."""
-        obv = _obv_series(self.close, self.volume)
-        # Apply medium moving average
-        medium_obv = obv.rolling(self.window, min_periods=1).mean()
-        return medium_obv
+        return _windowed_raw_obv_series(self.close, self.volume, self.window)
 
     # aliases for compatibility
     def obv(self) -> pd.Series:
@@ -204,7 +212,7 @@ class MediumOBVIndicator:
 
 
 class SlowOBVIndicator:
-    """Slow OBV - OBV with 20-bar moving average smoothing."""
+    """Slow raw OBV over the configured trailing bar window."""
 
     def __init__(self, close: pd.Series, volume: pd.Series, window: int = 20):
         self.close = close
@@ -212,11 +220,7 @@ class SlowOBVIndicator:
         self.window = _positive_window(window, 20)
 
     def slow_obv(self) -> pd.Series:
-        """Calculate OBV and apply slow MA smoothing."""
-        obv = _obv_series(self.close, self.volume)
-        # Apply slow moving average
-        slow_obv = obv.rolling(self.window, min_periods=1).mean()
-        return slow_obv
+        return _windowed_raw_obv_series(self.close, self.volume, self.window)
 
     # aliases for compatibility
     def obv(self) -> pd.Series:

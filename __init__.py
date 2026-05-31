@@ -3204,6 +3204,7 @@ class BackgroundTop50Scanner:
                             "ticker": sym,
                             "conId": None,
                             "change": 0,
+                            "rank": idx,
                         })
                         securities["cusip"].append(cusip)
                         securities["ticker"].append(sym)
@@ -3252,6 +3253,7 @@ class BackgroundTop50Scanner:
                             "ticker": m["symbol"],
                             "conId": m.get("conId"),
                             "change": 0,
+                            "rank": m.get("rank", idx),
                         })
                         securities["cusip"].append(cusip)
                         securities["ticker"].append(m["symbol"])

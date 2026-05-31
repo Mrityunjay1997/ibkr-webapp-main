@@ -1265,6 +1265,7 @@
 													</div>
 													<button id="ttsMuteBtn" style="padding:6px 12px; background:#0073aa; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:bold;" onclick="toggleTTSMute()">🔊 Mute</button>
 													<button id="ttsStopBtn" style="padding:6px 12px; background:#c74a4a; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:bold;" onclick="stopTTSPlayback()">⏹️ Stop</button>
+													<button id="ttsClearHistoryBtn" style="padding:6px 12px; background:#4a7c59; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:bold;" onclick="clearNewsReadHistory()">🗑️ Clear News History</button>
 												</div>
 											</td>
 										</tr>
@@ -2668,6 +2669,12 @@ function cleanNewsArticleText(rawText) {
   // Maps headline text to timestamp when it was last read (to allow stale headlines to be re-read after 1 hour)
   let _recentlyReadHeadlines = new Map();
   let _headlineRereadThreshold = 3600000; // 1 hour in milliseconds - after this, a headline can be re-read
+  let _ttsWatchdogTimer = null;
+  let _ttsResumeTimer = null;
+
+  function _normalizeHeadlineKey(text) {
+    return (text || "").trim().toLowerCase().replace(/\s+/g, " ");
+  }
   
   // Get available voices and select based on preference
   function _getPreferredVoice() {
@@ -2713,15 +2720,22 @@ function cleanNewsArticleText(rawText) {
       return;
     }
     
-    const text = _headlineQueue.shift();
+    const item = _headlineQueue.shift();
+    const text = typeof item === "string" ? item : item.text;
+    const queueKey = typeof item === "string" ? _normalizeHeadlineKey(item) : item.key;
     _isPlayingHeadline = true;
     
     try {
       if (!window.speechSynthesis) {
         _isPlayingHeadline = false;
+        _queuedHeadlines.delete(queueKey);
         _processHeadlineQueue();
         return;
       }
+
+      try {
+        window.speechSynthesis.cancel();
+      } catch(e) {}
       
       const utter = new SpeechSynthesisUtterance(text);
       utter.rate = 1.0;
@@ -2735,25 +2749,53 @@ function cleanNewsArticleText(rawText) {
         utter.voice = preferredVoice;
       }
       
-      // When speech ends, process next item in queue
-      utter.onend = function() {
+      const cleanupAndContinue = function() {
+        if (_ttsWatchdogTimer) {
+          clearTimeout(_ttsWatchdogTimer);
+          _ttsWatchdogTimer = null;
+        }
+        if (_ttsResumeTimer) {
+          clearInterval(_ttsResumeTimer);
+          _ttsResumeTimer = null;
+        }
         _isPlayingHeadline = false;
+        _queuedHeadlines.delete(queueKey);
         // Add small delay before next item
         setTimeout(_processHeadlineQueue, 300);
       };
+
+      // When speech ends, process next item in queue
+      utter.onend = cleanupAndContinue;
       
       // Also handle errors and continue with next item
       utter.onerror = function() {
         console.warn("TTS error for:", text);
-        _isPlayingHeadline = false;
-        setTimeout(_processHeadlineQueue, 300);
+        cleanupAndContinue();
       };
+
+      const estimatedMs = Math.max(8000, Math.min(45000, text.length * 95 + 3000));
+      _ttsWatchdogTimer = setTimeout(function() {
+        if (_isPlayingHeadline) {
+          console.warn("TTS watchdog advanced stuck utterance:", text);
+          try { window.speechSynthesis.cancel(); } catch(e) {}
+          cleanupAndContinue();
+        }
+      }, estimatedMs);
+
+      _ttsResumeTimer = setInterval(function() {
+        try {
+          if (window.speechSynthesis && window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+          }
+        } catch(e) {}
+      }, 1000);
       
       window.speechSynthesis.speak(utter);
       console.log("TTS started speaking:", text, "voice:", preferredVoice ? preferredVoice.name : "default", "volume:", utter.volume);
     } catch(e) {
       console.warn("TTS failed:", e);
       _isPlayingHeadline = false;
+      _queuedHeadlines.delete(queueKey);
       _processHeadlineQueue();
     }
   }
@@ -2832,53 +2874,62 @@ function cleanNewsArticleText(rawText) {
     return num.toString();
   }
 
-  function readHeadlineAloud(text) {
+  function readHeadlineAloud(text, headlineTimestamp=null) {
     if (!text || text.trim() === "") return;
     
     const now = Date.now();
-    const normalizedText = text.trim().toLowerCase();
+    const normalizedText = _normalizeHeadlineKey(text);
     
-    // Check if already read in this scan cycle
-    if (_readHeadlinesCache.has(text)) {
+    // CRITICAL FIX: Only check if already read IN THIS SCAN CYCLE
+    // Do NOT prevent re-reads based on global "recently read" cache
+    // Users should hear headlines every loop as long as they're within the configured timeframe
+    if (_readHeadlinesCache.has(normalizedText)) {
       console.log("Headline already read in this scan cycle, skipping:", text);
-      return; // Already read, skip
+      return; // Already read in this scan, skip
     }
     
-    // Check if recently read (within threshold) - prevent duplicate reads across scan loops
-    if (_recentlyReadHeadlines.has(normalizedText)) {
-      const lastReadTime = _recentlyReadHeadlines.get(normalizedText);
-      const timeSinceLastRead = now - lastReadTime;
-      if (timeSinceLastRead < _headlineRereadThreshold) {
-        console.log("Headline recently read " + Math.round(timeSinceLastRead / 1000) + " seconds ago, skipping:", text);
-        return; // Read too recently, skip
-      }
-    }
-    
-    // Don't queue if already in current queue
-    if (_queuedHeadlines.has(text)) {
+    // Don't queue if already in current queue (prevent duplicate queueing within same render)
+    if (_queuedHeadlines.has(normalizedText)) {
       console.log("Headline already queued, skipping duplicate:", text);
-      return; // Already queued, skip duplicate
+      return; // Already queued in this cycle, skip duplicate
     }
     
     // Format headline text for natural TTS reading (convert price numbers to words)
     const formattedText = _formatHeadlineForTTS(text);
     
-    // Mark as read and as queued, then add to queue
-    _readHeadlinesCache.add(text);
-    _queuedHeadlines.add(text);
-    _recentlyReadHeadlines.set(normalizedText, now); // Track this headline across scan cycles
-    _headlineQueue.push(formattedText);
+    // Mark as read IN THIS CYCLE and as queued, then add to queue
+    // Note: _readHeadlinesCache gets cleared at the start of each new scan (renderResultsFromBackend)
+    _readHeadlinesCache.add(normalizedText);
+    _queuedHeadlines.add(normalizedText);
+    _headlineQueue.push({ text: formattedText, key: normalizedText });
     console.log("Headline queued for reading:", text, "queueLength:", _headlineQueue.length);
     _processHeadlineQueue();
   }
   
-  // Clear the cache and pending queue at the start of each new scan
-  // This avoids stale headline entries from previous scan cycles being replayed
-  // while still allowing the currently speaking headline to finish.
+  // Clear only the per-render duplicate cache. Keep the active speech queue intact
+  // so polling/render refreshes do not cut off headlines mid-loop.
   function _clearHeadlineCache() {
     _readHeadlinesCache.clear();
+  }
+
+  // User-facing function to clear ALL news history and start fresh
+  function clearNewsReadHistory() {
+    _readHeadlinesCache.clear();
     _queuedHeadlines.clear();
-    _headlineQueue = [];
+    _recentlyReadHeadlines.clear();
+    console.log("✓ News read history cleared. Headlines will read again in next scan.");
+    
+    // Visual feedback to user
+    const btn = document.getElementById('ttsClearHistoryBtn');
+    if (btn) {
+      const originalText = btn.innerHTML;
+      btn.innerHTML = "✓ Cleared";
+      btn.style.background = "#4a7c59";
+      setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.style.background = "#4a7c59";
+      }, 2000);
+    }
   }
 
   // Set TTS volume (0.0 to 1.0)
@@ -2914,7 +2965,16 @@ function cleanNewsArticleText(rawText) {
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
+    if (_ttsWatchdogTimer) {
+      clearTimeout(_ttsWatchdogTimer);
+      _ttsWatchdogTimer = null;
+    }
+    if (_ttsResumeTimer) {
+      clearInterval(_ttsResumeTimer);
+      _ttsResumeTimer = null;
+    }
     _headlineQueue = [];
+    _queuedHeadlines.clear();
     _isPlayingHeadline = false;
     console.log('TTS playback stopped');
   }
@@ -3204,6 +3264,25 @@ function cleanNewsArticleText(rawText) {
 function renderResultsFromBackend(response) {
     if (!response || !response.result) return;
 
+    function hasRenderableRows(result) {
+        if (!result || typeof result !== "object" || result === "disconnected") return false;
+        for (const etf in result) {
+            const groups = result[etf];
+            if (!groups || typeof groups !== "object") continue;
+            for (const groupKey in groups) {
+                const group = groups[groupKey];
+                if (Array.isArray(group) && group.length > 0) return true;
+                if (group && typeof group === "object" && Object.keys(group).length > 0) return true;
+            }
+        }
+        return false;
+    }
+
+    if (!hasRenderableRows(response.result) && response.result !== "disconnected") {
+        document.getElementById("validator").classList.remove("loader");
+        return;
+    }
+
     // Store scan stock data globally for multi-level order reference
     window._scanStockData = {};
     
@@ -3256,13 +3335,15 @@ function renderResultsFromBackend(response) {
                 ? msg[groupKey]
                 : Object.values(msg[groupKey] || {});
 
-            // Sort: stocks with most recent news first
+            // Keep scanner order stable across refresh loops.
             rows.sort(function(a, b) {
-                const tA = a.latestNewsTime || "";
-                const tB = b.latestNewsTime || "";
-                if (tA && tB) return tB.localeCompare(tA);
-                if (tA) return -1;
-                if (tB) return 1;
+                const rankA = Number(a.rank);
+                const rankB = Number(b.rank);
+                if (Number.isFinite(rankA) && Number.isFinite(rankB) && rankA !== rankB) {
+                    return rankA - rankB;
+                }
+                if (Number.isFinite(rankA) && !Number.isFinite(rankB)) return -1;
+                if (!Number.isFinite(rankA) && Number.isFinite(rankB)) return 1;
                 return (a.symbol || a.cusip || "").toString().localeCompare((b.symbol || b.cusip || "").toString());
             });
 
@@ -3533,18 +3614,13 @@ function renderResultsFromBackend(response) {
                 let sma200CrossoverStyle = "";
                 let obvStyle = "";
                 
-                // Check if 200 SMA bullish crossover and apply orange highlighting
+                // Check if 200 SMA bullish crossover and apply orange highlighting (row-level)
+                // NOTE: TTS disabled per user request to avoid interference with news headlines
                 if (dta.variableResults && dta.variableResults["sma200Crossover"]) {
-                    // No row-level style - highlighting is applied per-cell for smaSlow
-                    // Read alert if enabled
-                    try {
-                        const enableTTS = document.querySelector('input[name="EnableSMA200TTS"]');
-                        if (enableTTS && enableTTS.checked) {
-                            announceSMA200Bullish(dta.symbol);
-                        }
-                    } catch(e) {
-                        console.warn("200 SMA crossover TTS alert error:", e);
-                    }
+                    // Apply orange highlighting to entire row for 200 SMA bullish crossover
+                    sma200CrossoverStyle = " style='background:#FFA500;color:#000;font-weight:700'";
+                    console.log("200 SMA Bullish Crossover detected for", dta.symbol, "- highlighting orange (TTS disabled)");
+                    // TTS DISABLED: Removed announceSMA200Bullish call to prevent interference with news read-aloud
                 }
 
                 // Check OBV analysis and apply highlighting + TTS alerts
@@ -3628,9 +3704,21 @@ function renderResultsFromBackend(response) {
                     }
                 }
 
-                // Apply style in priority: RVOL (Brown) > Key Level (Yellow) > Price Change (Green) > OBV > sma200Crossover > newsKeyword
-                let appliedStyle = rvolStyle || keyLevelStyle || pctChangeStyle || obvStyle || sma200CrossoverStyle || _keywordRowStyle;
-                txt1 += `<tr class='${rowClass}'${appliedStyle}>`;
+                // Determine row style with priority: RVOL > KeyLevel > PctChange > OBV > SMA200Crossover
+                let rowStyle = "";
+                if (rvolStyle) {
+                    rowStyle = rvolStyle;
+                } else if (keyLevelStyle) {
+                    rowStyle = keyLevelStyle;
+                } else if (pctChangeStyle) {
+                    rowStyle = pctChangeStyle;
+                } else if (obvStyle) {
+                    rowStyle = obvStyle;
+                } else if (sma200CrossoverStyle) {
+                    rowStyle = sma200CrossoverStyle;
+                }
+                
+                txt1 += `<tr class='${rowClass}'${rowStyle}>`;
 
                 const headerCols = groupHeaderCols || [];
                 const pivotPrimary = groupPivotPrimary || [];
